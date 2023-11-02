@@ -6,7 +6,6 @@
  *
  *        This file implements the functionality required to inject Spack's build logic
  *        into the compiler/linker interface and drives the main entrypoint.
- * @version 0.1
  * @date 2023-10-20
  *
  * @copyright  Copyright 2013-2023 Lawrence Livermore National Security, LLC and other
@@ -53,6 +52,43 @@ std::wstring ConvertAnsiToWide(const std::string &str) {
     std::wstring wstr(count, 0);
     MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), &wstr[0], count);
     return wstr;
+}
+
+StrList split(std::string s, std::string delim) {
+    size_t pos_start = 0, pos_end;
+    size_t delim_len = delim.length();
+    std::string token;
+    StrList res;
+
+    while ( (pos_end = s.find(delim, pos_start)) != std::string::npos ) {
+        size_t token_len = pos_end - pos_start;
+        token = s.substr(pos_start, token_len);
+        pos_start = pos_end + delim_len;
+        if (token == delim || token.empty())
+        {
+            continue;
+        }
+        res.push_back(token);
+    }
+    res.push_back(s.substr(pos_start));
+    return res;
+}
+
+std::string getSpackEnv(const char* env) {
+    char* envVal = getenv(env);
+    return envVal ? envVal : std::string();
+}
+
+std::string getSpackEnv(std::string env) {
+    return getSpackEnv(env.c_str());
+}
+
+StrList getenvlist(std::string envVar, std::string delim = ";") {
+    std::string envValue = getSpackEnv(envVar);
+    if (! envValue.empty())
+        return split(envValue, delim);
+    else
+        return StrList();
 }
 
 SpackEnvState SpackEnvState::loadSpackEnvState() {
@@ -378,43 +414,6 @@ void validate_spack_env() {
 
 void die(std::string &cli ) {
     throw SpackCompilerException(cli);
-}
-
-StrList split(std::string s, std::string delim) {
-    size_t pos_start = 0, pos_end;
-    size_t delim_len = delim.length();
-    std::string token;
-    StrList res;
-
-    while ( (pos_end = s.find(delim, pos_start)) != std::string::npos ) {
-        size_t token_len = pos_end - pos_start;
-        token = s.substr(pos_start, token_len);
-        pos_start = pos_end + delim_len;
-        if (token == delim || token.empty())
-        {
-            continue;
-        }
-        res.push_back(token);
-    }
-    res.push_back(s.substr(pos_start));
-    return res;
-}
-
-std::string getSpackEnv(const char* env) {
-    char* envVal = getenv(env);
-    return envVal ? envVal : std::string();
-}
-
-std::string getSpackEnv(std::string env) {
-    return getSpackEnv(env.c_str());
-}
-
-StrList getenvlist(std::string envVar, std::string delim = ";") {
-    std::string envValue = getSpackEnv(envVar);
-    if (! envValue.empty())
-        return split(envValue, delim);
-    else
-        return StrList();
 }
 
 int main(int argc, char* argv[]) {

@@ -10,7 +10,6 @@
  *        This header files specificies the interface with which the compiler
  *        wrapper interacts with the Spack build env, and the associated calls to
  *        the compiler and linker
- * @version 0.1
  * @date 2023-10-20
  * @copyright  Copyright 2013-2023 Lawrence Livermore National Security, LLC and other
  *             Spack Project Developers. See the top-level COPYRIGHT file for details.
@@ -27,6 +26,8 @@
 #include <tchar.h>
 #include <stdio.h>
 #include <strsafe.h>
+
+#include "version.hxx"
 
 #define BUFSIZE 4096
 
