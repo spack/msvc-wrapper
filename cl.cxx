@@ -58,7 +58,7 @@ StrList split(std::string s, std::string delim) {
     size_t pos_start = 0, pos_end;
     size_t delim_len = delim.length();
     std::string token;
-    StrList res;
+    StrList res = StrList();
 
     while ( (pos_end = s.find(delim, pos_start)) != std::string::npos ) {
         size_t token_len = pos_end - pos_start;
