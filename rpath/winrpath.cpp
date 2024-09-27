@@ -457,7 +457,7 @@ std::vector<std::string> system_locations = {
     "wpax",
     "azure",
     "vcruntime",
-    "msvc"
+    "msvc",
     "WINDOWS",
     "system32"
 };
