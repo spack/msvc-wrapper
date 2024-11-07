@@ -57,3 +57,23 @@ StrList split(std::string s, std::string delim) {
     res.push_back(s.substr(pos_start));
     return res;
 }
+
+std::string getCmdOption(char ** begin, char ** end, const std::string & option)
+{
+    char ** itr = std::find(begin, end, option);
+    if (itr != end && ++itr != end)
+    {
+        return std::string(*itr);
+    }
+    return 0;
+}
+
+bool isPatch(const char ** begin, const char ** end) {
+    return std::find(begin, end, "patch") != end;
+}
+
+StrList parsePatch(const char ** args, int argc) {
+    for (int i = 0; args[i] != '\0'; ++i){
+        if strcmp
+    }
+}

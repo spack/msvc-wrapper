@@ -1,5 +1,9 @@
 #include <string>
 #include <vector>
+#include <windows.h>
+#include <tchar.h>
+#include <stdio.h>
+#include <strsafe.h>
 
 typedef std::vector<std::string> StrList;
 // String helper methods adding cxx20 features to cxx14
