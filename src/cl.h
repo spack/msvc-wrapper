@@ -31,8 +31,6 @@
 
 #define BUFSIZE 4096
 
-typedef std::vector<std::string> StrList;
-
 struct SpackEnvState{
     std::string addDebugFlags;
     StrList SpackFFlags;
@@ -162,7 +160,7 @@ private:
 
 class ToolChainFactory{
 public:
-    static std::unique_ptr<ToolChainInvocation> ParseToolChain(int argc, char const* const * argv);
+    static std::unique_ptr<ToolChainInvocation> ParseToolChain(char const* const * argv);
 private:
     static void stripPathandExe(std::string &command);
     static void stripExe(std::string &command);

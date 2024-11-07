@@ -121,9 +121,6 @@ private:
     bool replace;
 };
 
-
-
-
 class LibraryFinder {
 private:
     std::map<std::string, std::string> found_libs;

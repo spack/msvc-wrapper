@@ -30,7 +30,7 @@ LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
 
 
 .cxx.obj:
-	$(CC) /c $(cflags) $(cvars) $*.cxx
+	$(CC) /c $(cflags) $(cvars) src/$*.cxx
 
 all: install
 
@@ -40,3 +40,14 @@ cl.exe : cl.obj
 install : cl.exe
 	mkdir $(PREFIX)
 	copy cl.exe $(PREFIX)
+
+
+test: build_test_driver build_test_sample
+	rmdir /q /s test
+	mkdir tmp/test && cd tmp/test
+	copy cl.exe .
+	copy driver.exe .
+	copy calc.dll .
+	driver.exe cl.exe calc.dll
+
+
