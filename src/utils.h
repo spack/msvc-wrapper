@@ -26,3 +26,8 @@ std::wstring ConvertAnsiToWide(const std::string &str);
 // Returns vector of strings, if delim is present
 // Returns a single item list
 StrList split(std::string s, std::string delim);
+
+// Parse command line opts
+bool isPatch(const char ** begin, const char ** end);
+
+StrList parsePatch(const char ** args);

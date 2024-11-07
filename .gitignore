@@ -2,6 +2,7 @@
 
 /build/
 /install/
+/tmp/
 
 # Ignore .cxx build artifacts
 *.obj

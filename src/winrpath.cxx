@@ -274,10 +274,7 @@ void LibRename::computeDefFile() {
             0, NULL
         );
         throw WinRPathRenameException((char *)lpMsgBuf);
-    // We've suceeded in kicking off the toolchain run
-    // Explicitly close write handle to child proc stdout
-    // as it is no longer needed and if we do not then cannot
-    // determine when child proc is done
+
     CloseHandle(this->ChildStdOut_Wd);
 }
 
@@ -322,10 +319,6 @@ void LibRename::executeLibRename() {
             0, NULL
         );
         throw WinRPathRenameException((char *)lpMsgBuf);
-    // We've suceeded in kicking off the toolchain run
-    // Explicitly close write handle to child proc stdout
-    // as it is no longer needed and if we do not then cannot
-    // determine when child proc is done
     CloseHandle(this->ChildStdOut_Wd);
 }
 

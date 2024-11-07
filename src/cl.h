@@ -27,7 +27,7 @@
 #include <stdio.h>
 #include <strsafe.h>
 
-#include "version.hxx"
+#include "version.h"
 
 #define BUFSIZE 4096
 
