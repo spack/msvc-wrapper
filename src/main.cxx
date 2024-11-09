@@ -1,19 +1,37 @@
-#include "cl.h"
+/**
+ * @file main.cxx
+ * @author John Parent (john.parent@kitware.com)
+ * @brief A C++ wrapper file for the MSVC c and c++ compilers and linkers
+ *        created for the Spack package manager.
+ *
+ *        This file implements the functionality required to inject Spack's build logic
+ *        into the compiler/linker interface and drives the main entrypoint.
+ * @date 2023-10-20
+ *
+ * @copyright  Copyright 2013-2023 Lawrence Livermore National Security, LLC and other
+ *             Spack Project Developers. See the top-level COPYRIGHT file for details.
+ *             SPDX-License-Identifier: (Apache-2.0 OR MIT)
+ *
+ */
+
+#include "toolchain_factory.h"
 #include "winrpath.h"
 #include "utils.h"
 
-
 int main(int argc, char* argv[]) {
 
-    if (isPatch(argv, argv+argc)) {
-        StrList patch_args = parsePatch(argv);
-        LibRename patcher(patch_args[0], patch_args[1], true);
+    if(checkAndPrintHelp(argv[0])) {
+        return 0;
+    }
+    if (isPatch(argv[0])) {
+        std::map<std::string, std::string> patch_args = parsePatch(argv, argc);
+        LibRename patcher(patch_args.at("lib"), patch_args.at("name"), true);
         patcher.computeDefFile();
         patcher.executeLibRename();
     }
     else {
         // Ensure required variables are set
-        // validate_spack_env();
+        validate_spack_env();
         // Determine which tool we're trying to run
         std::unique_ptr<ToolChainInvocation> tchain(ToolChainFactory::ParseToolChain(argv));
         // Establish Spack compiler/linker modifications from env
@@ -25,6 +43,5 @@ int main(int argc, char* argv[]) {
         // Any errors caused by the run are reported via the
         // toolchain, if we reach here, we've had success, exit
     }
-
     return 0;
 }
