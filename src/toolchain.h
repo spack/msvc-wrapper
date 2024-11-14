@@ -12,9 +12,7 @@
 #include "version.h"
 #include "utils.h"
 #include "spack_env.h"
-
-#define BUFSIZE 4096
-
+#include "execute.h"
 
 class ToolChainInvocation{
 public:
@@ -24,17 +22,11 @@ public:
     virtual void invokeToolchain();
 protected:
     virtual void parse_command_args(char const* const* cli);
-    virtual void setupExecute();
-    bool pipeChildtoStdOut();
     virtual void loadToolchainDependentSpackVars(SpackEnvState &spackenv) = 0;
-    virtual void executeToolChainChild();
-    virtual void createChildPipes();
     std::string composeIncludeArg(std::string &include);
     std::string composeLibPathArg(std::string &libPath);
     void addExtraLibPaths(StrList paths);
     std::string composeCLI();
-    virtual void cleanupHandles();
-    virtual void safeHandleCleanup(HANDLE &handle);
 
     std::string command;
     std::string lang;
@@ -42,9 +34,6 @@ protected:
     StrList includeArgs;
     StrList libDirArgs;
     StrList libArgs;
-    HANDLE ChildStdOut_Rd;
-    HANDLE ChildStdOut_Wd;
-    PROCESS_INFORMATION procInfo;
-    STARTUPINFOW startInfo;
+    ExecuteCommand executor;
     std::string spackCommand;
 };

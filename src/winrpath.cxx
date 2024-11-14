@@ -9,11 +9,7 @@
 using CoffMembers = std::vector<coff_entry>;
 
 
-LinkerInvocation::LinkerInvocation(std::string linkLine): line(linkLine) {
-    this->is_exe = true;
-    this->libs = StrList();
-    this->tokens = StrList();
-}
+LinkerInvocation::LinkerInvocation(std::string linkLine): line(linkLine), is_exe(true) {}
 
 void LinkerInvocation::parse() {
 
@@ -99,7 +95,7 @@ bool CoffParser::parse() {
         entry.offset = this->coffStream->tell();
         this->coffStream->read_header(&entry.header);
         this->coffStream->read_member(entry.header, &entry.member);
-        members.push_back(entry);
+        members.emplace_back(entry);
     }
     this->coff_.members = members;
 }
@@ -160,7 +156,6 @@ bool CoffParser::normalize_name() {
     }
 }
 
-
 const std::map<char, char> special_character_to_path{
     {'|', '\\'},
     {';', ':'}
@@ -186,97 +181,16 @@ void replace_path_characters(char in[], int len) {
     }
 }
 
-void LibRename::setupExecute() {
-    PROCESS_INFORMATION piProcInfo;
-    STARTUPINFOW siStartInfo;
-    ZeroMemory( &piProcInfo, sizeof(PROCESS_INFORMATION) );
 
-    // Set up members of the STARTUPINFO structure.
-    // This structure specifies the STDIN and STDOUT handles for redirection.
-    ZeroMemory( &siStartInfo, sizeof(STARTUPINFOW) );
-    siStartInfo.cb = sizeof(STARTUPINFOW);
-    siStartInfo.hStdError = this->ChildStdOut_Wd;
-    siStartInfo.hStdOutput = this->ChildStdOut_Wd;
-    siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
-    this->procInfo = piProcInfo;
-    this->startInfo= siStartInfo;
-}
-
-bool LibRename::pipeChildtoStdOut() {
-    DWORD dwRead, dwWritten;
-    CHAR chBuf[BUFSIZE];
-    BOOL bSuccess = TRUE;
-    HANDLE hParentStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-
-    for (;;)
-    {
-        bSuccess = ReadFile( this->ChildStdOut_Rd, chBuf, BUFSIZE, &dwRead, NULL);
-        if( ! bSuccess || dwRead == 0 ) break;
-
-        bSuccess = WriteFile(hParentStdOut, chBuf,
-                            dwRead, &dwWritten, NULL);
-        if (! bSuccess ) break;
-    }
-    return bSuccess;
-}
-
-
-std::string LibRename::pipeChildToString() {
-    DWORD dwRead, dwWritten;
-    CHAR chBuf[BUFSIZE];
-    std::string out;
-    bool bSuccess;
-    HANDLE hParentStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-
-    for (;;)
-    {
-        bSuccess = ReadFile( this->ChildStdOut_Rd, chBuf, BUFSIZE, &dwRead, NULL);
-        if( ! bSuccess || dwRead == 0 ) break;
-
-        out = std::string(chBuf);
-    }
-    return out;
-}
 
 LibRename::LibRename(std::string lib, std::string name, bool replace) : replace(replace), lib(lib), name(name) {
     this->def_file = std::filesystem::path(this->lib).stem().string() + ".def";
 }
 
-
 std::string LibRename::compute_def_line() {
     return "/EXPORTS " + this->name + ".dll";
 }
 
-void LibRename::computeDefFile() {
-    LPVOID lpMsgBuf;
-    wchar_t * commandline = &ConvertAnsiToWide(this->compute_def_line())[0];
-    if(! CreateProcessW(
-        ConvertAnsiToWide("dumpbin.exe").c_str(),
-        commandline,
-        NULL,
-        NULL,
-        TRUE,
-        0,
-        NULL,
-        NULL,
-        &this->startInfo,
-        &this->procInfo)
-    )
-        // Handle errors coming from creating of child proc
-        FormatMessage(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER |
-            FORMAT_MESSAGE_FROM_SYSTEM |
-            FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL,
-            GetLastError(),
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            (LPTSTR) &lpMsgBuf,
-            0, NULL
-        );
-        throw WinRPathRenameException((char *)lpMsgBuf);
-
-    CloseHandle(this->ChildStdOut_Wd);
-}
 
 std::string LibRename::compute_rename_line() {
     std::string line("-def:");
@@ -291,50 +205,6 @@ std::string LibRename::compute_rename_line() {
     line += "-out:\""+ this->new_lib + "\"" + " " + this->lib;
     return line;
 }
-
-void LibRename::executeLibRename() {
-    LPVOID lpMsgBuf;
-    wchar_t * commandline = &ConvertAnsiToWide(this->compute_rename_line())[0];
-    if(! CreateProcessW(
-        ConvertAnsiToWide("lib.exe").c_str(),
-        commandline,
-        NULL,
-        NULL,
-        TRUE,
-        0,
-        NULL,
-        NULL,
-        &this->startInfo,
-        &this->procInfo)
-    )
-        // Handle errors coming from creating of child proc
-        FormatMessage(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER |
-            FORMAT_MESSAGE_FROM_SYSTEM |
-            FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL,
-            GetLastError(),
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            (LPTSTR) &lpMsgBuf,
-            0, NULL
-        );
-        throw WinRPathRenameException((char *)lpMsgBuf);
-    CloseHandle(this->ChildStdOut_Wd);
-}
-
-void LibRename::createChildPipes() {
-    SECURITY_ATTRIBUTES saAttr;
-    // Set the bInheritHandle flag so pipe handles are inherited.
-    saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
-    saAttr.bInheritHandle = TRUE;
-    saAttr.lpSecurityDescriptor = NULL;
-
-    if( !CreatePipe(&this->ChildStdOut_Rd, &this->ChildStdOut_Wd, &saAttr, 0) )
-        throw WinRPathRenameException("Could not create Child Pipe");
-    if ( !SetHandleInformation(ChildStdOut_Rd, HANDLE_FLAG_INHERIT, 0) )
-        throw WinRPathRenameException("Child pipe handle inappropriately inhereited");
-}
-
 
 LibraryFinder::LibraryFinder() : search_vars{"LINK", "LIB", "PATH", "TMP"} {}
 
@@ -400,7 +270,6 @@ std::vector<std::string> system_locations = {
     "WINDOWS",
     "system32"
 };
-
 
 bool LibraryFinder::is_system(std::string pth) {
     for (auto loc: system_locations) {
