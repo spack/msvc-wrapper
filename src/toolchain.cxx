@@ -27,18 +27,18 @@ void ToolChainInvocation::interpolateSpackEnv(SpackEnvState &spackenv) {
 }
 
 void ToolChainInvocation::invokeToolchain() {
-    StrList commandLine;
-    for(auto arg_list : {this->CommandArgs,
-                         this->includeArgs,
-                         this->libDirArgs,
-                         this->libArgs
-                        })
-    {
-        commandLine.insert(commandLine.end(), arg_list.begin(), arg_list.end());
-    }
+    StrList commandLine(this->composeCommandLists({
+        this->commandArgs,
+        this->includeArgs,
+        this->libArgs,
+        this->libDirArgs,
+        this->objArgs
+    }));
+
     this->executor = ExecuteCommand(  this->spackCommand,
                                       commandLine
                                     );
+    // Run first pass of command as requested by caller
     this->executor.execute();
 }
 
@@ -47,7 +47,7 @@ void ToolChainInvocation::parse_command_args(char const* const* cli) {
     // Includes come first
     for( char const* const* c = cli; *c; c++ ){
         std::string arg = std::string(*c);
-        if ( startswith(arg, "/I") )
+        if ( startswith(arg, "/I") ) {
             // We have an include arg
             // can have an optional space
             // check if there are characters after
@@ -57,6 +57,7 @@ void ToolChainInvocation::parse_command_args(char const* const* cli) {
                 this->includeArgs.push_back(arg);
             else
                 this->includeArgs.push_back(std::string(*(++c)));
+        }
         else if( endswith(arg, ".lib") )
             // Lib args are just libraries
             // provided like system32.lib on the
@@ -65,8 +66,10 @@ void ToolChainInvocation::parse_command_args(char const* const* cli) {
             // on MSVC but this is useful for filtering system libs
             // and adding all libs
             this->libArgs.push_back(arg);
+        else if ( endswith(arg, ".obj") )
+            this->objArgs.push_back(arg);
         else
-            this->CommandArgs.push_back(arg);
+            this->commandArgs.push_back(arg);
     }
 }
 
@@ -83,5 +86,15 @@ void ToolChainInvocation::addExtraLibPaths(StrList paths) {
     {
         this->libDirArgs.push_back(this->composeLibPathArg(libDir));
     }
+}
+
+StrList ToolChainInvocation::composeCommandLists(std::vector<StrList> &command_args)
+{
+    StrList commandLine;
+    for(auto arg_list : command_args)
+    {
+        commandLine.insert(commandLine.end(), arg_list.begin(), arg_list.end());
+    }
+    return commandLine;
 }
 

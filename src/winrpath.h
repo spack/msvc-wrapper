@@ -90,9 +90,11 @@ private:
     std::vector<std::string> libs;
     bool is_exe;
 public:
-    LinkerInvocation(std::string linkLine);
+    LinkerInvocation(const std::string &linkLine);
+    LinkerInvocation(const StrList &linkline);
     void parse();
     bool is_exe_link();
+    std::string get_name();
 };
 
 

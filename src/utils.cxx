@@ -68,6 +68,17 @@ StrList split(std::string s, std::string delim)
     return res;
 }
 
+std::string join(const StrList &args, const std::string &join_char = " ")
+{
+    std::string joined_path;
+    for(std::string arg : args) {
+       joined_path += arg + " ";
+    }
+    // Remove trailing space
+    joined_path.pop_back();
+    return joined_path;
+}
+
 std::string getCmdOption(char ** begin, char ** end, const std::string & option)
 {
     char ** itr = std::find(begin, end, option);

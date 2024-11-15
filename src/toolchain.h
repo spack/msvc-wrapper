@@ -17,7 +17,7 @@
 class ToolChainInvocation{
 public:
     ToolChainInvocation(std::string command, char const* const* cli);
-    virtual ~ToolChainInvocation();
+    virtual ~ToolChainInvocation() {}
     virtual void interpolateSpackEnv(SpackEnvState &spackenv);
     virtual void invokeToolchain();
 protected:
@@ -27,13 +27,15 @@ protected:
     std::string composeLibPathArg(std::string &libPath);
     void addExtraLibPaths(StrList paths);
     std::string composeCLI();
+    StrList composeCommandLists(std::vector<StrList> &command_args);
 
     std::string command;
     std::string lang;
-    StrList CommandArgs;
+    StrList commandArgs;
     StrList includeArgs;
     StrList libDirArgs;
     StrList libArgs;
+    StrList objArgs;
     ExecuteCommand executor;
     std::string spackCommand;
 };

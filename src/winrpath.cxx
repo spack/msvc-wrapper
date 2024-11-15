@@ -9,12 +9,18 @@
 using CoffMembers = std::vector<coff_entry>;
 
 
-LinkerInvocation::LinkerInvocation(std::string linkLine): line(linkLine), is_exe(true) {}
-
-void LinkerInvocation::parse() {
-
+LinkerInvocation::LinkerInvocation(const std::string &linkLine): line(linkLine), is_exe(true) {
     StrList tokenized_line = split(this->line, " ");
     this->tokens = tokenized_line;
+
+}
+
+LinkerInvocation::LinkerInvocation(const StrList &linkLine) {
+    this->tokens = linkLine;
+    this->line = join(linkLine);
+}
+
+void LinkerInvocation::parse() {
     for (auto token = this->tokens.begin(); token != this->tokens.end(); ++token) {
         if (endswith(*token, ".lib")) {
             this->libs.push_back(*token);
@@ -29,6 +35,11 @@ void LinkerInvocation::parse() {
             this->output = split(*token, ":")[1];
         }
     }
+}
+
+std::string LinkerInvocation::get_name()
+{
+    return this->name;
 }
 
 bool LinkerInvocation::is_exe_link() {
@@ -181,8 +192,6 @@ void replace_path_characters(char in[], int len) {
     }
 }
 
-
-
 LibRename::LibRename(std::string lib, std::string name, bool replace) : replace(replace), lib(lib), name(name) {
     this->def_file = std::filesystem::path(this->lib).stem().string() + ".def";
 }
@@ -190,7 +199,6 @@ LibRename::LibRename(std::string lib, std::string name, bool replace) : replace(
 std::string LibRename::compute_def_line() {
     return "/EXPORTS " + this->name + ".dll";
 }
-
 
 std::string LibRename::compute_rename_line() {
     std::string line("-def:");

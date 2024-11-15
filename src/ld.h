@@ -9,7 +9,9 @@
 class LdInvocation : public ToolChainInvocation {
 public:
     using ToolChainInvocation::ToolChainInvocation;
+    virtual void invokeToolchain();
 private:
     void loadToolchainDependentSpackVars(SpackEnvState &spackenv);
     std::string lang = "link";
+    ExecuteCommand rpath_executor;
 };

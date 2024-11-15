@@ -65,6 +65,10 @@ std::wstring ConvertAnsiToWide(const std::string &str);
 // Returns a single item list
 StrList split(std::string s, std::string delim);
 
+
+// Joins vector of strings by join character
+std::string join(const StrList &strs, const std::string &join_char = " ");
+
 // Parse command line opts
 bool isPatch(const char * arg);
 
