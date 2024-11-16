@@ -12,7 +12,7 @@
 #include <strsafe.h>
 #include <filesystem>
 
-
+#include "execute.h"
 
 #pragma pack(push, r1, 1)
 typedef struct coff_member {
@@ -101,21 +101,14 @@ public:
 class LibRename {
 public:
     LibRename(std::string lib, std::string name, bool replace);
-    void setupExecute();
     void executeLibRename();
     void computeDefFile();
-    bool pipeChildtoStdOut();
-    void createChildPipes();
-    std::string pipeChildToString();
     std::string compute_rename_line();
     std::string compute_def_line();
-    bool write_def();
 
 private:
-    HANDLE ChildStdOut_Rd;
-    HANDLE ChildStdOut_Wd;
-    PROCESS_INFORMATION procInfo;
-    STARTUPINFOW startInfo;
+    ExecuteCommand def_executor;
+    ExecuteCommand lib_executor;
     std::string lib;
     std::string name;
     std::string new_lib;

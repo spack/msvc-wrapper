@@ -194,10 +194,23 @@ void replace_path_characters(char in[], int len) {
 
 LibRename::LibRename(std::string lib, std::string name, bool replace) : replace(replace), lib(lib), name(name) {
     this->def_file = std::filesystem::path(this->lib).stem().string() + ".def";
+    this->def_executor = ExecuteCommand("dumpbin.exe", this->compute_def_line());
+    this->lib_executor = ExecuteCommand("lib.exe", this->compute_rename_line());
 }
 
 std::string LibRename::compute_def_line() {
     return "/EXPORTS " + this->name + ".dll";
+}
+
+
+void LibRename::computeDefFile()
+{
+    this->def_executor.execute(this->def_file);
+}
+
+void LibRename::executeLibRename()
+{
+    this->lib_executor.execute();
 }
 
 std::string LibRename::compute_rename_line() {

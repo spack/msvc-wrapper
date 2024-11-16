@@ -5,7 +5,7 @@
 
 
 // String helper methods adding cxx20 features to cxx14
-bool startswith(std::string &arg, std::string &match)
+bool startswith(const std::string &arg, const std::string &match)
 {
     size_t matchLen = match.size();
     if ( matchLen > arg.size() )
@@ -13,12 +13,12 @@ bool startswith(std::string &arg, std::string &match)
     return arg.compare(0, matchLen, match) == 0;
 }
 
-bool startswith(std::string &arg, const char * match)
+bool startswith(const std::string &arg, const char * match)
 {
     return startswith(arg, (std::string)match);
 }
 
-bool endswith(std::string &arg, std::string &match)
+bool endswith(const std::string &arg, const std::string &match)
 {
     size_t matchLen = match.size();
     if ( matchLen > arg.size() )
@@ -26,7 +26,7 @@ bool endswith(std::string &arg, std::string &match)
     return arg.compare(arg.size() - matchLen, matchLen, match) == 0;
 }
 
-bool endswith(std::string &arg, char const* match)
+bool endswith(const std::string &arg, char const* match)
 {
     return endswith(arg, (std::string)match);
 }
@@ -47,7 +47,7 @@ std::wstring ConvertAnsiToWide(const std::string &str)
     return wstr;
 }
 
-StrList split(std::string s, std::string delim)
+StrList split(const std::string &s, const std::string &delim)
 {
     size_t pos_start = 0, pos_end;
     size_t delim_len = delim.length();
@@ -66,6 +66,20 @@ StrList split(std::string s, std::string delim)
     }
     res.push_back(s.substr(pos_start));
     return res;
+}
+
+std::string strip(const std::string &s, const std::string &substr)
+{
+    if(!endswith(s, substr))
+        return s;
+    return s.substr(0, s.size()-substr.size());
+}
+
+std::string lstrip(const std::string &s, const std::string &substr)
+{
+    if(!startswith(s, substr))
+        return s;
+    return s.substr(substr.size()-1, s.size());
 }
 
 std::string join(const StrList &args, const std::string &join_char = " ")
@@ -89,13 +103,13 @@ std::string getCmdOption(char ** begin, char ** end, const std::string & option)
     return 0;
 }
 
-bool isPatch(const char * arg)
+bool isRelocate(const char * arg)
 {
-    return strcmp(arg, "patch");
+    return strcmp(arg, "relocate");
 }
 
 
-void redefinedArgCheck(std::map<std::string, std::string> &args, const char * arg, const char * cli_name)
+void redefinedArgCheck(const std::map<std::string, std::string> &args, const char * arg, const char * cli_name)
 {
     if ( args.find(arg) != args.end()) {
         char * error_line = strcat("Invalid command line, too many values for argument: ", cli_name);
@@ -103,7 +117,7 @@ void redefinedArgCheck(std::map<std::string, std::string> &args, const char * ar
     }
 }
 
-void checkArgumentPresence(std::map<std::string, std::string> &args, const char * val, bool required = true)
+void checkArgumentPresence(const std::map<std::string, std::string> &args, const char * val, bool required = true)
 {
     if (args.find(val) == args.end()) {
         if (required) {
@@ -115,7 +129,7 @@ void checkArgumentPresence(std::map<std::string, std::string> &args, const char 
     }
 }
 
-std::map<std::string, std::string> parsePatch(const char ** args, int argc) {
+std::map<std::string, std::string> parseRelocate(const char ** args, int argc) {
     std::map<std::string, std::string> opts;
     for (int i = 0; i < argc; ++i){
         if (strcmp(args[i], "--library")) {
@@ -152,11 +166,11 @@ std::string getSpackEnv(const char* env) {
     return envVal ? envVal : std::string();
 }
 
-std::string getSpackEnv(std::string env) {
+std::string getSpackEnv(const std::string &env) {
     return getSpackEnv(env.c_str());
 }
 
-StrList getenvlist(std::string envVar, std::string delim = ";") {
+StrList getenvlist(const std::string &envVar, const std::string &delim = ";") {
     std::string envValue = getSpackEnv(envVar);
     if (! envValue.empty())
         return split(envValue, delim);

@@ -23,11 +23,11 @@ int main(int argc, char* argv[]) {
     if(checkAndPrintHelp(argv[0])) {
         return 0;
     }
-    if (isPatch(argv[0])) {
-        std::map<std::string, std::string> patch_args = parsePatch(argv, argc);
-        LibRename patcher(patch_args.at("lib"), patch_args.at("name"), true);
-        patcher.computeDefFile();
-        patcher.executeLibRename();
+    if (isRelocate(argv[0])) {
+        std::map<std::string, std::string> patch_args = parseRelocate(argv, argc);
+        LibRename rpath_lib(patch_args.at("lib"), patch_args.at("name"), true);
+        rpath_lib.computeDefFile();
+        rpath_lib.executeLibRename();
     }
     else {
         // Ensure required variables are set
