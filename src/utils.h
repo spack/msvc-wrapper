@@ -77,4 +77,4 @@ bool isRelocate(const char * arg);
 std::map<std::string, std::string> parseRelocate(const char ** args, int argc);
 
 // Writes CLI help message to stdout
-bool checkAndPrintHelp(const char * arg);
+bool checkAndPrintHelp(const char * arg, int argc);

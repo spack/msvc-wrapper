@@ -202,7 +202,6 @@ std::string LibRename::compute_def_line() {
     return "/EXPORTS " + this->name + ".dll";
 }
 
-
 void LibRename::computeDefFile()
 {
     this->def_executor.execute(this->def_file);

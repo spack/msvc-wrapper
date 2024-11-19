@@ -220,9 +220,9 @@ void die(std::string &cli ) {
     throw SpackCompilerException(cli);
 }
 
-bool checkAndPrintHelp(const char * arg)
+bool checkAndPrintHelp(const char * arg, int argc)
 {
-    if(strcmp(arg, "--help") || strcmp(arg, "-h")) {
+    if(strcmp(arg, "--help") || strcmp(arg, "-h") || argc < 2) {
         std::cout << "Spack's Windows compiler wrapper\n";
         std::cout << "\n";
         std::cout << "  Description:\n";

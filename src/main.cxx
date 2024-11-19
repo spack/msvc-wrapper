@@ -20,7 +20,7 @@
 
 int main(int argc, char* argv[]) {
 
-    if(checkAndPrintHelp(argv[0])) {
+    if(checkAndPrintHelp(argv[0], argc)) {
         return 0;
     }
     if (isRelocate(argv[0])) {
