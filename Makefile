@@ -30,7 +30,7 @@ LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
 
 
 .cxx.obj:
-	$(CC) /c $(cflags) $(cvars) src/$*.cxx
+	$(CC) /c $(cflags) $(cvars) /I:src src/$*.cxx
 
 all: install
 
@@ -41,13 +41,28 @@ install : cl.exe
 	mkdir $(PREFIX)
 	copy cl.exe $(PREFIX)
 
+build_test_driver: test/test_driver.obj
+	rmdir /q /s tmp
+	mkdir tmp
+	lib $(LFLAGS) *.obj /out:wrapper.lib
+	link $(LFLAGS) test/test_driver.obj wrapper.lib /out:driver.exe
+	move driver.exe tmp/driver.exe
+
+build_test_sample: test/calc.obj
+	link $(LFLAGS) test/calc.obj /out:calc.dll /dll
+	move calc.dll tmp/calc.dll
 
 test: build_test_driver build_test_sample
-	rmdir /q /s test
 	mkdir tmp/test && cd tmp/test
-	copy cl.exe .
-	copy driver.exe .
-	copy calc.dll .
-	driver.exe cl.exe calc.dll
+	move ../driver.exe .
+	move ../calc.dll .
+	# create symlinks to test the different toolchains
+	copy ../..cl.exe cl.exe
+	mklink /S link.exe cl.exe
+	mklink /S ifx.exe cl.exe
+	mklink /S relocate.exe cl.exe
+	cl.exe /c ../../test/calc.cpp
+	link.exe /dll calc.obj
+	# driver.exe calc.dll
 
 

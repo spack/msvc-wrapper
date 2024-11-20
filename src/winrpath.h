@@ -73,12 +73,10 @@ private:
     void parse_names();
 public:
     CoffParser(CoffReader * cr);
-    ~CoffParser();
+    ~CoffParser() = default;
     bool parse();
     bool is_imp_lib();
     bool normalize_name();
-    bool add_placeholder();
-    bool relocate();
 };
 
 class LinkerInvocation {
