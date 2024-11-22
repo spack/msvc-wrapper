@@ -65,7 +65,7 @@ void ExecuteCommand::executeToolChainChild()
     LPVOID lpMsgBuf;
     wchar_t * commandLine = &ConvertAnsiToWide(this->composeCLI())[0];
     if(! CreateProcessW(
-        ConvertAnsiToWide(this->baseCommand).c_str(),
+        NULL,
         commandLine,
         NULL,
         NULL,
@@ -149,6 +149,7 @@ void ExecuteCommand::safeHandleCleanup(HANDLE &handle)
 std::string ExecuteCommand::composeCLI()
 {
     std::string CLI;
+    CLI += this->baseCommand + " ";
     auto addToCLI = [&](StrList args){
         for( auto& arg: args ){
             CLI += arg + " ";
