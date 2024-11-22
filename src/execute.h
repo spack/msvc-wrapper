@@ -16,10 +16,7 @@ class ExecuteCommand {
 public:
     // constructor for single executable/arguments + command in one string
     ExecuteCommand(std::string command);
-    // constructor for command + arguments
-    template<typename... Arguments>
-    ExecuteCommand(std::string arg, Arguments... args);
-    ExecuteCommand(std::string arg, StrList args);
+    ExecuteCommand(std::string arg, std::vector<std::string> args);
     ExecuteCommand() = default;
     ~ExecuteCommand();
     void execute(const std::string &filename = empty);

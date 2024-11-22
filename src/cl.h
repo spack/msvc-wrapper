@@ -16,7 +16,7 @@
  *             SPDX-License-Identifier: (Apache-2.0 OR MIT)
  *
  */
-
+#pragma once
 
 #include <iostream>
 #include <string>
@@ -39,7 +39,7 @@
 class ClInvocation : public ToolChainInvocation {
 public:
     using ToolChainInvocation::ToolChainInvocation;
-private:
+protected:
     void loadToolchainDependentSpackVars(SpackEnvState &spackenv);
     std::string lang = "c/c++";
 };

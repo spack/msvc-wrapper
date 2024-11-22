@@ -7,17 +7,17 @@
 #include <map>
 #include <iostream>
 #include <fstream>
-#include <winnt.h>
 #include <windows.h>
+#include <winnt.h>
 #include <strsafe.h>
-#include <filesystem>
 
+#include "utils.h"
 #include "execute.h"
 
 #pragma pack(push, r1, 1)
 typedef struct coff_member {
     char data[];
-};
+} coff_member;
 
 typedef struct coff_header {
     char file_name[16];
@@ -27,19 +27,19 @@ typedef struct coff_header {
 	char file_mode[8];
 	char file_size[10];
 	wchar_t end_marker;
-};
+} coff_header;
 #pragma pack(pop, r1)
 
 typedef struct coff_entry {
     std::streampos offset;
     coff_header header;
     coff_member member;
-};
+} coff_entry;
 
 typedef struct coff {
     char signature[IMAGE_ARCHIVE_START_SIZE];
     std::vector<coff_entry> members;
-};
+} coff;
 
 /**
  * @brief Encapsulates a stream reading a COFF file object
@@ -50,7 +50,7 @@ private:
     std::string _file;
 public:
     CoffReader(std::string file);
-    ~CoffReader();
+    ~CoffReader() = default;
     bool Open();
     bool Close();
     bool isOpen();
@@ -80,6 +80,13 @@ public:
 };
 
 class LinkerInvocation {
+public:
+    LinkerInvocation(const std::string &linkLine);
+    LinkerInvocation(const StrList &linkline);
+    ~LinkerInvocation() = default;
+    void parse();
+    bool is_exe_link();
+    std::string get_name();
 private:
     std::string line;
     std::vector<std::string> tokens;
@@ -87,12 +94,6 @@ private:
     std::string output;
     std::vector<std::string> libs;
     bool is_exe;
-public:
-    LinkerInvocation(const std::string &linkLine);
-    LinkerInvocation(const StrList &linkline);
-    void parse();
-    bool is_exe_link();
-    std::string get_name();
 };
 
 
@@ -114,19 +115,6 @@ private:
     bool replace;
 };
 
-class LibraryFinder {
-private:
-    std::map<std::string, std::string> found_libs;
-    std::vector<std::string> search_vars;
-    std::map<std::string, std::vector<std::string>> evald_search_paths;
-    std::filesystem::path finder(std::filesystem::path pth);
-    std::filesystem::path finder(std::string pth);
-    bool is_system(std::string pth);
-public:
-    LibraryFinder();
-    std::string find_library(std::string lib_name);
-    void eval_search_paths();
-};
 
 class WinRPathRenameException : public std::exception {
 public:

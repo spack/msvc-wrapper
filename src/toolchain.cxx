@@ -88,7 +88,7 @@ void ToolChainInvocation::addExtraLibPaths(StrList paths) {
     }
 }
 
-StrList ToolChainInvocation::composeCommandLists(std::vector<StrList> &command_args)
+StrList ToolChainInvocation::composeCommandLists(std::vector<StrList> command_args)
 {
     StrList commandLine;
     for(auto arg_list : command_args)
@@ -97,4 +97,3 @@ StrList ToolChainInvocation::composeCommandLists(std::vector<StrList> &command_a
     }
     return commandLine;
 }
-

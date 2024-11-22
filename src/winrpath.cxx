@@ -9,6 +9,31 @@
 using CoffMembers = std::vector<coff_entry>;
 
 
+const std::map<char, char> special_character_to_path{
+    {'|', '\\'},
+    {';', ':'}
+};
+
+const std::map<char, char> path_to_special_characters{
+    {'\\', '|'},
+    {'/', '|'},
+    {':', ';'}
+};
+
+void replace_special_characters(char in[], int len) {
+    for (int i = 0; i < len; ++i) {
+        if (special_character_to_path.count(in[i]))
+            in[i] = special_character_to_path.at(in[i]);
+    }
+}
+
+void replace_path_characters(char in[], int len) {
+    for (int i = 0; i < len; i++ ) {
+        if (path_to_special_characters.count(in[i]))
+            in[i] = path_to_special_characters.at(in[i]);
+    }
+}
+
 LinkerInvocation::LinkerInvocation(const std::string &linkLine): line(linkLine), is_exe(true) {
     StrList tokenized_line = split(this->line, " ");
     this->tokens = tokenized_line;
@@ -83,7 +108,7 @@ std::streampos CoffReader::tell() {
     return this->pe_stream.tellg();
 }
 
-void CoffReader::seek(int bytes=-1) {
+void CoffReader::seek(int bytes) {
     this->pe_stream.seekg(bytes);
     this->pe_stream.seekp(bytes);
 }
@@ -109,6 +134,7 @@ bool CoffParser::parse() {
         members.emplace_back(entry);
     }
     this->coff_.members = members;
+    return true;
 }
 
 void CoffParser::parse_names() {
@@ -165,37 +191,13 @@ bool CoffParser::normalize_name() {
             this->coffStream->write_name(mem.header.file_name, 16);
         }
     }
-}
-
-const std::map<char, char> special_character_to_path{
-    {'|', '\\'},
-    {';', ':'}
-};
-
-const std::map<char, char> path_to_special_characters{
-    {'\\', '|'},
-    {'/', '|'},
-    {':', ';'}
-};
-
-void replace_special_characters(char in[], int len) {
-    for (int i = 0; i < len; ++i) {
-        if (special_character_to_path.count(in[i]))
-            in[i] = special_character_to_path.at(in[i]);
-    }
-}
-
-void replace_path_characters(char in[], int len) {
-    for (int i = 0; i < len; i++ ) {
-        if (path_to_special_characters.count(in[i]))
-            in[i] = path_to_special_characters.at(in[i]);
-    }
+    return true;
 }
 
 LibRename::LibRename(std::string lib, std::string name, bool replace) : replace(replace), lib(lib), name(name) {
-    this->def_file = std::filesystem::path(this->lib).stem().string() + ".def";
-    this->def_executor = ExecuteCommand("dumpbin.exe", this->compute_def_line());
-    this->lib_executor = ExecuteCommand("lib.exe", this->compute_rename_line());
+    this->def_file = stem(this->lib) + ".def";
+    this->def_executor = ExecuteCommand("dumpbin.exe", {this->compute_def_line()});
+    this->lib_executor = ExecuteCommand("lib.exe", {this->compute_rename_line()});
 }
 
 std::string LibRename::compute_def_line() {
@@ -217,86 +219,13 @@ std::string LibRename::compute_rename_line() {
     line += this->def_file + " ";
     line += "-name:";
     line += this->name + " ";
-    std::string name(std::filesystem::path(this->lib).stem().string());
+    std::string name(stem(this->lib));
     if (!this->replace)
         this->new_lib = name + "abs-name.lib";
     else
         this->new_lib = this->lib;
     line += "-out:\""+ this->new_lib + "\"" + " " + this->lib;
     return line;
-}
-
-LibraryFinder::LibraryFinder() : search_vars{"LINK", "LIB", "PATH", "TMP"} {}
-
-std::string LibraryFinder::find_library(std::string lib_name) {
-    // Read env variables and split into paths
-    // Only ever run once
-    // First check if lib is absolute path
-    std::filesystem::path lib_path(lib_name);
-    if (this->is_system(lib_name)) {
-        return std::string();
-    }
-    if (lib_path.is_absolute())
-        return lib_path.string();
-    // next search the CWD
-    std::filesystem::path cwd(std::filesystem::current_path());
-    auto res = this->finder(cwd);
-    if (!res.empty())
-        return res.string();
-    this->eval_search_paths();
-    // next search env variable paths
-    for (std::string var: this->search_vars) {
-        std::vector<std::string> searchable_paths = this->evald_search_paths.at(var);
-        for (std::string pth: searchable_paths) {
-            auto res = this->finder(pth);
-            if (!res.empty())
-                return res.string();
-        }
-    }
-}
-
-void LibraryFinder::eval_search_paths() {
-    if (!this->evald_search_paths.empty())
-        return;
-    for (std::string var: this->search_vars) {
-        std::string envVal = getenv(var.c_str());
-        if (!envVal.empty())
-            this->evald_search_paths[var] = split(envVal, ";");
-    }
-}
-
-std::filesystem::path LibraryFinder::finder(std::filesystem::path pth) {
-    for (auto const& dir_entry: std::filesystem::directory_iterator{pth}) {
-        auto candidate_file = dir_entry.path() / pth;
-        if (std::filesystem::exists(candidate_file))
-            return candidate_file;
-    }
-}
-
-std::filesystem::path LibraryFinder::finder(std::string pth) {
-    this->finder(std::filesystem::path(pth));
-}
-
-std::vector<std::string> system_locations = {
-    "api-ms-",
-    "ext-ms-",
-    "ieshims",
-    "emclient",
-    "devicelock",
-    "wpax",
-    "azure",
-    "vcruntime",
-    "msvc",
-    "WINDOWS",
-    "system32"
-};
-
-bool LibraryFinder::is_system(std::string pth) {
-    for (auto loc: system_locations) {
-        if (pth.find(loc) != std::string::npos) {
-            return true;
-        }
-    }
 }
 
 char const * WinRPathRenameException::what() {

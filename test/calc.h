@@ -6,5 +6,4 @@
 #define CALC_API __declspec(dllimport)
 #endif
 
-extern "C" CALC_API int add(int &a, int &b);
-
+extern "C" CALC_API int add(int a, int b);

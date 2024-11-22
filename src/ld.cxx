@@ -39,8 +39,6 @@ void LdInvocation::invokeToolchain()
         CoffParser coff(&cr);
         coff.parse();
         coff.normalize_name();
-        // filesystem::rename removes 2nd arg if it exists and then
-        // points the name at the file in the first arg
-        std::filesystem::rename(abs_imp_lib_name.c_str(), imp_lib_name.c_str());
+        std::rename(abs_imp_lib_name.c_str(), imp_lib_name.c_str());
     }
 }

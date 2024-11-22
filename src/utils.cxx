@@ -2,6 +2,7 @@
 
 #include <map>
 #include <iostream>
+#include <string>
 
 
 // String helper methods adding cxx20 features to cxx14
@@ -82,7 +83,7 @@ std::string lstrip(const std::string &s, const std::string &substr)
     return s.substr(substr.size()-1, s.size());
 }
 
-std::string join(const StrList &args, const std::string &join_char = " ")
+std::string join(const StrList &args, const std::string &join_char)
 {
     std::string joined_path;
     for(std::string arg : args) {
@@ -105,7 +106,7 @@ std::string getCmdOption(char ** begin, char ** end, const std::string & option)
 
 bool isRelocate(const char * arg)
 {
-    return strcmp(arg, "relocate");
+    return strcmp(arg, "relocate") == 0;
 }
 
 
@@ -131,28 +132,28 @@ void checkArgumentPresence(const std::map<std::string, std::string> &args, const
 
 std::map<std::string, std::string> parseRelocate(const char ** args, int argc) {
     std::map<std::string, std::string> opts;
-    for (int i = 0; i < argc; ++i){
+    for (int i = 0; i < argc; i++){
         if (strcmp(args[i], "--library")) {
             redefinedArgCheck(opts, "lib", "--library");
-            opts.insert("lib", args[++i]);
+            opts.insert(std::pair<std::string, std::string>("lib", args[++i]));
         }
         else if (endswith((std::string)args[i], ".dll")) {
             redefinedArgCheck(opts, "lib", "lib");
-            opts.insert("lib", args[i]);
+            opts.insert(std::pair<std::string, std::string>("lib", args[i]));
         }
         else if (strcmp(args[i], "--name")) {
             redefinedArgCheck(opts, "name", "--name");
-            opts.insert("name", args[++i]);
+            opts.insert(std::pair<std::string, std::string>("name", args[++i]));
         }
         else if (strcmp(args[i], "-n")) {
             redefinedArgCheck(opts, "name", "-n");
-            opts.insert("name", args[++i]);
+            opts.insert(std::pair<std::string, std::string>("name", args[++i]));
         }
         else {
             // arg was not given via named arg, any remaining positional arg is assumed to be
             // a name if name was not already defined
             redefinedArgCheck(opts, "name", "name");
-            opts.insert("name", args[i]);
+            opts.insert(std::pair<std::string, std::string>("name", args[i]));
         }
     }
     checkArgumentPresence(opts, "lib");
@@ -170,7 +171,7 @@ std::string getSpackEnv(const std::string &env) {
     return getSpackEnv(env.c_str());
 }
 
-StrList getenvlist(const std::string &envVar, const std::string &delim = ";") {
+StrList getenvlist(const std::string &envVar, const std::string &delim) {
     std::string envValue = getSpackEnv(envVar);
     if (! envValue.empty())
         return split(envValue, delim);
@@ -220,25 +221,47 @@ void die(std::string &cli ) {
     throw SpackCompilerException(cli);
 }
 
-bool checkAndPrintHelp(const char * arg, int argc)
+
+bool print_help()
 {
-    if(strcmp(arg, "--help") || strcmp(arg, "-h") || argc < 2) {
-        std::cout << "Spack's Windows compiler wrapper\n";
-        std::cout << "\n";
-        std::cout << "  Description:\n";
-        std::cout << "      This compiler wrapper is designed to abstact the functions\n";
-        std::cout << "      of the MSVC and Intel C/C++/Fortran compilers and linkers.\n";
-        std::cout << "      This wrapper modifies linker behavior by injecting the absolute path\n";
-        std::cout << "      to any dll in its import library, allowing for RPATH link behavior.\n";
-        std::cout << "      RPaths can be relocated simply by providing this wrapper a dll and a new path.\n";
-        std::cout << "\n";
-        std::cout << "  Useage:\n";
-        std::cout << "      To use this as a compiler/linker wrapper, simply invoke the compiler/linker\n";
-        std::cout << "      as normal, with the properly named link to this compiler wrapper in the PATH\n";
-        std::cout << "      To preform relocation, invoke the 'patch' symlink to this file with the following arguments:\n";
-        std::cout << "          <lib-name>.dll or --library <lib-name>.dll\n";
-        std::cout << "          --name name|-n name| name\n";
-        std::cout << "\n";
-        std::cout << "          If using the positional form the order does not matter.";
+    std::cout << "Spack's Windows compiler wrapper\n";
+    std::cout << "\n";
+    std::cout << "  Description:\n";
+    std::cout << "      This compiler wrapper is designed to abstact the functions\n";
+    std::cout << "      of the MSVC and Intel C/C++/Fortran compilers and linkers.\n";
+    std::cout << "      This wrapper modifies linker behavior by injecting the absolute path\n";
+    std::cout << "      to any dll in its import library, allowing for RPATH link behavior.\n";
+    std::cout << "      RPaths can be relocated simply by providing this wrapper a dll and a new path.\n";
+    std::cout << "\n";
+    std::cout << "  Useage:\n";
+    std::cout << "      To use this as a compiler/linker wrapper, simply invoke the compiler/linker\n";
+    std::cout << "      as normal, with the properly named link to this compiler wrapper in the PATH\n";
+    std::cout << "      To preform relocation, invoke the 'relocate' symlink to this file with the following arguments:\n";
+    std::cout << "          <lib-name>.dll or --library <lib-name>.dll\n";
+    std::cout << "          --name name|-n name| name\n";
+    std::cout << "\n";
+    std::cout << "          If using the positional form the order does not matter.";
+    return true;
+}
+
+bool checkAndPrintHelp(const char ** arg, int argc)
+{
+    if(argc < 2) {
+        return print_help();
     }
+    else if(strcmp(arg[1], "--help") == 0 || strcmp(arg[1], "-h") == 0)
+    {
+        return print_help();
+    }
+    return false;
+
+}
+
+std::string stem(const std::string &file)
+{
+    std::size_t last_dot = file.find_last_of('.');
+    if (last_dot == std::string::npos) {
+        return file;
+    }
+    return file.substr(0, last_dot);
 }

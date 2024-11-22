@@ -1,9 +1,12 @@
+#pragma once
+
 #include <string>
 #include <vector>
 #include <windows.h>
 #include <tchar.h>
 #include <stdio.h>
 #include <strsafe.h>
+#include <map>
 
 typedef std::vector<std::string> StrList;
 
@@ -77,4 +80,7 @@ bool isRelocate(const char * arg);
 std::map<std::string, std::string> parseRelocate(const char ** args, int argc);
 
 // Writes CLI help message to stdout
-bool checkAndPrintHelp(const char * arg, int argc);
+bool checkAndPrintHelp(const char ** arg, int argc);
+
+// gets filename stem
+std::string stem(const std::string &file);

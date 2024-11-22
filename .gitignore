@@ -6,3 +6,11 @@
 
 # Ignore .cxx build artifacts
 *.obj
+*.exe
+*.ilk
+*.pdb
+*.lib
+*.dll
+
+# Vscode 
+/.vscode/

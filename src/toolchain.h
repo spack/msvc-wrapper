@@ -27,7 +27,7 @@ protected:
     std::string composeLibPathArg(std::string &libPath);
     void addExtraLibPaths(StrList paths);
     std::string composeCLI();
-    StrList composeCommandLists(std::vector<StrList> &command_args);
+    StrList composeCommandLists(std::vector<StrList> command_args);
 
     std::string command;
     std::string lang;

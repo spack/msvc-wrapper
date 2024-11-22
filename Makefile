@@ -29,40 +29,59 @@ CFLAGS = $(BASE_CFLAGS) $(BUILD_CFLAGS) $(CLFLAGS)
 LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
 
 
-.cxx.obj:
-	$(CC) /c $(cflags) $(cvars) /I:src src/$*.cxx
+{src}.cxx{}.obj::
+	$(CC) /c $(CFLAGS) $(CVARS) /I:src $<	
 
-all: install
+{test}.cxx{test}.obj::
+	$(CC) /c $(CFLAGS) $(CVARS) /I:test $<
 
-cl.exe : cl.obj
-	link $(LFLAGS) cl.obj /out:cl.exe
+all : install
+
+cl.exe : cl.obj execute.obj intel.obj ld.obj main.obj spack_env.obj toolchain.obj toolchain_factory.obj utils.obj winrpath.obj 
+	link $(LFLAGS) $** /out:cl.exe
 
 install : cl.exe
 	mkdir $(PREFIX)
 	copy cl.exe $(PREFIX)
+	mklink /S link.exe cl.exe
+	mklink /S ifx.exe cl.exe
+	mklink /S relocate.exe cl.exe
 
-build_test_driver: test/test_driver.obj
+build_test_driver : test/test_driver.obj
 	rmdir /q /s tmp
 	mkdir tmp
 	lib $(LFLAGS) *.obj /out:wrapper.lib
 	link $(LFLAGS) test/test_driver.obj wrapper.lib /out:driver.exe
 	move driver.exe tmp/driver.exe
 
-build_test_sample: test/calc.obj
-	link $(LFLAGS) test/calc.obj /out:calc.dll /dll
-	move calc.dll tmp/calc.dll
-
-test: build_test_driver build_test_sample
-	mkdir tmp/test && cd tmp/test
-	move ../driver.exe .
-	move ../calc.dll .
+setup_test: cl.exe
+	rmdir /q /s tmp
+	mkdir tmp/test
+	cd tmp/test
 	# create symlinks to test the different toolchains
 	copy ../..cl.exe cl.exe
 	mklink /S link.exe cl.exe
-	mklink /S ifx.exe cl.exe
 	mklink /S relocate.exe cl.exe
-	cl.exe /c ../../test/calc.cpp
-	link.exe /dll calc.obj
-	# driver.exe calc.dll
+	cd ../..
 
+build_test_samples : test/calc.obj test/main.obj setup_test
+	link $(LFLAGS) test/calc.obj /out:calc.dll /dll
+	move calc.dll tmp/calc.dll
+	link $(LFLAGS) /test/main.obj calc.lib /out:tester.exe
+	move tester.exe tmp/test/tester.exe
 
+test : build_test_sample
+	# if this runs the rpath hack worked
+	tmp/test/tester.exe
+	# now make sure relocate works
+	tmp/test/relocate calc.lib C:/new/path/to/dll.dll
+	# validate that path is in the new binary
+
+clean :
+	del *.obj
+	del *.exe
+	del *.dll
+	del *.lib
+
+clean-cl :
+	del cl.exe

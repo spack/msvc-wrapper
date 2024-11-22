@@ -12,19 +12,6 @@ ExecuteCommand::ExecuteCommand(std::string command) :
     this->setupExecute();
 }
 
-template<typename ...Arguments>
-ExecuteCommand::ExecuteCommand(std::string arg, Arguments... args) :
-    ChildStdOut_Rd(NULL),
-    ChildStdOut_Wd(NULL),
-    baseCommand(arg)
-{
-    for(const auto a: {args}) {
-        this->commandArgs.push_back(a);
-    }
-    this->createChildPipes();
-    this->setupExecute();
-}
-
 ExecuteCommand::ExecuteCommand(std::string arg, StrList args) :
     ChildStdOut_Rd(NULL),
     ChildStdOut_Wd(NULL),
@@ -56,7 +43,7 @@ void ExecuteCommand::setupExecute()
     siStartInfo.hStdOutput = this->ChildStdOut_Wd;
     siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
     this->procInfo = piProcInfo;
-    this->startInfo= siStartInfo;
+    this->startInfo = siStartInfo;
 }
 
 void ExecuteCommand::createChildPipes()
@@ -89,6 +76,7 @@ void ExecuteCommand::executeToolChainChild()
         &this->startInfo,
         &this->procInfo)
     )
+    {
         // Handle errors coming from creating of child proc
         FormatMessage(
             FORMAT_MESSAGE_ALLOCATE_BUFFER |
@@ -101,6 +89,7 @@ void ExecuteCommand::executeToolChainChild()
             0, NULL
         );
         throw SpackException((char *)lpMsgBuf);
+    }
     // We've suceeded in kicking off the toolchain run
     // Explicitly close write handle to child proc stdout
     // as it is no longer needed and if we do not then cannot
@@ -135,17 +124,25 @@ bool ExecuteCommand::pipeChildToStdout()
 
 void ExecuteCommand::cleanupHandles()
 {
+    try {
+        this->safeHandleCleanup(this->procInfo.hProcess);
+        this->safeHandleCleanup(this->procInfo.hThread);
+    }
+    catch(SpackException &e)
+    {
+        std::cerr << "Exception: " << e.what() << "\n";
+    }
 
-    this->safeHandleCleanup(this->procInfo.hProcess);
-    this->safeHandleCleanup(this->procInfo.hThread);
 }
 
 void ExecuteCommand::safeHandleCleanup(HANDLE &handle)
 {
-    if ( !CloseHandle(handle) ) {
-        std::stringstream os_error;
-        os_error << GetLastError();
-        throw SpackException(os_error.str());
+    if(handle){
+        if ( !CloseHandle(handle) ) {
+            std::stringstream os_error;
+            os_error << GetLastError();
+            throw SpackException(os_error.str());
+        }
     }
 }
 
@@ -162,11 +159,11 @@ std::string ExecuteCommand::composeCLI()
     return CLI;
 }
 
-void ExecuteCommand::execute(const std::string &filename = empty)
+void ExecuteCommand::execute(const std::string &filename)
 {
-    if (!filename.empty())
+    if (!filename.empty()){
         this->write_to_file = true;
-        this->fileout = CreateFile(ConvertAnsiToWide(filename).c_str(),
+        this->fileout = CreateFileW(ConvertAnsiToWide(filename).c_str(),
                                     FILE_APPEND_DATA,
                                     FILE_SHARE_WRITE | FILE_SHARE_READ,
                                     &this->saAttr,
@@ -174,6 +171,13 @@ void ExecuteCommand::execute(const std::string &filename = empty)
                                     FILE_ATTRIBUTE_NORMAL,
                                     NULL
                                     );
-    this->executeToolChainChild();
-    this->pipeChildToStdout();
+    }
+    try {
+        this->executeToolChainChild();
+        this->pipeChildToStdout();
+    }
+    catch(SpackException &e) {
+
+    }
+
 }
