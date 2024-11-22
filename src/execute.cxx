@@ -178,7 +178,8 @@ void ExecuteCommand::execute(const std::string &filename)
         this->pipeChildToStdout();
     }
     catch(SpackException &e) {
-
+        std::cerr << "exception: " << e.what() << "\n";
+        throw SpackException("Failed execution");
     }
 
 }
