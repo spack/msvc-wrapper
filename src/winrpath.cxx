@@ -55,6 +55,17 @@ void pad_path(char *pth, DWORD str_size, DWORD bsize = MAX_PATH)
     }
 }
 
+int get_padding_length(const std::string &name)
+{
+    int c = 0;
+    std::string::const_iterator p = name.cbegin();
+    p+=2;
+    while(p != name.end() && *p == '/') {
+        ++c;
+    }
+    return c;
+}
+
 std::string mangle_name(const std::string &name)
 {
     std::string abs_out;
@@ -80,7 +91,6 @@ LinkerInvocation::LinkerInvocation(const std::string &linkLine)
 {
     StrList tokenized_line = split(this->line, " ");
     this->tokens = tokenized_line;
-
 }
 
 LinkerInvocation::LinkerInvocation(const StrList &linkLine)
@@ -259,7 +269,7 @@ bool CoffParser::normalize_name()
             for (i = longname_offset; this->coff_.members[2].member.data[i] != '\0'; ++i)
                 name.push_back(this->coff_.members[2].member.data[i]);
             replace_special_characters((char *)&name, i-longname_offset);
-            this->coffStream->seek(mem.offset);
+            this->coffStream->seek(this->coff_.members[2].offset);
             this->coffStream->seek(longname_offset);
             this->coffStream->write_name(name.data(), name.size());
         }
@@ -273,8 +283,118 @@ bool CoffParser::normalize_name()
     return true;
 }
 
-LibRename::LibRename(std::string lib, bool full, bool replace)
-: replace(replace), full(full), lib(lib)
+
+bool LibRename::spack_check_for_dll(const std::string &name)
+{
+    if(this->deploy){
+        for(std::map<char, char>::const_iterator it = path_to_special_characters.begin(); it != path_to_special_characters.end(); ++it){
+            if(!name.find(it->first) == std::string::npos){
+                return true;
+            }
+        }
+        return false;
+    }
+    else {
+        return (!name.find("<!spack>") == std::string::npos);
+    }
+}
+
+int LibRename::rename_dll(DWORD name_loc, const std::string &dll_name)
+{
+    if(this->deploy) {
+        int padding_len = get_padding_length(dll_name);
+        if(padding_len < 8) {
+            // path is too long to mark as a Spack path
+            // use shorter sigil
+            *((LPDWORD) name_loc+2) = (DWORD)"<sp>"; 
+        }
+        else {
+            *((LPDWORD) name_loc+2) = (DWORD)"<!spack>"; 
+        }
+    }
+    else {
+        std::string file_name = basename(dll_name);
+        if(file_name.empty()) {
+            std::cerr << "Unable to extract filename from dll for relocation" << "\n";
+            return -1;
+        }
+        LibraryFinder lf;
+        std::string new_library_loc = lf.find_library(file_name);
+        if(new_library_loc.empty()) {
+            std::cerr << "Unable to find library for relocation" << "\n";
+            return -1;
+        }
+        std::string mangled_padded_new_name = mangle_name(new_library_loc);
+        *((LPDWORD) name_loc) = mangled_padded_new_name.c_str();
+    }
+
+}
+
+int LibRename::find_dll_and_rename(HANDLE &pe_in)
+{
+    HANDLE hMapObject = CreateFileMapping(pe_in, NULL, PAGE_READWRITE, 0, 0, NULL);
+    if(!hMapObject){
+        std::cerr << "Unable to create mapping object\n";
+        return -5;
+    }
+    LPVOID basepointer = (char*)MapViewOfFile(hMapObject, FILE_MAP_WRITE, 0, 0, 0);
+    if(!basepointer){
+        std::cerr << "Unable to create file map view\n";
+        return -6;
+    }
+    // Establish base PE headers
+    PIMAGE_DOS_HEADER dos_header = (PIMAGE_DOS_HEADER)basepointer;
+    PIMAGE_NT_HEADERS nt_header = 
+        (PIMAGE_NT_HEADERS)((DWORD)basepointer + dos_header->e_lfanew);
+
+    PIMAGE_FILE_HEADER coff_header = 
+        (PIMAGE_FILE_HEADER)((DWORD)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature));
+        
+    PIMAGE_OPTIONAL_HEADER optional_header = 
+        (PIMAGE_OPTIONAL_HEADER)((DWORD)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader));
+        
+    PIMAGE_SECTION_HEADER section_header = 
+        (PIMAGE_SECTION_HEADER)((DWORD)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader) + sizeof(nt_header->OptionalHeader));
+    
+    DWORD number_of_rva_and_sections = optional_header->NumberOfRvaAndSizes;
+    if(number_of_rva_and_sections == 0) {
+        std::cerr << "PE file does not import symbols" << "\n";
+        return -1;
+    }
+    else if(number_of_rva_and_sections < 2) {
+        std::cerr << "PE file contains insufficient data directories, likely corrupted" << "\n";
+        return -2;
+    }
+
+    DWORD number_of_sections = coff_header->NumberOfSections;
+    // Data directory #2 points to the RVA of the import section
+    DWORD RVA_import_directory = nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+    DWORD import_section_file_offset = RvaToFileOffset(section_header, number_of_sections, RVA_import_directory);
+    DWORD import_table_offset = (DWORD)basepointer + import_section_file_offset;
+    PIMAGE_IMPORT_DESCRIPTOR import_image_descriptor = (PIMAGE_IMPORT_DESCRIPTOR)(import_table_offset);
+    //DLL Imports
+    for (; import_image_descriptor->Name != 0; import_image_descriptor++) {
+        DWORD Imported_DLL = import_table_offset + (import_image_descriptor->Name - RVA_import_directory);
+        std::ostringstream str_stream;
+        str_stream << Imported_DLL;
+        if(this->spack_check_for_dll(str_stream.str())) {
+            if(!this->rename_dll(Imported_DLL, str_stream.str())) {
+                throw SpackException("Unable to relocate DLL");
+            }
+        }
+    }
+    if(!CloseHandle(basepointer)){
+        std::cerr << "Unable to properly close file view\n";
+        return -3;
+    }
+    if(!CloseHandle(hMapObject)){
+        std::cerr << "Unable to properly close file map\n";
+        return -4;
+    }
+}
+
+LibRename::LibRename(std::string lib, bool full, bool deploy, bool replace)
+: replace(replace), full(full), lib(lib), deploy(deploy)
 {
     this->name = stem(this->lib);
     this->def_file = this->name + ".def";
@@ -292,6 +412,22 @@ void LibRename::computeDefFile()
     this->def_executor.execute(this->def_file);
 }
 
+int LibRename::executeRename()
+{
+    try {
+        this->computeDefFile();
+        this->executeLibRename();
+        if (this->full) {
+            this->executeDllRename();
+        }
+    }
+    catch (SpackException &e) {
+        std::cerr << e.what() << "\n";
+        return -1;
+    }
+    return 0;
+}
+
 void LibRename::executeLibRename()
 {
     this->lib_executor.execute();
@@ -302,6 +438,19 @@ void LibRename::executeLibRename()
     CoffParser coff(&cr);
     coff.parse();
     coff.normalize_name();
+}
+
+
+void LibRename::executeDllRename()
+{
+    LPCWSTR lib_name = ConvertAnsiToWide(this->lib).c_str();
+    HANDLE dll_handle = CreateFileW(lib_name, (GENERIC_READ|GENERIC_WRITE), FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (!dll_handle){
+        std::stringstream os_error;
+        os_error << GetLastError();
+        throw SpackException(os_error.str());
+    }
+    this->find_dll_and_rename(dll_handle);
 }
 
 std::string LibRename::compute_rename_line()
@@ -321,52 +470,6 @@ std::string LibRename::compute_rename_line()
     return line;
 }
 
-
-StrList findImportedDllNames(HANDLE &h_File)
-{
-    //Mapping Given EXE file to Memory
-    HANDLE hMapObject = CreateFileMapping(h_File, NULL, PAGE_READONLY, 0, 0, NULL);
-    LPVOID basepointer = (char*)MapViewOfFile(hMapObject, FILE_MAP_READ, 0, 0, 0);
-    //PIMAGE_DOS_HEADER dos_header;        
-    PIMAGE_DOS_HEADER dos_header = (PIMAGE_DOS_HEADER)basepointer;
-    //PIMAGE_NT_HEADERS ntHeader;         
-    PIMAGE_NT_HEADERS nt_header = 
-    (PIMAGE_NT_HEADERS)((DWORD)basepointer + dos_header->e_lfanew);
-    
-    PIMAGE_FILE_HEADER file_header = 
-    (PIMAGE_FILE_HEADER)((DWORD)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature));
-    
-    PIMAGE_OPTIONAL_HEADER optional_header = 
-    (PIMAGE_OPTIONAL_HEADER)((DWORD)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader));
-    
-    PIMAGE_SECTION_HEADER section_header = 
-    (PIMAGE_SECTION_HEADER)((DWORD)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader) + sizeof(nt_header->OptionalHeader));
-    
-    DWORD numberofsections = file_header->NumberOfSections;
-    DWORD RVAimport_directory = nt_header->OptionalHeader.DataDirectory[1].VirtualAddress;
-
-    PIMAGE_SECTION_HEADER import_section = {};
-    for (int i = 1; i <= numberofsections; i++, section_header++) {
-        printf("Section Header: Section Name %s\n", section_header->Name);
-
-        if (RVAimport_directory >= section_header->VirtualAddress && RVAimport_directory < section_header->VirtualAddress + section_header->Misc.VirtualSize) {
-
-            import_section = section_header;
-        }
-    }
-    DWORD import_table_offset = (DWORD)basepointer + import_section->PointerToRawData;
-    PIMAGE_IMPORT_DESCRIPTOR import_image_descriptor = 
-    (PIMAGE_IMPORT_DESCRIPTOR)(import_table_offset + (nt_header->OptionalHeader.DataDirectory[1].VirtualAddress - import_section->VirtualAddress));
-    StrList dll_list;
-    //DLL Imports
-    for (;import_image_descriptor->Name != 0 ; import_image_descriptor++) {
-        DWORD Imported_DLL = import_table_offset + (import_image_descriptor->Name - import_section->VirtualAddress);
-        std::ostringstream str_stream;
-        str_stream << Imported_DLL;
-        dll_list.emplace_back(str_stream.str());
-    }
-    return dll_list;
-}
 
 char const * WinRPathRenameException::what()
 {

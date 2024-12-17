@@ -104,13 +104,18 @@ private:
 
 class LibRename {
 public:
-    LibRename(std::string lib, bool full, bool replace);
+    LibRename(std::string lib, bool full, bool deploy, bool replace);
+    int executeRename();
     void executeLibRename();
+    void executeDllRename();
     void computeDefFile();
     std::string compute_rename_line();
     std::string compute_def_line();
 
 private:
+    int find_dll_and_rename(HANDLE &pe_in);
+    bool spack_check_for_dll(const std::string &dll_name);
+    int rename_dll(DWORD pos, const std::string &new_name);
     ExecuteCommand def_executor;
     ExecuteCommand lib_executor;
     std::string lib;
@@ -118,6 +123,7 @@ private:
     std::string new_lib;
     std::string def_file;
     bool full;
+    bool deploy;
     bool replace;
 };
 

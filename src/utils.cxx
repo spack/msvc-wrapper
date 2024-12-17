@@ -146,12 +146,25 @@ std::map<std::string, std::string> parseRelocate(const char ** args, int argc) {
         }
         else if (strcmp(args[i], "--full")) {
             redefinedArgCheck(opts, "full", "--full");
-            opts.insert(std::pair<std::string, std::string>("full", std::string("full")));
+            opts.insert(std::pair<std::string, std::string>("full", "full"));
+        }
+        else if (strcmp(args[i], "--export")) {
+            // export and deploy are mutually exclusive, if one is defined
+            // the other cannot be
+            redefinedArgCheck(opts, "export", "--export");
+            redefinedArgCheck(opts, "deploy", "--deploy");
+            opts.insert(std::pair<std::string, std::string>("cmd", "export"));
+        }
+        else if (strcmp(args[i], "--deploy")) {
+            // export and deploy are mutually exclusive, if one is defined
+            // the other cannot be
+            redefinedArgCheck(opts, "export", "--export");
+            redefinedArgCheck(opts, "deploy", "--deploy");
+            opts.insert(std::pair<std::string, std::string>("cmd", "deploy"));
         }
         else {
             // Unknown argument, warn the user it will not be used
             std::cerr << "Unknown argument :" << args[i] << "will be ignored\n";
-
         }
     }
     if(!opts.count("full"))
@@ -160,6 +173,7 @@ std::map<std::string, std::string> parseRelocate(const char ** args, int argc) {
     }
     checkArgumentPresence(opts, "lib");
     checkArgumentPresence(opts, "full");
+    checkArgumentPresence(opts, "cmd");
     return opts;
 }
 
@@ -204,15 +218,17 @@ void validate_spack_env() {
     std::vector<std::string> SpackEnv{
 "SPACK_ENV_PATH"
 "SPACK_DEBUG_LOG_DIR"
-"SPACK_DEBUG_LOG_ID"
+// "SPACK_DEBUG_LOG_ID"
 "SPACK_COMPILER_SPEC"
-"SPACK_CC_RPATH_ARG"
-"SPACK_CXX_RPATH_ARG"
-"SPACK_F77_RPATH_ARG"
-"SPACK_FC_RPATH_ARG"
-"SPACK_LINKER_ARG"
-"SPACK_SHORT_SPEC"
-"SPACK_SYSTEM_DIRS"};
+// "SPACK_CC_RPATH_ARG"
+// "SPACK_CXX_RPATH_ARG"
+// "SPACK_F77_RPATH_ARG"
+// "SPACK_FC_RPATH_ARG"
+// "SPACK_LINKER_ARG"
+// "SPACK_SHORT_SPEC"
+"SPACK_SYSTEM_DIRS"
+"SPACK_CC"
+"SPACK_LD"};
     for(auto &var: SpackEnv)
         if(!getenv(var.c_str())){
             throw SpackCompilerContextException(var + " isn't set in the environment and is expected to be");
@@ -256,6 +272,10 @@ bool print_help()
     std::cout << "          --full                                       = Relocate dynamic references inside\n";
     std::cout << "                                                         the dll in addition to re-generating\n";
     std::cout << "                                                         the import library\n";
+    std::cout << "          --export|--deploy                             = Mutually exclusive command modifier.\n";
+    std::cout << "                                                          Instructs relocate to either prepare the\n";
+    std::cout << "                                                          dynamic library for exporting to build cache\n";
+    std::cout << "                                                          or for extraction from bc onto new host system\n";
     std::cout << "\n";
     return true;
 }
@@ -282,6 +302,15 @@ std::string stem(const std::string &file)
     return file.substr(0, last_dot);
 }
 
+std::string basename(const std::string &file)
+{
+    std:size_t last_path = file.find_last_of("\\");
+    if (last_path == std::string::npos) {
+        return std::string();
+    }
+    return file.substr(0, last_path);
+}
+
 std::string getCWD()
 {
     DWORD buf_size;
@@ -298,39 +327,22 @@ bool isPathAbsolute(const std::string &pth)
     return !PathIsRelativeA(pth.c_str());
 }
 
+DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER section_header, DWORD number_of_sections, DWORD rva) {
 
-DWORD RvaToFileOffset(std::ifstream file, DWORD rva) {
-    if (!file.is_open()) {
-        std::cerr << "Error: File is not open" << std::endl;
-        return 0;
-    }
-
-    IMAGE_DOS_HEADER dosHeader;
-    file.read(reinterpret_cast<char*>(&dosHeader), sizeof(dosHeader));
-
-    file.seekg(dosHeader.e_lfanew, std::ios::beg);
-    IMAGE_NT_HEADERS ntHeaders;
-    file.read(reinterpret_cast<char*>(&ntHeaders), sizeof(ntHeaders));
-
-     IMAGE_SECTION_HEADER* sectionHeader = (IMAGE_SECTION_HEADER*)((char*)&ntHeaders + sizeof(ntHeaders));
-    for (int i = 0; i < ntHeaders.FileHeader.NumberOfSections; ++i) {
-        DWORD sectionStartRVA = sectionHeader->VirtualAddress;
-        DWORD sectionEndRVA = sectionStartRVA + sectionHeader->SizeOfRawData;
-
+    for (int i = 0; i < number_of_sections; ++i, ++section_header) {
+        DWORD sectionStartRVA = section_header->VirtualAddress;
+        DWORD sectionEndRVA = sectionStartRVA + section_header->SizeOfRawData;
+        // check section bounds for RVA
         if (rva >= sectionStartRVA && rva < sectionEndRVA) {
-            DWORD fileOffset = rva - sectionStartRVA + sectionHeader->PointerToRawData;
-            file.close();
+            DWORD fileOffset = rva - sectionStartRVA + section_header->PointerToRawData;
             return fileOffset;
         }
-         sectionHeader++;
     }
-
     std::cerr << "Error: RVA 0x" << std::hex << rva << " not found in any section." << std::endl;
-    file.close();
     return 0;
 }
 
-LibraryFinder::LibraryFinder() : search_vars{"LINK", "LIB", "PATH", "TMP"} {}
+LibraryFinder::LibraryFinder() : search_vars{"SPACK_RELOCATE_PATH"} {}
 
 std::string LibraryFinder::find_library(const std::string &lib_name) {
     // Read env variables and split into paths
@@ -356,6 +368,7 @@ std::string LibraryFinder::find_library(const std::string &lib_name) {
                 return res;
         }
     }
+    return std::string();
 }
 
 void LibraryFinder::eval_search_paths() {
@@ -399,7 +412,17 @@ std::vector<std::string> system_locations = {
     "wpax",
     "vcruntime",
     "WINDOWS",
-    "system32"
+    "system32",
+    "KERNEL32",
+    "WS2_32",
+    "dbghelp",
+    "bcrypt",
+    "ADVAPI32",
+    "SHELL32",
+    "CRYPT32",
+    "USER32",
+    "ole32",
+    "OLEAUTH32"
 };
 
 bool LibraryFinder::is_system(const std::string &pth) {

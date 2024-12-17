@@ -30,6 +30,7 @@ struct SpackEnvState{
     std::string SpackFC;
     std::string SpackF77;
     std::string SpackRoot;
+    std::string SpackLD;
 
     static SpackEnvState loadSpackEnvState();
 };

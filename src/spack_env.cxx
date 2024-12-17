@@ -30,5 +30,6 @@ SpackEnvState SpackEnvState::loadSpackEnvState() {
     spackenv.SpackSystemDirs = getenvlist("SPACK_SYSTEM_DIRS", "|");
     spackenv.SpackRPathDirs = getenvlist("SPACK_RPATH_DIRS", "|");
     spackenv.SpackLinkerArg = getSpackEnv("SPACK_LINKER_ARG");
+    spackenv.SpackLD = getSpackEnv("SPACK_LD");
     return spackenv;
 }

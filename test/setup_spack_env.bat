@@ -1,0 +1,7 @@
+@echo off
+SPACK_CC = (where cl)
+SPACK_LD = (where link)
+SPACK_ENV_PATH = %PATH%
+SPACK_DEBUG_LOG_DIR = %CD%
+SPACK_COMPILER_SPEC = %msvc
+SPACK_SYSTEM_DIRS = %PATH%

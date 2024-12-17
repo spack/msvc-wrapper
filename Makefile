@@ -48,6 +48,7 @@ install : cl.exe
 	mklink $(PREFIX)/relocate.exe $(PREFIX)/cl.exe
 
 setup_test: cl.exe
+	test\setup_spack_env.bat
 	rmdir /q /s tmp
 	mkdir tmp/test
 	cd tmp/test

@@ -2,7 +2,7 @@
 #include "winrpath.h"
 
 void LdInvocation::loadToolchainDependentSpackVars(SpackEnvState &spackenv) {
-    this->spackCommand = std::string("C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.42.34433\\bin\\Hostx64\\x64\\link.exe");
+    this->spackCommand = spackenv.SpackLD;
 }
 
 

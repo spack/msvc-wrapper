@@ -1,5 +1,5 @@
 #include "cl.h"
 
 void ClInvocation::loadToolchainDependentSpackVars(SpackEnvState &spackenv) {
-    this->spackCommand = spackenv.SpackCC.empty() ? "cl.exe" : spackenv.SpackCC;
+    this->spackCommand = spackenv.SpackCC;
 }

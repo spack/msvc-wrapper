@@ -90,8 +90,11 @@ std::map<std::string, std::string> parseRelocate(const char ** args, int argc);
 // Writes CLI help message to stdout
 bool checkAndPrintHelp(const char ** arg, int argc);
 
-// gets filename stem
+// Returns filename stem
 std::string stem(const std::string &file);
+
+// Returns file basename
+std::string basename(const std::string &file);
 
 // Returns current working directory
 std::string getCWD();
@@ -100,7 +103,7 @@ std::string getCWD();
 bool isPathAbsolute(const std::string &pth);
 
 // Returns File offset given RVA
-DWORD RvaToFileOffset(const std::string& filePath, DWORD rva);
+DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER section_header, DWORD number_of_sections, DWORD rva);
 
 class LibraryFinder {
 private:

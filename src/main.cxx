@@ -25,20 +25,23 @@ int main(int argc, const char* argv[]) {
     if (isRelocate(argv[0])) {
         std::map<std::string, std::string> patch_args = parseRelocate(argv, argc);
         bool full = !patch_args.at("full").empty();
-        LibRename rpath_lib(patch_args.at("lib"), full, true);
-        rpath_lib.computeDefFile();
-        rpath_lib.executeLibRename();
+        bool deploy = patch_args.at("cmd") == "deploy";
+        LibRename rpath_lib(patch_args.at("lib"), full, deploy, true);
+        if(!rpath_lib.executeRename()){
+            std::cerr << "Library rename failed\n";
+            return 9;
+        }
     }
     else {
         // Ensure required variables are set
-        // try {
-        //     validate_spack_env();
-        // }
-        // catch (SpackCompilerContextException e)
-        // {
-        //     std::cerr << "Spack compiler environment not properly established, please setup the environment and try again\n";
-        //     return 99;
-        // }
+        try {
+            validate_spack_env();
+        }
+        catch (SpackCompilerContextException e)
+        {
+            std::cerr << "Spack compiler environment not properly established, please setup the environment and try again\n";
+            return 99;
+        }
         // Determine which tool we're trying to run
         std::unique_ptr<ToolChainInvocation> tchain(ToolChainFactory::ParseToolChain(argv));
         // Establish Spack compiler/linker modifications from env
