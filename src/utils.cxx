@@ -3,6 +3,9 @@
 #include <map>
 #include <iostream>
 #include <string>
+#include <cwchar>
+#include <fstream>
+#include "shlwapi.h"
 
 
 // String helper methods adding cxx20 features to cxx14
@@ -87,7 +90,7 @@ std::string join(const StrList &args, const std::string &join_char)
 {
     std::string joined_path;
     for(std::string arg : args) {
-       joined_path += arg + " ";
+       joined_path += arg + join_char;
     }
     // Remove trailing space
     joined_path.pop_back();
@@ -141,23 +144,22 @@ std::map<std::string, std::string> parseRelocate(const char ** args, int argc) {
             redefinedArgCheck(opts, "lib", "lib");
             opts.insert(std::pair<std::string, std::string>("lib", args[i]));
         }
-        else if (strcmp(args[i], "--name")) {
-            redefinedArgCheck(opts, "name", "--name");
-            opts.insert(std::pair<std::string, std::string>("name", args[++i]));
-        }
-        else if (strcmp(args[i], "-n")) {
-            redefinedArgCheck(opts, "name", "-n");
-            opts.insert(std::pair<std::string, std::string>("name", args[++i]));
+        else if (strcmp(args[i], "--full")) {
+            redefinedArgCheck(opts, "full", "--full");
+            opts.insert(std::pair<std::string, std::string>("full", std::string("full")));
         }
         else {
-            // arg was not given via named arg, any remaining positional arg is assumed to be
-            // a name if name was not already defined
-            redefinedArgCheck(opts, "name", "name");
-            opts.insert(std::pair<std::string, std::string>("name", args[i]));
+            // Unknown argument, warn the user it will not be used
+            std::cerr << "Unknown argument :" << args[i] << "will be ignored\n";
+
         }
     }
+    if(!opts.count("full"))
+    {
+        opts.insert(std::pair<std::string, std::string>("full", std::string("")));
+    }
     checkArgumentPresence(opts, "lib");
-    checkArgumentPresence(opts, "name");
+    checkArgumentPresence(opts, "full");
     return opts;
 }
 
@@ -225,22 +227,36 @@ void die(std::string &cli ) {
 bool print_help()
 {
     std::cout << "Spack's Windows compiler wrapper\n";
+    std::cout << "Version: " << STRING(MSVC_WRAPPER_VERSION) <<"\n";
     std::cout << "\n";
     std::cout << "  Description:\n";
-    std::cout << "      This compiler wrapper is designed to abstact the functions\n";
+    std::cout << "      This compiler wrapper abstacts the functions \n";
     std::cout << "      of the MSVC and Intel C/C++/Fortran compilers and linkers.\n";
-    std::cout << "      This wrapper modifies linker behavior by injecting the absolute path\n";
-    std::cout << "      to any dll in its import library, allowing for RPATH link behavior.\n";
-    std::cout << "      RPaths can be relocated simply by providing this wrapper a dll and a new path.\n";
-    std::cout << "\n";
+    std::cout << "      This wrapper modifies compilation and link time behavior by\n";
+    std::cout << "      injecting Spack specific paths, flags, and arguments to the\n";
+    std::cout << "      compiler and linker lines.\n";
+    std::cout << "      Link operations are amended to inject the absolute path to\n";
+    std::cout << "      a package's dll in its import library, allowing for RPATH\n";
+    std::cout << "      like link behavior.\n";
+    std::cout << "      Spack's Windows RPaths can be relocated by this wrapper\n";
+    std::cout << "      by invoking the 'relocate' form with the proper arguments\n";
+    std::cout << "\n\n";
     std::cout << "  Useage:\n";
     std::cout << "      To use this as a compiler/linker wrapper, simply invoke the compiler/linker\n";
-    std::cout << "      as normal, with the properly named link to this compiler wrapper in the PATH\n";
-    std::cout << "      To preform relocation, invoke the 'relocate' symlink to this file with the following arguments:\n";
-    std::cout << "          <lib-name>.dll or --library <lib-name>.dll\n";
-    std::cout << "          --name name|-n name| name\n";
+    std::cout << "      as normal, with the properly named link to this wrapper in the PATH\n";
+    std::cout << "      In this case, the CLI of this wrapper is identical to cl|ifx|link.\n";
+    std::cout << "      See https://learn.microsoft.com/en-us/cpp/build/reference/c-cpp-building-reference\n";
     std::cout << "\n";
-    std::cout << "          If using the positional form the order does not matter.";
+    std::cout << "      cl.exe /c foo.c";
+    std::cout << "\n";
+    std::cout << "      To preform relocation, invoke the 'relocate' symlink to this file:\n";
+    std::cout << "\n";
+    std::cout << "      options:";
+    std::cout << "          [--library] <path to library>                = Dynamic library to be relocated\n";
+    std::cout << "          --full                                       = Relocate dynamic references inside\n";
+    std::cout << "                                                         the dll in addition to re-generating\n";
+    std::cout << "                                                         the import library\n";
+    std::cout << "\n";
     return true;
 }
 
@@ -264,4 +280,132 @@ std::string stem(const std::string &file)
         return file;
     }
     return file.substr(0, last_dot);
+}
+
+std::string getCWD()
+{
+    DWORD buf_size;
+    buf_size = GetCurrentDirectoryW(0, NULL);
+    wchar_t * w_cwd = new wchar_t[buf_size];
+    GetCurrentDirectoryW(buf_size, w_cwd);
+    std::wstring ws_cwd(w_cwd);
+    free(w_cwd);
+    return ConvertWideToANSI(ws_cwd);
+}
+
+bool isPathAbsolute(const std::string &pth)
+{
+    return !PathIsRelativeA(pth.c_str());
+}
+
+
+DWORD RvaToFileOffset(std::ifstream file, DWORD rva) {
+    if (!file.is_open()) {
+        std::cerr << "Error: File is not open" << std::endl;
+        return 0;
+    }
+
+    IMAGE_DOS_HEADER dosHeader;
+    file.read(reinterpret_cast<char*>(&dosHeader), sizeof(dosHeader));
+
+    file.seekg(dosHeader.e_lfanew, std::ios::beg);
+    IMAGE_NT_HEADERS ntHeaders;
+    file.read(reinterpret_cast<char*>(&ntHeaders), sizeof(ntHeaders));
+
+     IMAGE_SECTION_HEADER* sectionHeader = (IMAGE_SECTION_HEADER*)((char*)&ntHeaders + sizeof(ntHeaders));
+    for (int i = 0; i < ntHeaders.FileHeader.NumberOfSections; ++i) {
+        DWORD sectionStartRVA = sectionHeader->VirtualAddress;
+        DWORD sectionEndRVA = sectionStartRVA + sectionHeader->SizeOfRawData;
+
+        if (rva >= sectionStartRVA && rva < sectionEndRVA) {
+            DWORD fileOffset = rva - sectionStartRVA + sectionHeader->PointerToRawData;
+            file.close();
+            return fileOffset;
+        }
+         sectionHeader++;
+    }
+
+    std::cerr << "Error: RVA 0x" << std::hex << rva << " not found in any section." << std::endl;
+    file.close();
+    return 0;
+}
+
+LibraryFinder::LibraryFinder() : search_vars{"LINK", "LIB", "PATH", "TMP"} {}
+
+std::string LibraryFinder::find_library(const std::string &lib_name) {
+    // Read env variables and split into paths
+    // Only ever run once
+    // First check if lib is absolute path
+    if (this->is_system(lib_name)) {
+        return std::string();
+    }
+    if (!PathIsRelativeW(ConvertAnsiToWide(lib_name).c_str()))
+        return lib_name;
+    // next search the CWD
+    std::string cwd(getCWD());
+    auto res = this->finder(cwd, lib_name);
+    if (!res.empty())
+        return res;
+    this->eval_search_paths();
+    // next search env variable paths
+    for (std::string var: this->search_vars) {
+        std::vector<std::string> searchable_paths = this->evald_search_paths.at(var);
+        for (std::string pth: searchable_paths) {
+            auto res = this->finder(pth, lib_name);
+            if (!res.empty())
+                return res;
+        }
+    }
+}
+
+void LibraryFinder::eval_search_paths() {
+    if (!this->evald_search_paths.empty())
+        return;
+    for (std::string var: this->search_vars) {
+        std::string envVal = getenv(var.c_str());
+        if (!envVal.empty())
+            this->evald_search_paths[var] = split(envVal, ";");
+    }
+}
+
+std::string LibraryFinder::finder(const std::string &pth, const std::string &lib_name) {
+        WIN32_FIND_DATA findFileData;
+        HANDLE hFind = FindFirstFileW(ConvertAnsiToWide(pth).c_str(), &findFileData);
+
+        if (hFind == INVALID_HANDLE_VALUE) {
+            std::cerr << "FindFirstFile failed (" << GetLastError() << ")" << std::endl;
+            return;
+        }
+        
+        do {
+            if (std::wcsstr(findFileData.cFileName, ConvertAnsiToWide(lib_name).c_str())){
+                return ConvertWideToANSI(findFileData.cFileName);
+            }
+        } while (FindNextFile(hFind, &findFileData) != 0);
+
+        DWORD dwError = GetLastError();
+        if (dwError != ERROR_NO_MORE_FILES) {
+            std::cerr << "FindNextFile failed (" << dwError << ")" << std::endl;
+        }
+        FindClose(hFind);
+}
+
+std::vector<std::string> system_locations = {
+    "api-ms-",
+    "ext-ms-",
+    "ieshims",
+    "emclient",
+    "devicelock",
+    "wpax",
+    "vcruntime",
+    "WINDOWS",
+    "system32"
+};
+
+bool LibraryFinder::is_system(const std::string &pth) {
+    for (auto loc: system_locations) {
+        if (pth.find(loc) != std::string::npos) {
+            return true;
+        }
+    }
 }

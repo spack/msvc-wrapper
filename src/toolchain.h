@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <strsafe.h>
 
-#include "version.h"
 #include "utils.h"
 #include "spack_env.h"
 #include "execute.h"
@@ -19,7 +18,7 @@ public:
     ToolChainInvocation(std::string command, char const* const* cli);
     virtual ~ToolChainInvocation() {}
     virtual void interpolateSpackEnv(SpackEnvState &spackenv);
-    virtual void invokeToolchain();
+    virtual int invokeToolchain();
 protected:
     virtual void parse_command_args(char const* const* cli);
     virtual void loadToolchainDependentSpackVars(SpackEnvState &spackenv) = 0;

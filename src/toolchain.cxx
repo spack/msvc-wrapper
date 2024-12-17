@@ -26,7 +26,7 @@ void ToolChainInvocation::interpolateSpackEnv(SpackEnvState &spackenv) {
     this->loadToolchainDependentSpackVars(spackenv);
 }
 
-void ToolChainInvocation::invokeToolchain() {
+int ToolChainInvocation::invokeToolchain() {
     StrList commandLine(this->composeCommandLists({
         this->commandArgs,
         this->includeArgs,
@@ -38,8 +38,15 @@ void ToolChainInvocation::invokeToolchain() {
     this->executor = ExecuteCommand(  this->spackCommand,
                                       commandLine
                                     );
-    // Run first pass of command as requested by caller
-    this->executor.execute();
+    try{
+        // Run first pass of command as requested by caller
+        this->executor.execute();
+    }
+    catch(SpackException &e){
+        std::cerr << e.what() << "\n";
+        return 0;
+    }
+    return 1;
 }
 
 void ToolChainInvocation::parse_command_args(char const* const* cli) {

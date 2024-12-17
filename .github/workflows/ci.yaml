@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{github.ref}}-${{github.event.pull_request.number || github.run_number}}
+  cancel-in-progress: true
+
+jobs:
+  # Check which files have been updated by the PR
+  validate-wrapper:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch_depth: 0
+      - name: "build wrapper"
+        run: |
+          nmake cl.exe
+      - name: "create link wrapper"
+        run: |
+          mklink link.exe cl.exe
+      - name: "Test compiler wrapper"
+        run: |
+          nmake build_and_check_test_sample
+      - name: "Test RPath"
+        run: |
+          nmake test  
+    

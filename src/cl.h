@@ -27,7 +27,6 @@
 #include <stdio.h>
 #include <strsafe.h>
 
-#include "version.h"
 #include "toolchain.h"
 #include "utils.h"
 

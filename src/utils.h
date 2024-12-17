@@ -8,6 +8,11 @@
 #include <strsafe.h>
 #include <map>
 
+#include "version.h"
+
+#define _STRING(m) #m
+#define STRING(m) _STRING(m)
+
 typedef std::vector<std::string> StrList;
 
 class SpackException : public std::exception {
@@ -74,9 +79,12 @@ std::string strip(const std::string& s, const std::string &substr);
 // Joins vector of strings by join character
 std::string join(const StrList &strs, const std::string &join_char = " ");
 
-// Parse command line opts
+// Determines if a command line invocation is for the relocate form
+// of this executable
 bool isRelocate(const char * arg);
 
+// Parses the command line for an invocation of the relocate command
+// and returns the arguments mapped from argument name to value
 std::map<std::string, std::string> parseRelocate(const char ** args, int argc);
 
 // Writes CLI help message to stdout
@@ -84,3 +92,25 @@ bool checkAndPrintHelp(const char ** arg, int argc);
 
 // gets filename stem
 std::string stem(const std::string &file);
+
+// Returns current working directory
+std::string getCWD();
+
+// Returns boolean indication whether pth is absolute
+bool isPathAbsolute(const std::string &pth);
+
+// Returns File offset given RVA
+DWORD RvaToFileOffset(const std::string& filePath, DWORD rva);
+
+class LibraryFinder {
+private:
+    std::map<std::string, std::string> found_libs;
+    std::vector<std::string> search_vars;
+    std::map<std::string, std::vector<std::string>> evald_search_paths;
+    std::string finder(const std::string &pth, const std::string &lib_name);
+    bool is_system(const std::string &pth);
+public:
+    LibraryFinder();
+    std::string find_library(const std::string &lib_name);
+    void eval_search_paths();
+};

@@ -9,7 +9,7 @@
 class LdInvocation : public ToolChainInvocation {
 public:
     using ToolChainInvocation::ToolChainInvocation;
-    virtual void invokeToolchain();
+    virtual int invokeToolchain();
 protected:
     void loadToolchainDependentSpackVars(SpackEnvState &spackenv);
     std::string lang = "link";

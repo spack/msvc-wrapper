@@ -28,7 +28,6 @@ typedef struct coff_header {
 	char file_size[10];
 	wchar_t end_marker;
 } coff_header;
-#pragma pack(pop, r1)
 
 typedef struct coff_entry {
     std::streampos offset;
@@ -40,6 +39,9 @@ typedef struct coff {
     char signature[IMAGE_ARCHIVE_START_SIZE];
     std::vector<coff_entry> members;
 } coff;
+
+#pragma pack(pop, r1)
+
 
 /**
  * @brief Encapsulates a stream reading a COFF file object
@@ -55,9 +57,9 @@ public:
     bool Close();
     bool isOpen();
     bool isClosed();
-    void read_header(coff_header * coff_in);
-    void read_member(coff_header head, coff_member * coff_in);
-    void read_sig(char * sig);
+    void read_header(coff_header &coff_in);
+    void read_member(coff_header &head, coff_member &coff_in);
+    void read_sig(coff &coff_in);
     void write_name(char * name, int size);
     void seek(int bytes=-1);
     std::streampos tell();
@@ -87,19 +89,22 @@ public:
     void parse();
     bool is_exe_link();
     std::string get_name();
+    std::string get_out();
+    std::string get_mangled_out();
 private:
     std::string line;
-    std::vector<std::string> tokens;
+    StrList tokens;
     std::string name;
     std::string output;
-    std::vector<std::string> libs;
+    StrList libs;
+    StrList objs;
     bool is_exe;
 };
 
 
 class LibRename {
 public:
-    LibRename(std::string lib, std::string name, bool replace);
+    LibRename(std::string lib, bool full, bool replace);
     void executeLibRename();
     void computeDefFile();
     std::string compute_rename_line();
@@ -112,6 +117,7 @@ private:
     std::string name;
     std::string new_lib;
     std::string def_file;
+    bool full;
     bool replace;
 };
 

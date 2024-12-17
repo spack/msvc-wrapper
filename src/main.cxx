@@ -8,7 +8,7 @@
  *        into the compiler/linker interface and drives the main entrypoint.
  * @date 2023-10-20
  *
- * @copyright  Copyright 2013-2023 Lawrence Livermore National Security, LLC and other
+ * @copyright  Copyright 2013-2024 Lawrence Livermore National Security, LLC and other
  *             Spack Project Developers. See the top-level COPYRIGHT file for details.
  *             SPDX-License-Identifier: (Apache-2.0 OR MIT)
  *
@@ -24,20 +24,21 @@ int main(int argc, const char* argv[]) {
     }
     if (isRelocate(argv[0])) {
         std::map<std::string, std::string> patch_args = parseRelocate(argv, argc);
-        LibRename rpath_lib(patch_args.at("lib"), patch_args.at("name"), true);
+        bool full = !patch_args.at("full").empty();
+        LibRename rpath_lib(patch_args.at("lib"), full, true);
         rpath_lib.computeDefFile();
         rpath_lib.executeLibRename();
     }
     else {
         // Ensure required variables are set
-        try {
-            validate_spack_env();
-        }
-        catch (SpackCompilerContextException e)
-        {
-            std::cerr << "Spack compiler environment not properly established, please setup the environment and try again\n";
-            return 99;
-        }
+        // try {
+        //     validate_spack_env();
+        // }
+        // catch (SpackCompilerContextException e)
+        // {
+        //     std::cerr << "Spack compiler environment not properly established, please setup the environment and try again\n";
+        //     return 99;
+        // }
         // Determine which tool we're trying to run
         std::unique_ptr<ToolChainInvocation> tchain(ToolChainFactory::ParseToolChain(argv));
         // Establish Spack compiler/linker modifications from env
@@ -45,9 +46,10 @@ int main(int argc, const char* argv[]) {
         // Apply modifications to toolchain invocation
         tchain->interpolateSpackEnv(spack);
         // Execute coolchain invocation
-        tchain->invokeToolchain();
-        // Any errors caused by the run are reported via the
-        // toolchain, if we reach here, we've had success, exit
+        if (!tchain->invokeToolchain())
+        {
+            return 999;
+        }
     }
     return 0;
 }

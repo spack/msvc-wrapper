@@ -57,16 +57,17 @@ void ExecuteCommand::createChildPipes()
     if( !CreatePipe(&this->ChildStdOut_Rd, &this->ChildStdOut_Wd, &saAttr, 0) )
         throw SpackException("Could not create Child Pipe");
     if ( !SetHandleInformation(ChildStdOut_Rd, HANDLE_FLAG_INHERIT, 0) )
-        throw SpackException("Child pipe handle inappropriately inhereited");
+        throw SpackException("Child pipe handle inappropriately inherited");
 }
 
 void ExecuteCommand::executeToolChainChild()
 {
     LPVOID lpMsgBuf;
-    wchar_t * commandLine = &ConvertAnsiToWide(this->composeCLI())[0];
+    const std::wstring c_commandLine = ConvertAnsiToWide(this->composeCLI());
+    wchar_t * nc_commandLine = _wcsdup(c_commandLine.c_str());
     if(! CreateProcessW(
         NULL,
-        commandLine,
+        nc_commandLine,
         NULL,
         NULL,
         TRUE,
@@ -88,12 +89,14 @@ void ExecuteCommand::executeToolChainChild()
             (LPTSTR) &lpMsgBuf,
             0, NULL
         );
+        free(nc_commandLine);
         throw SpackException((char *)lpMsgBuf);
     }
     // We've suceeded in kicking off the toolchain run
     // Explicitly close write handle to child proc stdout
     // as it is no longer needed and if we do not then cannot
     // determine when child proc is done
+    free(nc_commandLine);
     CloseHandle(this->ChildStdOut_Wd);
 }
 
@@ -150,13 +153,9 @@ std::string ExecuteCommand::composeCLI()
 {
     std::string CLI;
     CLI += this->baseCommand + " ";
-    auto addToCLI = [&](StrList args){
-        for( auto& arg: args ){
-            CLI += arg + " ";
-        }
-    };
-    addToCLI(this->commandArgs);
-
+    for(auto arg: this->commandArgs){
+        CLI += arg + " ";
+    }
     return CLI;
 }
 
