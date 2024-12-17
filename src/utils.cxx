@@ -167,9 +167,11 @@ std::map<std::string, std::string> parseRelocate(const char ** args, int argc) {
             std::cerr << "Unknown argument :" << args[i] << "will be ignored\n";
         }
     }
-    if(!opts.count("full"))
-    {
-        opts.insert(std::pair<std::string, std::string>("full", std::string("")));
+    if(!opts.count("full")){
+        opts.insert(std::pair<std::string, std::string>("full", std::string()));
+    }
+    if(!opts.count("cmd")){
+        opts.insert(std::pair<std::string, std::string>("cmd", std::string()));
     }
     checkArgumentPresence(opts, "lib");
     checkArgumentPresence(opts, "full");

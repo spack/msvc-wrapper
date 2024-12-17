@@ -415,8 +415,10 @@ void LibRename::computeDefFile()
 int LibRename::executeRename()
 {
     try {
-        this->computeDefFile();
-        this->executeLibRename();
+        if(!this->deploy){
+            this->computeDefFile();
+            this->executeLibRename();
+        }
         if (this->full) {
             this->executeDllRename();
         }
