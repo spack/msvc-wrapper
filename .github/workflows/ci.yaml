@@ -2,11 +2,6 @@ name: ci
 
 on: [push, pull_request]
 
-
-concurrency:
-  group: ci-${{github.ref}}-${{github.event.pull_request.number || github.run_number}}
-  cancel-in-progress: true
-
 jobs:
   # Check which files have been updated by the PR
   validate-wrapper:
