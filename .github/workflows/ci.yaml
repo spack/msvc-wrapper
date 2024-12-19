@@ -1,6 +1,11 @@
 name: ci
 
-on: [push, pull_request]
+on: [pull_request, push]
+
+
+concurrency:
+  group: ci-${{github.ref}}-${{github.event.pull_request.number || github.run_number}}
+  cancel-in-progress: true
 
 jobs:
   # Check which files have been updated by the PR
@@ -22,3 +27,4 @@ jobs:
       - name: "Test RPath"
         run: |
           nmake test  
+    
