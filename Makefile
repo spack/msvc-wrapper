@@ -45,6 +45,7 @@ install : cl.exe
 	mkdir $(PREFIX)
 	move cl.exe $(PREFIX)
 	mklink $(PREFIX)/link.exe $(PREFIX)/cl.exe
+	mklink $(PREFIX)/ifx.exe $(PREFIX)/cl.exe
 	mklink $(PREFIX)/relocate.exe $(PREFIX)/cl.exe
 
 setup_test: cl.exe

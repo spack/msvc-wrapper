@@ -2,11 +2,12 @@
 
 #include <string>
 #include <vector>
+#include <map>
+#include <iostream>
 #include <windows.h>
 #include <tchar.h>
 #include <stdio.h>
 #include <strsafe.h>
-#include <map>
 
 #include "version.h"
 
