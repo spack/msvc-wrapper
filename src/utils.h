@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <iostream>
+#include <sstream>
 #include <windows.h>
 #include <tchar.h>
 #include <stdio.h>
@@ -47,7 +48,7 @@ public:
 std::string getSpackEnv(const char* env);
 std::string getSpackEnv(const std::string &env);
 StrList getenvlist(const std::string &envVar, const std::string &delim = ";");
-void validate_spack_env();
+int validate_spack_env();
 
 // String helper methods adding cxx20 features to cxx14
 
@@ -105,6 +106,8 @@ bool isPathAbsolute(const std::string &pth);
 
 // Returns File offset given RVA
 DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER section_header, DWORD number_of_sections, DWORD rva);
+
+int safeHandleCleanup(HANDLE &handle);
 
 class LibraryFinder {
 private:

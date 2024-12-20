@@ -51,13 +51,13 @@ install : cl.exe
 setup_test: cl.exe
 	test\setup_spack_env.bat
 	rmdir /q /s tmp
-	mkdir tmp/test
-	cd tmp/test
+	mkdir tmp\test
+	cd tmp\test
 	# create symlinks to test the different toolchains
-	copy ../../cl.exe cl.exe
+	copy ..\..\cl.exe cl.exe
 	mklink link.exe cl.exe
 	mklink relocate.exe cl.exe
-	cd ../..
+	cd ..\..
 
 build_and_check_test_sample : test/calc.obj test/main.obj setup_test
 	link $(LFLAGS) calc.obj /out:calc.dll /dll
@@ -87,6 +87,8 @@ clean :
 	del *.exe
 	del *.dll
 	del *.lib
+	del *.exp
+	del *.pdb
 
 clean-cl :
 	del cl.exe

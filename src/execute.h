@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <strsafe.h>
 #include <vector>
+#include <future>
+
+#include "utils.h"
 
 #define BUFSIZE 4096
 
@@ -16,25 +19,29 @@ class ExecuteCommand {
 public:
     // constructor for single executable/arguments + command in one string
     ExecuteCommand(std::string command);
-    ExecuteCommand(std::string arg, std::vector<std::string> args);
+    ExecuteCommand(std::string arg, StrList args);
     ExecuteCommand() = default;
+    ExecuteCommand& operator=(ExecuteCommand &&ec);
     ~ExecuteCommand();
-    void execute(const std::string &filename = empty);
+    int execute(const std::string &filename = empty);
+    int join();
 private:
     void setupExecute();
-    void executeToolChainChild();
-    bool pipeChildToStdout();
-    void createChildPipes();
-    void cleanupHandles();
-    void safeHandleCleanup(HANDLE &handle);
+    int executeToolChainChild();
+    int pipeChildToStdout();
+    int createChildPipes();
+    int cleanupHandles();
+    int reportExitCode();
+    std::future<int> child_out_future;
+    std::future<int> exit_code_future;
     std::string composeCLI();
     HANDLE ChildStdOut_Rd;
     HANDLE ChildStdOut_Wd;
     PROCESS_INFORMATION procInfo;
     STARTUPINFOW startInfo;
     SECURITY_ATTRIBUTES saAttr;
-    HANDLE fileout;
+    HANDLE fileout = INVALID_HANDLE_VALUE;
     bool write_to_file;
     std::string baseCommand;
-    std::vector<std::string> commandArgs;
+    StrList commandArgs;
 };

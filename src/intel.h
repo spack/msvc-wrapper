@@ -6,7 +6,7 @@
  * @brief ClInvocation exposes an interface driving invocations of
  * ifx.exe and defines the parameters of the call to said executable
  */
-class IntelFortranInvocation : public ToolChainInvocation {
+class FortranInvocation : public ToolChainInvocation {
 public:
     using ToolChainInvocation::ToolChainInvocation;
 protected:

@@ -106,9 +106,9 @@ class LibRename {
 public:
     LibRename(std::string lib, bool full, bool deploy, bool replace);
     int executeRename();
-    void executeLibRename();
-    void executeDllRename();
-    void computeDefFile();
+    int executeLibRename();
+    int executeDllRename();
+    int computeDefFile();
     std::string compute_rename_line();
     std::string compute_def_line();
 

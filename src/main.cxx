@@ -34,14 +34,9 @@ int main(int argc, const char* argv[]) {
     }
     else {
         // Ensure required variables are set
-        try {
-            validate_spack_env();
-        }
-        catch (SpackCompilerContextException e)
-        {
-            std::cerr << "Spack compiler environment not properly established, please setup the environment and try again\n";
-            return 99;
-        }
+        // if(!validate_spack_env()) {
+        //     return -99;
+        // }
         // Determine which tool we're trying to run
         std::unique_ptr<ToolChainInvocation> tchain(ToolChainFactory::ParseToolChain(argv));
         // Establish Spack compiler/linker modifications from env
@@ -49,10 +44,7 @@ int main(int argc, const char* argv[]) {
         // Apply modifications to toolchain invocation
         tchain->interpolateSpackEnv(spack);
         // Execute coolchain invocation
-        if (!tchain->invokeToolchain())
-        {
-            return 999;
-        }
+        return tchain->invokeToolchain();
     }
     return 0;
 }

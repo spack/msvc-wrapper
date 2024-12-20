@@ -216,25 +216,27 @@ char const * SpackCompilerContextException::what() {
     return msg.c_str();
 }
 
-void validate_spack_env() {
+int validate_spack_env() {
     std::vector<std::string> SpackEnv{
-"SPACK_ENV_PATH"
-"SPACK_DEBUG_LOG_DIR"
+"SPACK_ENV_PATH",
+"SPACK_DEBUG_LOG_DIR",
 // "SPACK_DEBUG_LOG_ID"
-"SPACK_COMPILER_SPEC"
+"SPACK_COMPILER_SPEC",
 // "SPACK_CC_RPATH_ARG"
 // "SPACK_CXX_RPATH_ARG"
 // "SPACK_F77_RPATH_ARG"
 // "SPACK_FC_RPATH_ARG"
 // "SPACK_LINKER_ARG"
 // "SPACK_SHORT_SPEC"
-"SPACK_SYSTEM_DIRS"
-"SPACK_CC"
-"SPACK_LD"};
+"SPACK_SYSTEM_DIRS",
+"SPACK_CC",
+"SPACK_LD",};
     for(auto &var: SpackEnv)
         if(!getenv(var.c_str())){
-            throw SpackCompilerContextException(var + " isn't set in the environment and is expected to be");
+            std::cerr << var + " isn't set in the environment and is expected to be\n";
+            return 0;
         }
+    return 1;
 }
 
 void die(std::string &cli ) {
@@ -384,25 +386,27 @@ void LibraryFinder::eval_search_paths() {
 }
 
 std::string LibraryFinder::finder(const std::string &pth, const std::string &lib_name) {
-        WIN32_FIND_DATA findFileData;
-        HANDLE hFind = FindFirstFileW(ConvertAnsiToWide(pth).c_str(), &findFileData);
+    WIN32_FIND_DATAW findFileData;
+    HANDLE hFind = FindFirstFileW(ConvertAnsiToWide(pth).c_str(), &findFileData);
 
-        if (hFind == INVALID_HANDLE_VALUE) {
-            std::cerr << "FindFirstFile failed (" << GetLastError() << ")" << std::endl;
-            return;
+    if (hFind == INVALID_HANDLE_VALUE) {
+        std::cerr << "FindFirstFile failed (" << GetLastError() << ")" << std::endl;
+        return std::string();
+    }
+    
+    do {
+        if (std::wcsstr(findFileData.cFileName, ConvertAnsiToWide(lib_name).c_str())){
+            return ConvertWideToANSI(findFileData.cFileName);
         }
+    } while (FindNextFileW(hFind, &findFileData) != 0);
+
+    DWORD dwError = GetLastError();
+    if (dwError != ERROR_NO_MORE_FILES) {
+        std::cerr << "FindNextFile failed (" << dwError << ")" << std::endl;
+    }
+    FindClose(hFind);
+    return std::string();
         
-        do {
-            if (std::wcsstr(findFileData.cFileName, ConvertAnsiToWide(lib_name).c_str())){
-                return ConvertWideToANSI(findFileData.cFileName);
-            }
-        } while (FindNextFile(hFind, &findFileData) != 0);
-
-        DWORD dwError = GetLastError();
-        if (dwError != ERROR_NO_MORE_FILES) {
-            std::cerr << "FindNextFile failed (" << dwError << ")" << std::endl;
-        }
-        FindClose(hFind);
 }
 
 std::vector<std::string> system_locations = {
@@ -433,4 +437,17 @@ bool LibraryFinder::is_system(const std::string &pth) {
             return true;
         }
     }
+    return false;
+}
+
+int safeHandleCleanup(HANDLE &handle)
+{
+    if(handle){
+        if ( !CloseHandle(handle) ) {
+            std::stringstream os_error;
+            std::cerr << GetLastError();
+            return 0;
+        }
+    }
+    return 1;
 }

@@ -11,7 +11,7 @@ private:
     static void stripPath(std::string &command);
     enum Language {
         cpp,
-        intelFortran,
+        Fortran,
         link
     };
     const static std::map<std::string, Language> SupportedTools;

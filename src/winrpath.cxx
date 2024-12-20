@@ -288,14 +288,14 @@ bool LibRename::spack_check_for_dll(const std::string &name)
 {
     if(this->deploy){
         for(std::map<char, char>::const_iterator it = path_to_special_characters.begin(); it != path_to_special_characters.end(); ++it){
-            if(!name.find(it->first) == std::string::npos){
+            if(!(name.find(it->first) == std::string::npos)){
                 return true;
             }
         }
         return false;
     }
     else {
-        return (!name.find("<!spack>") == std::string::npos);
+        return (!(name.find("<!spack>") == std::string::npos));
     }
 }
 
@@ -306,10 +306,12 @@ int LibRename::rename_dll(DWORD name_loc, const std::string &dll_name)
         if(padding_len < 8) {
             // path is too long to mark as a Spack path
             // use shorter sigil
-            *((LPDWORD) name_loc+2) = (DWORD)"<sp>"; 
+            char short_sigil[] = "<sp>";
+            snprintf((char*)name_loc, sizeof(short_sigil), short_sigil); 
         }
         else {
-            *((LPDWORD) name_loc+2) = (DWORD)"<!spack>"; 
+            char long_sigil[] = "<!spack>";
+            snprintf((char*)name_loc, sizeof(long_sigil), long_sigil);
         }
     }
     else {
@@ -325,9 +327,9 @@ int LibRename::rename_dll(DWORD name_loc, const std::string &dll_name)
             return -1;
         }
         std::string mangled_padded_new_name = mangle_name(new_library_loc);
-        *((LPDWORD) name_loc) = mangled_padded_new_name.c_str();
+        *((LPDWORD) name_loc) = (DWORD)mangled_padded_new_name.c_str();
     }
-
+    return 1;
 }
 
 int LibRename::find_dll_and_rename(HANDLE &pe_in)
@@ -383,14 +385,10 @@ int LibRename::find_dll_and_rename(HANDLE &pe_in)
             }
         }
     }
-    if(!CloseHandle(basepointer)){
-        std::cerr << "Unable to properly close file view\n";
+    if(!safeHandleCleanup(basepointer) || !safeHandleCleanup(hMapObject)) {
         return -3;
     }
-    if(!CloseHandle(hMapObject)){
-        std::cerr << "Unable to properly close file map\n";
-        return -4;
-    }
+    return 1;
 }
 
 LibRename::LibRename(std::string lib, bool full, bool deploy, bool replace)
@@ -407,9 +405,9 @@ std::string LibRename::compute_def_line()
     return "/EXPORTS " + this->lib;
 }
 
-void LibRename::computeDefFile()
+int LibRename::computeDefFile()
 {
-    this->def_executor.execute(this->def_file);
+    return this->def_executor.execute(this->def_file);
 }
 
 int LibRename::executeRename()
@@ -430,9 +428,14 @@ int LibRename::executeRename()
     return 0;
 }
 
-void LibRename::executeLibRename()
+int LibRename::executeLibRename()
 {
     this->lib_executor.execute();
+    int ret_code = this->lib_executor.join();
+    if(ret_code) {
+        std::cerr << GetLastError();
+        return ret_code;
+    }
     // import library has been generated with
     // mangled abs path to dll -
     // unmangle it
@@ -440,10 +443,11 @@ void LibRename::executeLibRename()
     CoffParser coff(&cr);
     coff.parse();
     coff.normalize_name();
+    return 0;
 }
 
 
-void LibRename::executeDllRename()
+int LibRename::executeDllRename()
 {
     LPCWSTR lib_name = ConvertAnsiToWide(this->lib).c_str();
     HANDLE dll_handle = CreateFileW(lib_name, (GENERIC_READ|GENERIC_WRITE), FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -452,7 +456,7 @@ void LibRename::executeDllRename()
         os_error << GetLastError();
         throw SpackException(os_error.str());
     }
-    this->find_dll_and_rename(dll_handle);
+    return this->find_dll_and_rename(dll_handle);
 }
 
 std::string LibRename::compute_rename_line()

@@ -1,5 +1,4 @@
 #include "execute.h"
-#include "utils.h"
 
 #include <sstream>
 
@@ -24,6 +23,22 @@ ExecuteCommand::ExecuteCommand(std::string arg, StrList args) :
     this->setupExecute();
 }
 
+ExecuteCommand& ExecuteCommand::operator=(ExecuteCommand &&ec)
+{
+    this->ChildStdOut_Rd = std::move(ec.ChildStdOut_Rd);
+    this->ChildStdOut_Wd = std::move(ec.ChildStdOut_Wd);
+    this->procInfo = std::move(ec.procInfo);
+    this->startInfo = std::move(ec.startInfo);
+    this->saAttr = std::move(ec.saAttr);
+    this->fileout = std::move(ec.fileout);
+    this->write_to_file = std::move(ec.write_to_file);
+    this->baseCommand = std::move(ec.baseCommand);
+    this->commandArgs = std::move(ec.commandArgs);
+    this->child_out_future = std::move(ec.child_out_future);
+    this->exit_code_future = std::move(exit_code_future);
+    return *this;
+}
+
 ExecuteCommand::~ExecuteCommand()
 {
     this->cleanupHandles();
@@ -46,7 +61,11 @@ void ExecuteCommand::setupExecute()
     this->startInfo = siStartInfo;
 }
 
-void ExecuteCommand::createChildPipes()
+/*
+ * Create pipes and handles to communicate with
+ * child process
+ */
+int ExecuteCommand::createChildPipes()
 {
     SECURITY_ATTRIBUTES saAttr;
     // Set the bInheritHandle flag so pipe handles are inherited.
@@ -55,12 +74,16 @@ void ExecuteCommand::createChildPipes()
     saAttr.lpSecurityDescriptor = NULL;
     this->saAttr = saAttr;
     if( !CreatePipe(&this->ChildStdOut_Rd, &this->ChildStdOut_Wd, &saAttr, 0) )
-        throw SpackException("Could not create Child Pipe");
+        return 0;
     if ( !SetHandleInformation(ChildStdOut_Rd, HANDLE_FLAG_INHERIT, 0) )
-        throw SpackException("Child pipe handle inappropriately inherited");
+        return 0;
+    return 1;
 }
 
-void ExecuteCommand::executeToolChainChild()
+/*
+ * Kick off subprocess executing a given toolchain
+ */
+int ExecuteCommand::executeToolChainChild()
 {
     LPVOID lpMsgBuf;
     const std::wstring c_commandLine = ConvertAnsiToWide(this->composeCLI());
@@ -78,7 +101,7 @@ void ExecuteCommand::executeToolChainChild()
         &this->procInfo)
     )
     {
-        // Handle errors coming from creating of child proc
+        // Handle errors coming from creation of child proc
         FormatMessage(
             FORMAT_MESSAGE_ALLOCATE_BUFFER |
             FORMAT_MESSAGE_FROM_SYSTEM |
@@ -89,8 +112,9 @@ void ExecuteCommand::executeToolChainChild()
             (LPTSTR) &lpMsgBuf,
             0, NULL
         );
+        std::cerr << (char*)lpMsgBuf << "\n";
         free(nc_commandLine);
-        throw SpackException((char *)lpMsgBuf);
+        return 0;
     }
     // We've suceeded in kicking off the toolchain run
     // Explicitly close write handle to child proc stdout
@@ -98,9 +122,14 @@ void ExecuteCommand::executeToolChainChild()
     // determine when child proc is done
     free(nc_commandLine);
     CloseHandle(this->ChildStdOut_Wd);
+    return 1;
 }
 
-bool ExecuteCommand::pipeChildToStdout()
+/* 
+ * Execute the command and then after it finishes collect all of 
+ * its output.
+ */
+int ExecuteCommand::pipeChildToStdout()
 {
     DWORD dwRead, dwWritten;
     CHAR chBuf[BUFSIZE];
@@ -122,31 +151,33 @@ bool ExecuteCommand::pipeChildToStdout()
                             dwRead, &dwWritten, NULL);
         if (! bSuccess ) break;
     }
-    return bSuccess;
+    return !bSuccess;
 }
 
-void ExecuteCommand::cleanupHandles()
+/*
+ * Ensures handles and their underlying resources are
+ * cleaned
+ */
+int ExecuteCommand::cleanupHandles()
 {
-    try {
-        this->safeHandleCleanup(this->procInfo.hProcess);
-        this->safeHandleCleanup(this->procInfo.hThread);
-    }
-    catch(SpackException &e)
-    {
-        std::cerr << "Exception: " << e.what() << "\n";
-    }
 
+    if(this->fileout != INVALID_HANDLE_VALUE)
+        if(!safeHandleCleanup(this->fileout))
+            return 0;
+    if(!safeHandleCleanup(this->procInfo.hProcess) 
+        || !safeHandleCleanup(this->procInfo.hThread))
+        return 0;
+    return 1;
 }
 
-void ExecuteCommand::safeHandleCleanup(HANDLE &handle)
+int ExecuteCommand::reportExitCode()
 {
-    if(handle){
-        if ( !CloseHandle(handle) ) {
-            std::stringstream os_error;
-            os_error << GetLastError();
-            throw SpackException(os_error.str());
-        }
+    DWORD exit_code;
+    while(GetExitCodeProcess(this->procInfo.hProcess, &exit_code)) {
+        if(exit_code != STILL_ACTIVE)
+            break;
     }
+    return exit_code;
 }
 
 std::string ExecuteCommand::composeCLI()
@@ -159,7 +190,11 @@ std::string ExecuteCommand::composeCLI()
     return CLI;
 }
 
-void ExecuteCommand::execute(const std::string &filename)
+/*
+ * Execute command in subprocess, piping stdout to parent
+ * and returning the exit code of the subprocess
+*/
+int ExecuteCommand::execute(const std::string &filename)
 {
     if (!filename.empty()){
         this->write_to_file = true;
@@ -172,13 +207,19 @@ void ExecuteCommand::execute(const std::string &filename)
                                     NULL
                                     );
     }
-    try {
-        this->executeToolChainChild();
-        this->pipeChildToStdout();
-    }
-    catch(SpackException &e) {
-        std::cerr << "exception: " << e.what() << "\n";
-        throw SpackException("Failed execution");
-    }
+    int ret_code = this->executeToolChainChild();
+    this->child_out_future = std::async(std::launch::async, &ExecuteCommand::pipeChildToStdout, this);
+    this->exit_code_future = std::async(std::launch::async, &ExecuteCommand::reportExitCode, this);
+    return ret_code;
+}
 
+/*
+ * Blocks until the command initiated by execute terminates
+ * and reports exit code
+ */
+int ExecuteCommand::join()
+{
+    if(!this->child_out_future.get())
+        return -999;
+    return this->exit_code_future.get();
 }

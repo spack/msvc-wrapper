@@ -10,10 +10,9 @@ int LdInvocation::invokeToolchain()
 {
     // Run base linker invocation to produce initial
     // dll and import library
-    if(!ToolChainInvocation::invokeToolchain()){
-        std::cerr << "Unable to complete initial linker pass. ";
-        std::cerr << "Skipping re-name operation.\n";
-        return 0;
+    int ret_code = ToolChainInvocation::invokeToolchain();
+    if(ret_code != 0){
+        return ret_code;
     }
     // Next we want to construct the proper commmand line to
     // recreate the import library from the same set of obj files
@@ -41,18 +40,17 @@ int LdInvocation::invokeToolchain()
                 this->libDirArgs,
             }
         ));
-        try{
-            this->rpath_executor.execute();
-            CoffReader cr(abs_out_imp_lib_name);
-            CoffParser coff(&cr);
-            coff.parse();
-            coff.normalize_name();
+        this->rpath_executor.execute();
+        int err_code = this->rpath_executor.join();
+        if(err_code != 0) {
+            return err_code;
         }
-        catch(SpackException &e){
-            std::cerr << "Failed to execute rename and normalization with error: " << e.what() << "\n";
-            return 0;
-        }
+        CoffReader cr(abs_out_imp_lib_name);
+        CoffParser coff(&cr);
+        coff.parse();
+        coff.normalize_name();
         std::rename(abs_out_imp_lib_name.c_str(), imp_lib_name.c_str());
+
     }
-    return 1;
+    return ret_code;
 }

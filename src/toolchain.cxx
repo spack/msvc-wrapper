@@ -38,15 +38,13 @@ int ToolChainInvocation::invokeToolchain() {
     this->executor = ExecuteCommand(  this->spackCommand,
                                       commandLine
                                     );
-    try{
-        // Run first pass of command as requested by caller
-        this->executor.execute();
+    // Run first pass of command as requested by caller
+    int ret_code = this->executor.execute();
+    if(!ret_code) {
+        std::cerr << "Unable to launch process \n";
+        return -9999;
     }
-    catch(SpackException &e){
-        std::cerr << e.what() << "\n";
-        return 0;
-    }
-    return 1;
+    return this->executor.join();
 }
 
 void ToolChainInvocation::parse_command_args(char const* const* cli) {

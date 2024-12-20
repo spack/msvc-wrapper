@@ -14,8 +14,8 @@ std::unique_ptr<ToolChainInvocation> ToolChainFactory::ParseToolChain(char const
         if(language == lang::cpp) {
             Tool = std::unique_ptr<ClInvocation>(new ClInvocation(command, cli));
         }
-        else if(language == lang::intelFortran) {
-            Tool = std::unique_ptr<IntelFortranInvocation>(new IntelFortranInvocation(command, cli));
+        else if(language == lang::Fortran) {
+            Tool = std::unique_ptr<FortranInvocation>(new FortranInvocation(command, cli));
         }
         else {
             // If it's not c/c++ or fortran we're linking
@@ -45,8 +45,8 @@ void ToolChainFactory::stripPath(std::string &command) {
 const std::map<std::string, ToolChainFactory::Language> ToolChainFactory::SupportedTools{
                                                         {"cl", ToolChainFactory::Language::cpp},
                                                         {"link", ToolChainFactory::Language::link},
-                                                        {"ifort", ToolChainFactory::Language::intelFortran},
-                                                        {"ifx", ToolChainFactory::Language::intelFortran}
+                                                        {"ifort", ToolChainFactory::Language::Fortran},
+                                                        {"ifx", ToolChainFactory::Language::Fortran}
                                                     };
 
 
