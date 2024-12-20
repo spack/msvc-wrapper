@@ -79,7 +79,7 @@ void ToolChainInvocation::parse_command_args(char const* const* cli) {
 }
 
 std::string ToolChainInvocation::composeIncludeArg(std::string &include) {
-    return "/I" + include;
+    return "/external:I " + include;
 }
 
 std::string ToolChainInvocation::composeLibPathArg(std::string &libPath) {

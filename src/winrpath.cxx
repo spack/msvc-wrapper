@@ -283,7 +283,10 @@ bool CoffParser::normalize_name()
     return true;
 }
 
-
+/*
+ * Checks a DLL name for special characters, if we're deploying, a path character, if we're
+ * relocating a spack sigil
+*/
 bool LibRename::spack_check_for_dll(const std::string &name)
 {
     if(this->deploy){
@@ -299,6 +302,12 @@ bool LibRename::spack_check_for_dll(const std::string &name)
     }
 }
 
+/*
+ * Actually performs the DLL rename, given the DLL location in mapped memory view
+ * determines the required padding for a name, if deploying, the proper length of a sigil
+ * then either writes the sigil'd name back into the memory map, or gets the new path to a dll
+ * re-pads it, and then writes that into the DLL name location.
+*/
 int LibRename::rename_dll(DWORD name_loc, const std::string &dll_name)
 {
     if(this->deploy) {
@@ -332,6 +341,22 @@ int LibRename::rename_dll(DWORD name_loc, const std::string &dll_name)
     return 1;
 }
 
+/*
+ * Loads DLL into memory the way it would be if loaded by the system
+ * This is require behavior as the MSVC structs designed to parse the PE
+ * format expect proper page/memory alignment, which is only done if properly
+ * mapped into memory.
+ * 
+ * Decompose the PE file into a series of structs to locate the IMPORT section
+ * Parse the IMPORT section for the names of all imported DLLS
+ * If a given DLL name is a Spack derived DLL name, identifiable via the
+ * spack sigil or the fact there are path characters in the DLL name, which is not 
+ * normally the case without Spack, depending on the operation, the name is modified
+ * If we're performing a deployment to a buildcache, we mark the name with a spack sigil
+ * to identify it as one in need of relocation post builcache extraction
+ * On extraction, we find dll names with the Spack sigil and rename (and repad) them with
+ * the correct absolute path to the requisite DLL on the new host system.
+*/
 int LibRename::find_dll_and_rename(HANDLE &pe_in)
 {
     HANDLE hMapObject = CreateFileMapping(pe_in, NULL, PAGE_READWRITE, 0, 0, NULL);
@@ -391,6 +416,24 @@ int LibRename::find_dll_and_rename(HANDLE &pe_in)
     return 1;
 }
 
+/*
+ * LibRename is responsible for renaming and relocating DLLs and
+ * their corresponding import libraries
+ * 
+ * Deploy - this flag determines whether or not this invocation is
+ *          being used to prepare a binary for deployment into a
+ *          build cache. If this is true, the import library is not
+ *          re-written to create an absolute path, and the dll names
+ *          in the dll are not made to be absolute paths, instead
+ *          a spack sigil is injected into the names so we can identify
+ *          them as Spack paths
+ * Full -   this flag informs the process if we're relocating a DLL or
+ *          just its import library. If we're doing a "full" pass, we
+ *          produce a new import library with the full path to its dll
+ *          AND we re-write all DLL references in the DLL itself. If this
+ *          is false and we're not doing a "full" build, we only re-write
+ *          and import lib
+*/
 LibRename::LibRename(std::string lib, bool full, bool deploy, bool replace)
 : replace(replace), full(full), lib(lib), deploy(deploy)
 {
@@ -459,6 +502,23 @@ int LibRename::executeDllRename()
     return this->find_dll_and_rename(dll_handle);
 }
 
+/* Construc the line needed to produce a new import library
+ * given a set of symbols exported by a DLL, the current import lib
+ * and a name for said DLL, which in our case is the mangled DLL
+ * absolute path. This creates an import libray with a
+ * mangled absolute path to the DLL as its DLL name
+ * which we then unmangle to produce the "rpath" that
+ * will be injected into binaries that link against this
+ * 
+ * A complete rename line looks something like
+ * 
+ * -def:foo.def -name:C;|abs|path|to|foo.dll -out:foo.dll-abs.lib foo.lib
+ * 
+ * If we're replacing the current binary
+ * 
+ * -def:foo.def -name:C;|abs|path|to|foo.dll -out:foo.dll.abs-name.lib foo.lib
+ * 
+*/
 std::string LibRename::compute_rename_line()
 {
     std::string line("-def:");
