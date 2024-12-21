@@ -10,6 +10,9 @@ concurrency:
 jobs:
   # Check which files have been updated by the PR
   validate-wrapper:
+    defaults:
+      run:
+        shell: cmd
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
