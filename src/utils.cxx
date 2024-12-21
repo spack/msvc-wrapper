@@ -136,13 +136,17 @@ void checkArgumentPresence(const std::map<std::string, std::string> &args, const
 std::map<std::string, std::string> parseRelocate(const char ** args, int argc) {
     std::map<std::string, std::string> opts;
     for (int i = 0; i < argc; i++){
-        if (strcmp(args[i], "--library")) {
-            redefinedArgCheck(opts, "lib", "--library");
-            opts.insert(std::pair<std::string, std::string>("lib", args[++i]));
+        if (strcmp(args[i], "--pe")) {
+            redefinedArgCheck(opts, "pe", "--pe");
+            opts.insert(std::pair<std::string, std::string>("pe", args[++i]));
         }
         else if (endswith((std::string)args[i], ".dll")) {
-            redefinedArgCheck(opts, "lib", "lib");
-            opts.insert(std::pair<std::string, std::string>("lib", args[i]));
+            redefinedArgCheck(opts, "pe", "pe");
+            opts.insert(std::pair<std::string, std::string>("pe", args[i]));
+        }
+        else if (endswith((std::string)args[i], ".exe")) {
+            redefinedArgCheck(opts, "pe", "pe");
+            opts.insert(std::pair<std::string, std::string>("pe", args[i]));
         }
         else if (strcmp(args[i], "--full")) {
             redefinedArgCheck(opts, "full", "--full");
@@ -173,7 +177,7 @@ std::map<std::string, std::string> parseRelocate(const char ** args, int argc) {
     if(!opts.count("cmd")){
         opts.insert(std::pair<std::string, std::string>("cmd", std::string()));
     }
-    checkArgumentPresence(opts, "lib");
+    checkArgumentPresence(opts, "pe");
     checkArgumentPresence(opts, "full");
     checkArgumentPresence(opts, "cmd");
     return opts;
@@ -271,15 +275,19 @@ bool print_help()
     std::cout << "\n";
     std::cout << "      To preform relocation, invoke the 'relocate' symlink to this file:\n";
     std::cout << "\n";
-    std::cout << "      options:";
-    std::cout << "          [--library] <path to library>                = Dynamic library to be relocated\n";
+    std::cout << "      options:\n";
+    std::cout << "          [--pe] <path to pe file>                     = PE file to be relocated\n";
     std::cout << "          --full                                       = Relocate dynamic references inside\n";
-    std::cout << "                                                         the dll in addition to re-generating\n";
-    std::cout << "                                                         the import library\n";
+    std::cout << "                                                          the dll in addition to re-generating\n";
+    std::cout << "                                                          the import library\n";
+    std::cout << "                                                          Note: this is assumed to be true if\n";
+    std::cout << "                                                           relocating an executable.\n";
+    std::cout << "                                                          If an executable is relocated, no import\n";
+    std::cout << "                                                          library operations are performed.\n";
     std::cout << "          --export|--deploy                             = Mutually exclusive command modifier.\n";
-    std::cout << "                                                          Instructs relocate to either prepare the\n";
-    std::cout << "                                                          dynamic library for exporting to build cache\n";
-    std::cout << "                                                          or for extraction from bc onto new host system\n";
+    std::cout << "                                                           Instructs relocate to either prepare the\n";
+    std::cout << "                                                           dynamic library for exporting to build cache\n";
+    std::cout << "                                                           or for extraction from bc onto new host system\n";
     std::cout << "\n";
     return true;
 }

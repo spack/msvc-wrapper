@@ -16,7 +16,7 @@
 
 #pragma pack(push, r1, 1)
 typedef struct coff_member {
-    char data[];
+    char * data;
 } coff_member;
 
 typedef struct coff_header {
@@ -61,7 +61,8 @@ public:
     void read_member(coff_header &head, coff_member &coff_in);
     void read_sig(coff &coff_in);
     void write_name(char * name, int size);
-    void seek(int bytes=-1);
+    void seek(int bytes=-1, std::ios_base::seekdir way=std::ios_base::beg);
+    void clear();
     std::streampos tell();
     bool end();
 
@@ -104,10 +105,10 @@ private:
 
 class LibRename {
 public:
-    LibRename(std::string lib, bool full, bool deploy, bool replace);
+    LibRename(std::string pe, bool full, bool deploy, bool replace);
     int executeRename();
     int executeLibRename();
-    int executeDllRename();
+    int executePERename();
     int computeDefFile();
     std::string compute_rename_line();
     std::string compute_def_line();
@@ -118,13 +119,14 @@ private:
     int rename_dll(DWORD pos, const std::string &new_name);
     ExecuteCommand def_executor;
     ExecuteCommand lib_executor;
-    std::string lib;
+    std::string pe;
     std::string name;
     std::string new_lib;
     std::string def_file;
     bool full;
     bool deploy;
     bool replace;
+    bool is_exe;
 };
 
 

@@ -26,7 +26,7 @@ int main(int argc, const char* argv[]) {
         std::map<std::string, std::string> patch_args = parseRelocate(argv, argc);
         bool full = !patch_args.at("full").empty();
         bool deploy = patch_args.at("cmd") == "deploy";
-        LibRename rpath_lib(patch_args.at("lib"), full, deploy, true);
+        LibRename rpath_lib(patch_args.at("pe"), full, deploy, true);
         if(!rpath_lib.executeRename()){
             std::cerr << "Library rename failed\n";
             return 9;

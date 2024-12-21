@@ -157,6 +157,11 @@ bool CoffReader::Close()
     return !this->pe_stream.is_open();
 }
 
+void CoffReader::clear()
+{
+    this->pe_stream.clear();
+}
+
 bool CoffReader::isOpen()
 {
     return this->pe_stream.is_open();
@@ -180,7 +185,11 @@ void CoffReader::read_header(coff_header& coff_in)
 void CoffReader::read_member(coff_header& head, coff_member& coff_in)
 {
     int member_size(std::stoi(head.file_size));
-    this->pe_stream.read((char *)&coff_in, member_size);
+    coff_in.data = new char[member_size];
+    this->pe_stream.read(coff_in.data, member_size);
+    if (member_size % 2 != 0) {
+        this->seek(1, std::ios_base::cur);
+    }
 }
 
 std::streampos CoffReader::tell()
@@ -188,10 +197,9 @@ std::streampos CoffReader::tell()
     return this->pe_stream.tellg();
 }
 
-void CoffReader::seek(int bytes)
+void CoffReader::seek(int bytes, std::ios_base::seekdir way)
 {
-    this->pe_stream.seekg(bytes);
-    this->pe_stream.seekp(bytes);
+    this->pe_stream.seekg(bytes, way);
 }
 
 bool CoffReader::end()
@@ -209,16 +217,26 @@ CoffParser::CoffParser(CoffReader * cr)
 
 bool CoffParser::parse()
 {
+    if(!this->coffStream->Open()) {
+        std::cerr << "Unable to open coff file for reading: " << (char*)GetLastError() << "\n";
+        return false;
+    }
     this->coffStream->read_sig(this->coff_);
     CoffMembers members;
     while(!this->coffStream->end()) {
+        coff_header header;
+        coff_member member;
+        std::streampos offset = this->coffStream->tell();
+        this->coffStream->read_header(header);
+        this->coffStream->read_member(header, member);
         coff_entry entry;
-        entry.offset = this->coffStream->tell();
-        this->coffStream->read_header(entry.header);
-        this->coffStream->read_member(entry.header, entry.member);
+        entry.header = header;
+        entry.member = member;
+        entry.offset = offset;
         members.emplace_back(entry);
     }
     this->coff_.members = members;
+    this->coffStream->clear();
     return true;
 }
 
@@ -256,8 +274,11 @@ bool CoffParser::is_imp_lib()
 bool CoffParser::normalize_name()
 {
     for (auto mem: this->coff_.members) {
-        std::string name_ref(mem.header.file_name);
-
+        int i = 0;
+        while(i < 16 && mem.header.file_name[i] != ' ') {
+            ++i;
+        }
+        std::string name_ref = std::string(mem.header.file_name, i);
         if (!endswith(name_ref, "/")) {
             // Name is longer than 16 bytes, need to lookup name in longname offset
             int longname_offset = std::stoi(name_ref.substr(1, std::string::npos));
@@ -268,10 +289,14 @@ bool CoffParser::normalize_name()
             int i;
             for (i = longname_offset; this->coff_.members[2].member.data[i] != '\0'; ++i)
                 name.push_back(this->coff_.members[2].member.data[i]);
-            replace_special_characters((char *)&name, i-longname_offset);
-            this->coffStream->seek(this->coff_.members[2].offset);
-            this->coffStream->seek(longname_offset);
+            replace_special_characters((char *)&name[0], i-longname_offset);
+            int offset = std::streamoff(this->coff_.members[2].offset);
+            this->coffStream->seek(offset);
+            this->coffStream->seek(sizeof(mem.header) + longname_offset, std::ios_base::cur);
             this->coffStream->write_name(name.data(), name.size());
+        }
+        else if (name_ref == "/" || name_ref == "//") {
+            continue;
         }
         else {
             // Supporting relocation requires a padded path, a path short enough
@@ -280,6 +305,7 @@ bool CoffParser::normalize_name()
             throw SpackException("Name too short for relocation");
         }
     }
+    this->coffStream->Close();
     return true;
 }
 
@@ -434,10 +460,11 @@ int LibRename::find_dll_and_rename(HANDLE &pe_in)
  *          is false and we're not doing a "full" build, we only re-write
  *          and import lib
 */
-LibRename::LibRename(std::string lib, bool full, bool deploy, bool replace)
-: replace(replace), full(full), lib(lib), deploy(deploy)
+LibRename::LibRename(std::string pe, bool full, bool deploy, bool replace)
+: replace(replace), full(full), pe(pe), deploy(deploy)
 {
-    this->name = stem(this->lib);
+    this->name = stem(this->pe);
+    this->is_exe = endswith(this->pe, ".exe");
     this->def_file = this->name + ".def";
     this->def_executor = ExecuteCommand("dumpbin.exe", {this->compute_def_line()});
     this->lib_executor = ExecuteCommand("lib.exe", {this->compute_rename_line()});
@@ -445,7 +472,7 @@ LibRename::LibRename(std::string lib, bool full, bool deploy, bool replace)
 
 std::string LibRename::compute_def_line()
 {
-    return "/EXPORTS " + this->lib;
+    return "/EXPORTS " + this->pe;
 }
 
 int LibRename::computeDefFile()
@@ -456,12 +483,12 @@ int LibRename::computeDefFile()
 int LibRename::executeRename()
 {
     try {
-        if(!this->deploy){
+        if(!this->deploy || this->is_exe){
             this->computeDefFile();
             this->executeLibRename();
         }
-        if (this->full) {
-            this->executeDllRename();
+        if (this->full || this->is_exe) {
+            this->executePERename();
         }
     }
     catch (SpackException &e) {
@@ -490,16 +517,16 @@ int LibRename::executeLibRename()
 }
 
 
-int LibRename::executeDllRename()
+int LibRename::executePERename()
 {
-    LPCWSTR lib_name = ConvertAnsiToWide(this->lib).c_str();
-    HANDLE dll_handle = CreateFileW(lib_name, (GENERIC_READ|GENERIC_WRITE), FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (!dll_handle){
+    LPCWSTR lib_name = ConvertAnsiToWide(this->pe).c_str();
+    HANDLE pe_handle = CreateFileW(lib_name, (GENERIC_READ|GENERIC_WRITE), FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (!pe_handle){
         std::stringstream os_error;
         os_error << GetLastError();
         throw SpackException(os_error.str());
     }
-    return this->find_dll_and_rename(dll_handle);
+    return this->find_dll_and_rename(pe_handle);
 }
 
 /* Construc the line needed to produce a new import library
@@ -524,15 +551,15 @@ std::string LibRename::compute_rename_line()
     std::string line("-def:");
     line += this->def_file + " ";
     line += "-name:";
-    line += mangle_name(this->lib) + " ";
-    std::string name(stem(this->lib));
+    line += mangle_name(this->pe) + " ";
+    std::string name(stem(this->pe));
     if (!this->replace){
         this->new_lib = name + ".abs-name.lib";
     }
     else {
-        this->new_lib = this->lib;
+        this->new_lib = this->pe;
     }
-    line += "-out:\""+ this->new_lib + "\"" + " " + this->lib;
+    line += "-out:\""+ this->new_lib + "\"" + " " + this->pe;
     return line;
 }
 
