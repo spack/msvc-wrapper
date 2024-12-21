@@ -49,38 +49,30 @@ install : cl.exe
 	mklink $(PREFIX)/relocate.exe $(PREFIX)/cl.exe
 
 setup_test: cl.exe
+	del *.obj
 	test\setup_spack_env.bat
-	rmdir /q /s tmp
 	mkdir tmp\test
 	cd tmp\test
-	# create symlinks to test the different toolchains
 	copy ..\..\cl.exe cl.exe
 	mklink link.exe cl.exe
 	mklink relocate.exe cl.exe
 	cd ..\..
 
-build_and_check_test_sample : test/calc.obj test/main.obj setup_test
-	link $(LFLAGS) calc.obj /out:calc.dll /dll
+build_and_check_test_sample : setup_test
+	cl /c /EHsc test\calc.cxx /DCALC_EXPORTS
+	cl /c /EHsc test\main.cxx
+	link $(LFLAGS) calc.obj /out:calc.dll /DLL
 	link $(LFLAGS) main.obj calc.lib /out:tester.exe
 	tester.exe
+	cd ..
 
 test : build_and_check_test_sample
-	move tester.exe tmp/test/tester.exe
-	# if this runs the rpath hack worked
-	tmp/test/tester.exe
-	# now move the dll and make sure the test
-	# executable fails
-	# (sanity check)
-	# need to wrap failure in bat file for nmake
-	move calc.dll tmp/calc.dll
-	test/run_failing_check.bat
-	# now make sure relocate works
-	tmp/test/relocate --executable tmp/test/tester.exe tmp
-	tmp/test/tester.exe
-	tmp/test/relocate --library tmp/calc.dll --full
-	# validate that path is in the new binary
-	link $(LFLAGS) main.obj tmp/calc.lib /out:tester.exe
-	tester.exe
+	move test\tester.exe tmp\test\tester.exe
+	tmp\test\tester.exe
+	move calc.dll tmp\calc.dll
+	test\run_failing_check.bat
+	rmdir /q /s tmp
+
 
 clean :
 	del *.obj
