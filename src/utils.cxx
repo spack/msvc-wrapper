@@ -450,7 +450,7 @@ bool LibraryFinder::is_system(const std::string &pth) {
 
 int safeHandleCleanup(HANDLE &handle)
 {
-    if(handle){
+    if(handle != INVALID_HANDLE_VALUE){
         if ( !CloseHandle(handle) ) {
             std::stringstream os_error;
             std::cerr << GetLastError();

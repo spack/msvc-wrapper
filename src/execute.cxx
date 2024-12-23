@@ -114,6 +114,7 @@ int ExecuteCommand::executeToolChainChild()
         );
         std::cerr << (char*)lpMsgBuf << "\n";
         free(nc_commandLine);
+        this->cpw_initalization_failure = true;
         return 0;
     }
     // We've suceeded in kicking off the toolchain run
@@ -160,23 +161,28 @@ int ExecuteCommand::pipeChildToStdout()
  */
 int ExecuteCommand::cleanupHandles()
 {
-
-    if(this->fileout != INVALID_HANDLE_VALUE)
-        if(!safeHandleCleanup(this->fileout))
+    if(!this->cpw_initalization_failure) {
+        if(this->fileout != INVALID_HANDLE_VALUE)
+            if(!safeHandleCleanup(this->fileout))
+                return 0;
+        if(!safeHandleCleanup(this->procInfo.hProcess))
             return 0;
-    if(!safeHandleCleanup(this->procInfo.hProcess) 
-        || !safeHandleCleanup(this->procInfo.hThread))
-        return 0;
-    return 1;
+        if( !safeHandleCleanup(this->procInfo.hThread))
+            return 0;
+        return 1;
+    }
+    return 0;
+
 }
 
 int ExecuteCommand::reportExitCode()
 {
     DWORD exit_code;
-    while(GetExitCodeProcess(this->procInfo.hProcess, &exit_code)) {
+    while(GetExitCodeProcess( this->procInfo.hProcess, &exit_code )) {
         if(exit_code != STILL_ACTIVE)
             break;
     }
+    CloseHandle(this->procInfo.hProcess);
     return exit_code;
 }
 
@@ -208,8 +214,10 @@ int ExecuteCommand::execute(const std::string &filename)
                                     );
     }
     int ret_code = this->executeToolChainChild();
-    this->child_out_future = std::async(std::launch::async, &ExecuteCommand::pipeChildToStdout, this);
-    this->exit_code_future = std::async(std::launch::async, &ExecuteCommand::reportExitCode, this);
+    if (ret_code) {
+        this->child_out_future = std::async(std::launch::async, &ExecuteCommand::pipeChildToStdout, this);
+        this->exit_code_future = std::async(std::launch::async, &ExecuteCommand::reportExitCode, this);
+    }
     return ret_code;
 }
 
