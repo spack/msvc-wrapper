@@ -60,6 +60,7 @@ typedef struct long_import_member {
     PIMAGE_SYMBOL * symbol_table;
     char * string_table;
     DWORD size_of_string_table;
+    long long string_table_offset;
     ~long_import_member() {
         for (int i=0; i<this->pfile_h->NumberOfSymbols; ++i) {
             delete *(this->symbol_table+i);
@@ -173,6 +174,7 @@ private:
     void parse_full_import(coff_member &member);
     void parse_first_linker_member(coff_member &member);
     void parse_second_linker_member(coff_member &member);
+    int compute_section_data_offset(int section_number, long_import_member *mem);
 public:
     CoffParser(CoffReaderWriter * cr);
     ~CoffParser() = default;

@@ -329,7 +329,7 @@ void CoffParser::parse_full_import(coff_member &member)
     // Parse Coff Symbol table
     this->coffStream->seek(0);
     this->coffStream->seek(file_h->PointerToSymbolTable);
-    IMAGE_SYMBOL ** symbol_table = new IMAGE_SYMBOL*[file_h->NumberOfSections];
+    IMAGE_SYMBOL ** symbol_table = new IMAGE_SYMBOL*[file_h->NumberOfSymbols];
     for(int i=0; i<file_h->NumberOfSymbols;++i) {
         *(symbol_table+i) = new IMAGE_SYMBOL;
         this->coffStream->read((char*)*(symbol_table+i), sizeof(IMAGE_SYMBOL));
@@ -337,6 +337,7 @@ void CoffParser::parse_full_import(coff_member &member)
     }
     // Parse string table
     DWORD size_of_string_table;
+    long long string_table_offset = std::streamoff(this->coffStream->tell());
     // first four bytes of string table give size of string table
     this->coffStream->read((char*)(&size_of_string_table), sizeof(DWORD));
     char * string_table;
@@ -354,6 +355,7 @@ void CoffParser::parse_full_import(coff_member &member)
     lm->symbol_table = symbol_table;
     lm->string_table = string_table;
     lm->size_of_string_table = size_of_string_table;
+    lm->string_table_offset = string_table_offset;
     member.long_member = lm;
 }
 
@@ -412,6 +414,7 @@ void CoffParser::parse_data(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member &me
     else if (!strncmp((char*)header->Name, IMAGE_ARCHIVE_LONGNAMES_MEMBER, 16)) {
         // Long names member doesn't provide us anything useful to parse
         // at this stage
+        return;
     }
     else {
         this->parse_full_import(member);
@@ -419,10 +422,23 @@ void CoffParser::parse_data(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member &me
 }
 
 /**
+ * Takes a zero indexed section number and a coff member
+ * and computes the offset to the start of section data corresponding to
+ * the given section number within the section data field of a long
+ * import member
+ */
+int CoffParser::compute_section_data_offset(int section_number, long_import_member *mem)
+{
+    return (*(mem->pp_sections+section_number))->PointerToRawData;
+}
+
+
+/**
  * 
  */
 bool CoffParser::normalize_name(std::string &name)
 {
+    std::string name_no_ext = strip(name, ".dll");
     for (auto mem: this->coff_.members) {
         int i = 0;
         while(i < 16 && mem.header->Name[i] != ' ') {
@@ -518,7 +534,85 @@ bool CoffParser::normalize_name(std::string &name)
         }
         else {
             // Rename standard import members
-            
+            // First perform the section data renames
+            WORD section_data_count = mem.member.long_member->pfile_h->NumberOfSections;
+            for(int i=0;i<section_data_count; ++i) {
+                int section_data_start_offset = this->compute_section_data_offset(i, mem.member.long_member);
+                char * section = *(mem.member.long_member->section_data+i);
+                char * section_search_start = *(mem.member.long_member->section_data+i);
+                // search section data for full name
+                while(section_search_start) {
+                    section_search_start = strstr(section_search_start, name.c_str());
+                    if (section_search_start) {
+                        // we found a name, rename
+                        ptrdiff_t offset = section_search_start - section;
+                        int name_len = name.size();
+                        char * new_name = new char[name_len];
+                        strncpy(section_search_start, new_name, name_len);
+                        replace_special_characters(new_name, name_len);
+                        this->coffStream->seek(0);
+                        this->coffStream->seek(section_data_start_offset + offset);
+                        this->coffStream->write(new_name, name_len);
+                        delete new_name;                      
+                    }
+                }
+                // search section data for extensionless name
+                section_search_start = *(mem.member.long_member->section_data+i);
+                while(section_search_start) {
+                    section_search_start = strstr(section_search_start, name_no_ext.c_str());
+                    if (section_search_start) {
+                        // we found a name, rename
+                        ptrdiff_t offset = section_search_start - section;
+                        int name_len = name_no_ext.size();
+                        char * new_name = new char[name_len];
+                        strncpy(section_search_start, new_name, name_len);
+                        replace_special_characters(new_name, name_len);
+                        this->coffStream->seek(0);
+                        this->coffStream->seek(section_data_start_offset + offset);
+                        this->coffStream->write(new_name, name_len);    
+                        delete new_name;                    
+                    }
+                }
+            }
+            // Section data rename is complete, now rename string table
+            int string_table_start_offset = mem.member.long_member->string_table_offset;
+            char * string_table_start, *string_table = mem.member.long_member->string_table;
+            int symbol_count = mem.member.long_member->pfile_h->NumberOfSymbols;
+            PIMAGE_SYMBOL * symbols = mem.member.long_member->symbol_table;
+            for(int i=0;i<symbol_count;++i) {
+                PIMAGE_SYMBOL symbol = *(symbols+i);
+                if(symbol->N.Name.Short == 0) {
+                    // name is longer than 8 bytes, it's likely a Spack name, search
+                    DWORD name_string_table_offset = symbol->N.Name.Long;
+                    // find and rename full name
+                    string_table_start = strstr((string_table+name_string_table_offset), name.c_str());
+                    if (string_table_start) {
+                        ptrdiff_t offset = string_table_start - string_table;
+                        int name_len = name.size();
+                        char * new_name = new char[name_len];
+                        strncpy(string_table_start, new_name, name_len);\
+                        replace_special_characters(new_name, name_len);
+                        this->coffStream->seek(0);
+                        this->coffStream->seek(string_table_start_offset + offset);
+                        this->coffStream->write(new_name, name_len);
+                        delete new_name;
+                    }
+                    // find and rename extensionless name
+                    string_table_start = strstr((string_table+name_string_table_offset), name_no_ext.c_str());
+                    if (string_table_start) {
+                        ptrdiff_t offset = string_table_start - string_table;
+                        int name_len = name_no_ext.size();
+                        char * new_name = new char[name_len];
+                        strncpy(string_table_start, new_name, name_len);\
+                        replace_special_characters(new_name, name_len);
+                        this->coffStream->seek(0);
+                        this->coffStream->seek(string_table_start_offset + offset);
+                        this->coffStream->write(new_name, name_len);
+                        delete new_name;
+                    }
+                }
+            }
+
         }
     }
     this->coffStream->Close();
