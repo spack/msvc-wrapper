@@ -27,32 +27,6 @@
 /**
  * @brief
  */
-typedef struct coff_member {
-    char * data;
-    bool is_short;
-    short_import_member *short_member;
-    long_import_member *long_member;
-    first_linker_member *first_link;
-    second_linker_member *second_link;
-    coff_member() {
-        is_short = false;
-    }
-    ~coff_member () {
-        if (this->is_short) {
-            delete short_member;
-        }
-        else {
-            delete long_member;
-        }
-        delete first_link;
-        delete second_link;
-        delete data;
-    }
-} coff_member;
-
-/**
- * @brief
- */
 typedef struct long_import_member {
     PIMAGE_FILE_HEADER pfile_h;
     PIMAGE_SECTION_HEADER * pp_sections;
@@ -114,13 +88,40 @@ typedef struct longnames_member {
     char * names_field;
 } longnames_member;
 
+
+/**
+ * @brief
+ */
+typedef struct coff_member {
+    char * data;
+    bool is_short;
+    short_import_member *short_member;
+    long_import_member *long_member;
+    first_linker_member *first_link;
+    second_linker_member *second_link;
+    coff_member() {
+        is_short = false;
+    }
+    ~coff_member () {
+        if (this->is_short) {
+            delete short_member;
+        }
+        else {
+            delete long_member;
+        }
+        delete first_link;
+        delete second_link;
+        delete data;
+    }
+} coff_member;
+
 /**
  * @brief
  */
 typedef struct coff_entry {
     std::streampos offset;
     PIMAGE_ARCHIVE_MEMBER_HEADER header;
-    coff_member member;
+    coff_member * member;
 } coff_entry;
 
 /**
@@ -153,7 +154,7 @@ public:
     bool isOpen();
     bool isClosed();
     void read_header(PIMAGE_ARCHIVE_MEMBER_HEADER coff_in);
-    void read_member(PIMAGE_ARCHIVE_MEMBER_HEADER head, coff_member &coff_in);
+    void read_member(PIMAGE_ARCHIVE_MEMBER_HEADER head, coff_member *coff_in);
     bool read_sig(coff &coff_in);
     void write(char * in, int size);
     void read(char * out, int size);
@@ -169,11 +170,11 @@ class CoffParser {
 private:
     CoffReaderWriter* coffStream;
     coff coff_;
-    void parse_data(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member &member);
-    void parse_short_import(coff_member &member);
-    void parse_full_import(coff_member &member);
-    void parse_first_linker_member(coff_member &member);
-    void parse_second_linker_member(coff_member &member);
+    void parse_data(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *member);
+    void parse_short_import(coff_member *member);
+    void parse_full_import(coff_member *member);
+    void parse_first_linker_member(coff_member *member);
+    void parse_second_linker_member(coff_member *member);
     int compute_section_data_offset(int section_number, long_import_member *mem);
 public:
     CoffParser(CoffReaderWriter * cr);

@@ -55,13 +55,14 @@ char * pad_path(const char *pth, DWORD str_size, DWORD bsize = MAX_PATH)
             ++j;
         }
         else if(i < extended_buf){
-            padded_path[i] = '/';
+            padded_path[i] = '|';
         }
         else{
             padded_path[i] = pth[j];
             ++j;
         }
     }
+    return padded_path;
 }
 
 /**
@@ -199,15 +200,14 @@ bool CoffReaderWriter::read_sig(coff &coff_in)
 
 void CoffReaderWriter::read_header(PIMAGE_ARCHIVE_MEMBER_HEADER coff_in)
 {
-    this->pe_stream.read((char*)&coff_in, sizeof(PIMAGE_ARCHIVE_MEMBER_HEADER));
+    this->pe_stream.read((char*)coff_in, sizeof(IMAGE_ARCHIVE_MEMBER_HEADER));
 }
 
-void CoffReaderWriter::read_member(PIMAGE_ARCHIVE_MEMBER_HEADER head, coff_member& coff_in)
+void CoffReaderWriter::read_member(PIMAGE_ARCHIVE_MEMBER_HEADER head, coff_member *coff_in)
 {
-    int member_size;
-    memcpy(&member_size, head->Size, sizeof(int));
-    coff_in.data = new char[member_size];
-    this->pe_stream.read(coff_in.data, member_size);
+    int member_size = atoi((char*)head->Size);
+    coff_in->data = new char[member_size];
+    this->pe_stream.read(coff_in->data, member_size);
     if (member_size % 2 != 0) {
         this->seek(1, std::ios_base::cur);
     }
@@ -253,17 +253,18 @@ CoffParser::CoffParser(CoffReaderWriter * cr)
 bool CoffParser::parse()
 {
     if(!this->coffStream->Open()) {
-        std::cerr << "Unable to open coff file for reading: " << (char*)GetLastError() << "\n";
+        std::cerr << "Unable to open coff file for reading: " << GetLastError() << "\n";
         return false;
     }
-    if(!this->coffStream->read_sig(this->coff_)) {
+    int invalid_valid_sig = this->coffStream->read_sig(this->coff_);
+    if(invalid_valid_sig) {
         std::cerr << "Invalid signature for expected COFF archive format file: " << this->coffStream->get_file() << "\n";
         return false;
     }
     CoffMembers members;
     while(!this->coffStream->end()) {
-        PIMAGE_ARCHIVE_MEMBER_HEADER header;
-        coff_member member;
+        PIMAGE_ARCHIVE_MEMBER_HEADER header = new IMAGE_ARCHIVE_MEMBER_HEADER;
+        coff_member * member = new coff_member;
         std::streampos offset = this->coffStream->tell();
         this->coffStream->read_header(header);
         this->coffStream->read_member(header, member);
@@ -282,9 +283,9 @@ bool CoffParser::parse()
 /**
  * 
  */
-void CoffParser::parse_short_import(coff_member &member)
+void CoffParser::parse_short_import(coff_member *member)
 {
-    IMPORT_OBJECT_HEADER * im_h = (IMPORT_OBJECT_HEADER *)member.data;
+    IMPORT_OBJECT_HEADER * im_h = (IMPORT_OBJECT_HEADER *)member->data;
     // validate header
     if(!(im_h->Sig2 == 0x00) || !(im_h->Sig2 == 0xFFFF)) {
         return;
@@ -293,21 +294,21 @@ void CoffParser::parse_short_import(coff_member &member)
     sm->im_h = im_h;
     sm->short_name = (char* )(im_h+1);
     sm->short_dll = sm->short_name + strlen(sm->short_name)+1;
-    member.short_member = sm;
+    member->short_member = sm;
 }
 
 
 /**
  * 
  */
-void CoffParser::parse_full_import(coff_member &member)
+void CoffParser::parse_full_import(coff_member *member)
 {
     // Parse image file header
-    PIMAGE_FILE_HEADER file_h = (PIMAGE_FILE_HEADER)member.data;
+    PIMAGE_FILE_HEADER file_h = (PIMAGE_FILE_HEADER)member->data;
     // Parse section headers
     IMAGE_SECTION_HEADER** p_sections = new PIMAGE_SECTION_HEADER[file_h->NumberOfSections];
     for(int i = 0; i < file_h->NumberOfSections; ++i) {
-        PIMAGE_SECTION_HEADER sec_h = (PIMAGE_SECTION_HEADER)(member.data + sizeof(IMAGE_FILE_HEADER) + sizeof(IMAGE_SECTION_HEADER)*i);
+        PIMAGE_SECTION_HEADER sec_h = (PIMAGE_SECTION_HEADER)(member->data + sizeof(IMAGE_FILE_HEADER) + sizeof(IMAGE_SECTION_HEADER)*i);
         *(p_sections+i) = new IMAGE_SECTION_HEADER;
         *(p_sections+i) = sec_h;
     }
@@ -356,32 +357,32 @@ void CoffParser::parse_full_import(coff_member &member)
     lm->string_table = string_table;
     lm->size_of_string_table = size_of_string_table;
     lm->string_table_offset = string_table_offset;
-    member.long_member = lm;
+    member->long_member = lm;
 }
 
 /**
  * 
  */
-void CoffParser::parse_first_linker_member(coff_member &member)
+void CoffParser::parse_first_linker_member(coff_member *member)
 {
-    DWORD sym_count = *(PDWORD)member.data;
-    PDWORD poffsets = (PDWORD)member.data+4;
+    DWORD sym_count = *(PDWORD)member->data;
+    PDWORD poffsets = (PDWORD)member->data+4;
     sym_count = to_little_endian(sym_count);
-    char * pnames = member.data+(4*sym_count);
+    char * pnames = member->data+(4*sym_count);
     first_linker_member *fl = new first_linker_member;
     fl->offsets = poffsets;
     fl->symbols = sym_count;
     fl->strings = pnames;
-    member.first_link = fl;
+    member->first_link = fl;
 }
 
-void CoffParser::parse_second_linker_member(coff_member &member)
+void CoffParser::parse_second_linker_member(coff_member *member)
 {
-    DWORD archive_member_count = *(PDWORD)member.data;
+    DWORD archive_member_count = *(PDWORD)member->data;
     archive_member_count = to_little_endian(archive_member_count);
-    PDWORD poffsets = (PDWORD)member.data+4;
-    DWORD sym_count = *((PDWORD)member.data+archive_member_count*sizeof(DWORD)+4);
-    PWORD pindex = (PWORD)member.data+8+archive_member_count*sizeof(DWORD);
+    PDWORD poffsets = (PDWORD)member->data+4;
+    DWORD sym_count = *((PDWORD)member->data+archive_member_count*sizeof(DWORD)+4);
+    PWORD pindex = (PWORD)member->data+8+archive_member_count*sizeof(DWORD);
     char * names = (char*)pindex+sym_count*sizeof(WORD);
     second_linker_member *sl = new second_linker_member;
     sl->members = archive_member_count;
@@ -389,15 +390,15 @@ void CoffParser::parse_second_linker_member(coff_member &member)
     sl->symbols = sym_count;
     sl->indicies = pindex;
     sl->strings = names;
-    member.second_link = sl;
+    member->second_link = sl;
 }
 
 /**
  * 
  */
-void CoffParser::parse_data(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member &member)
+void CoffParser::parse_data(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *member)
 {
-    IMPORT_OBJECT_HEADER * p_imp_header = (IMPORT_OBJECT_HEADER *)member.data;
+    IMPORT_OBJECT_HEADER * p_imp_header = (IMPORT_OBJECT_HEADER *)member->data;
     if((p_imp_header->Sig1 == IMAGE_FILE_MACHINE_UNKNOWN) && (p_imp_header->Sig2 == IMPORT_OBJECT_HDR_SIG2)) {
         // SHORT IMPORT LIB FORMAT (NT4,SP3)
         this->parse_short_import(member);
@@ -454,8 +455,8 @@ bool CoffParser::normalize_name(std::string &name)
             std::vector<char> new_name;
             // Reconstruct name from location in longnames member
             int i;
-            for (i = longname_offset; this->coff_.members[2].member.data[i] != '\0'; ++i)
-                new_name.push_back(this->coff_.members[2].member.data[i]);
+            for (i = longname_offset; this->coff_.members[2].member->data[i] != '\0'; ++i)
+                new_name.push_back(this->coff_.members[2].member->data[i]);
             if (!strcmp(name.c_str(), std::string(new_name.begin(), new_name.end()).c_str())) {
                 replace_special_characters((char *)&new_name[0], i-longname_offset);
                 int offset = std::streamoff(this->coff_.members[2].offset);
@@ -468,12 +469,12 @@ bool CoffParser::normalize_name(std::string &name)
             int base_offset = std::streamoff(mem.offset);
             int offset_with_header = base_offset + sizeof(mem.header);
             int current_relative_offset = 0;
-            if (mem.member.first_link) {
-                int member_offset = 4 + mem.member.first_link->symbols*sizeof(DWORD);
-                for (int i=0; i < mem.member.first_link->symbols; ++i) {
-                    int name_len = strlen(mem.member.first_link->strings+current_relative_offset);
+            if (mem.member->first_link) {
+                int member_offset = 4 + mem.member->first_link->symbols*sizeof(DWORD);
+                for (int i=0; i < mem.member->first_link->symbols; ++i) {
+                    int name_len = strlen(mem.member->first_link->strings+current_relative_offset);
                     char * new_name = new char[name_len];
-                    strcpy(new_name, mem.member.first_link->strings+current_relative_offset);
+                    strcpy(new_name, mem.member->first_link->strings+current_relative_offset);
                     if(!strcmp(new_name, name.c_str())) {
                         replace_special_characters(new_name, name_len);
                         int offset = offset_with_header + member_offset + current_relative_offset;
@@ -486,11 +487,11 @@ bool CoffParser::normalize_name(std::string &name)
             }
             else {
                 // rename second linker member names
-                int member_offset = sizeof(DWORD) + sizeof(DWORD) * mem.member.second_link->members + sizeof(DWORD) + sizeof(WORD) * mem.member.second_link->symbols;
-                for(int i=0; i<mem.member.second_link->symbols;++i) {
-                    int name_len = strlen(mem.member.second_link->strings+current_relative_offset);
+                int member_offset = sizeof(DWORD) + sizeof(DWORD) * mem.member->second_link->members + sizeof(DWORD) + sizeof(WORD) * mem.member->second_link->symbols;
+                for(int i=0; i<mem.member->second_link->symbols;++i) {
+                    int name_len = strlen(mem.member->second_link->strings+current_relative_offset);
                     char * new_name = new char[name_len];
-                    strcpy(new_name, mem.member.second_link->strings+current_relative_offset);
+                    strcpy(new_name, mem.member->second_link->strings+current_relative_offset);
                     if(!strcmp(new_name, name.c_str())) {
                         replace_special_characters(new_name, name_len);
                         int offset = offset_with_header + member_offset + current_relative_offset;
@@ -511,10 +512,10 @@ bool CoffParser::normalize_name(std::string &name)
         }
         // Name has been renamed
         // Now we rename the other DLL references
-        if(mem.member.is_short) {
-            int name_len = strlen(mem.member.short_member->short_dll);
+        if(mem.member->is_short) {
+            int name_len = strlen(mem.member->short_member->short_dll);
             char * new_name = new char[name_len];
-            strcpy(new_name, mem.member.short_member->short_dll);
+            strcpy(new_name, mem.member->short_member->short_dll);
             replace_special_characters(new_name, name_len);
             if(strcmp(name.c_str(), new_name)) {
                 // Member offset in file
@@ -525,7 +526,7 @@ bool CoffParser::normalize_name(std::string &name)
                 // First entry in short import member is the import header
                 offset += sizeof(IMPORT_OBJECT_HEADER);
                 // Next is the symbol name, which is a null terminated string
-                offset += strlen(mem.member.short_member->short_name);
+                offset += strlen(mem.member->short_member->short_name);
                 this->coffStream->seek(0);
                 this->coffStream->seek(offset);
                 this->coffStream->write(new_name, strlen(new_name));
@@ -535,11 +536,11 @@ bool CoffParser::normalize_name(std::string &name)
         else {
             // Rename standard import members
             // First perform the section data renames
-            WORD section_data_count = mem.member.long_member->pfile_h->NumberOfSections;
+            WORD section_data_count = mem.member->long_member->pfile_h->NumberOfSections;
             for(int i=0;i<section_data_count; ++i) {
-                int section_data_start_offset = this->compute_section_data_offset(i, mem.member.long_member);
-                char * section = *(mem.member.long_member->section_data+i);
-                char * section_search_start = *(mem.member.long_member->section_data+i);
+                int section_data_start_offset = this->compute_section_data_offset(i, mem.member->long_member);
+                char * section = *(mem.member->long_member->section_data+i);
+                char * section_search_start = *(mem.member->long_member->section_data+i);
                 // search section data for full name
                 while(section_search_start) {
                     section_search_start = strstr(section_search_start, name.c_str());
@@ -557,7 +558,7 @@ bool CoffParser::normalize_name(std::string &name)
                     }
                 }
                 // search section data for extensionless name
-                section_search_start = *(mem.member.long_member->section_data+i);
+                section_search_start = *(mem.member->long_member->section_data+i);
                 while(section_search_start) {
                     section_search_start = strstr(section_search_start, name_no_ext.c_str());
                     if (section_search_start) {
@@ -575,10 +576,10 @@ bool CoffParser::normalize_name(std::string &name)
                 }
             }
             // Section data rename is complete, now rename string table
-            int string_table_start_offset = mem.member.long_member->string_table_offset;
-            char * string_table_start, *string_table = mem.member.long_member->string_table;
-            int symbol_count = mem.member.long_member->pfile_h->NumberOfSymbols;
-            PIMAGE_SYMBOL * symbols = mem.member.long_member->symbol_table;
+            int string_table_start_offset = mem.member->long_member->string_table_offset;
+            char * string_table_start, *string_table = mem.member->long_member->string_table;
+            int symbol_count = mem.member->long_member->pfile_h->NumberOfSymbols;
+            PIMAGE_SYMBOL * symbols = mem.member->long_member->symbol_table;
             for(int i=0;i<symbol_count;++i) {
                 PIMAGE_SYMBOL symbol = *(symbols+i);
                 if(symbol->N.Name.Short == 0) {
@@ -840,7 +841,7 @@ int LibRename::executeLibRename()
         std::cerr << "Unable to parse\n";
         return 0;
     }
-    if(!coff.normalize_name()) {
+    if(!coff.normalize_name(mangle_name(this->pe) )) {
         std::cerr << "Unable to normalize name\n";
         return 0;
     }

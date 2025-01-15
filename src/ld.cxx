@@ -48,7 +48,9 @@ int LdInvocation::invokeToolchain()
         CoffReaderWriter cr(abs_out_imp_lib_name);
         CoffParser coff(&cr);
         coff.parse();
-        coff.normalize_name(dll_name);
+        if(!coff.normalize_name(dll_name)){
+            return -9;
+        }
         std::remove(imp_lib_name.c_str());
         std::rename(abs_out_imp_lib_name.c_str(), imp_lib_name.c_str());
 
