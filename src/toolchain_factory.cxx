@@ -3,13 +3,17 @@
 #include "ld.h"
 #include "intel.h"
 
+#include <algorithm>
+
 std::unique_ptr<ToolChainInvocation> ToolChainFactory::ParseToolChain(char const* const * argv) {
     std::string command(*argv);
     char const* const* cli(++argv);
     stripPathandExe(command);
     using lang = ToolChainFactory::Language;
-    try {
-        ToolChainFactory::Language language = SupportedTools.at(command);
+    auto lang_it = SupportedTools.find(command);
+    if (lang_it != SupportedTools.end())
+    {
+        ToolChainFactory::Language language = lang_it->second;
         std::unique_ptr<ToolChainInvocation> Tool;
         if(language == lang::cpp) {
             Tool = std::unique_ptr<ClInvocation>(new ClInvocation(command, cli));
@@ -22,9 +26,8 @@ std::unique_ptr<ToolChainInvocation> ToolChainFactory::ParseToolChain(char const
             Tool = std::unique_ptr<LdInvocation>(new LdInvocation(command, cli));
         }
         return Tool;
-    } catch (std::out_of_range& e) {
-        throw SpackUnknownCompilerException(command);
     }
+    return std::unique_ptr<ToolChainInvocation>(nullptr);
 }
 
 void ToolChainFactory::stripPathandExe(std::string &command) {
@@ -33,6 +36,9 @@ void ToolChainFactory::stripPathandExe(std::string &command) {
 };
 
 void ToolChainFactory::stripExe(std::string &command) {
+    // Normalize command to lowercase to avoid parsing issues
+    std::transform(command.begin(), command.end(), command.begin(),
+        [](unsigned char c){ return std::tolower(c); });
     std::string::size_type loc = command.rfind(".exe");
     if ( std::string::npos != loc )
         command.erase(loc);

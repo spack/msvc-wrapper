@@ -19,13 +19,23 @@
 #include "utils.h"
 
 int main(int argc, const char* argv[]) {
+#ifdef __SANITIZE_ADDRESS__
+    std::cout << "asan" << std::endl;
+#endif
+    
     if(checkAndPrintHelp(argv, argc)) {
         return 0;
     }
     if (isRelocate(argv[0])) {
         std::map<std::string, std::string> patch_args = parseRelocate(argv, argc);
-        bool full = !patch_args.at("full").empty();
-        bool deploy = patch_args.at("cmd") == "deploy";
+        if(patch_args.empty()) {
+            std::cerr << "Unable to parse command line for relocation\n" 
+                << "run command with --help flag for accepted command line arguments\n";
+            return -1;
+        }
+        bool full = !(patch_args.find("full") == patch_args.end());
+        bool deploy = !(patch_args.find("cmd") == patch_args.end()) 
+            && patch_args.at("cmd") == "deploy";
         LibRename rpath_lib(patch_args.at("pe"), full, deploy, true);
         if(!rpath_lib.executeRename()){
             std::cerr << "Library rename failed\n";
@@ -39,6 +49,9 @@ int main(int argc, const char* argv[]) {
         // }
         // Determine which tool we're trying to run
         std::unique_ptr<ToolChainInvocation> tchain(ToolChainFactory::ParseToolChain(argv));
+        if(!tchain) {
+            return -3;
+        }
         // Establish Spack compiler/linker modifications from env
         SpackEnvState spack = SpackEnvState::loadSpackEnvState();
         // Apply modifications to toolchain invocation

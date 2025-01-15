@@ -7,8 +7,12 @@
 #include <fstream>
 #include "shlwapi.h"
 
-
-// String helper methods adding cxx20 features to cxx14
+//////////////////////////////////////////////////////////
+// String helper methods adding cxx20 features to cxx14 //
+//////////////////////////////////////////////////////////
+/**
+ * Returns true of arg starts with match
+ */
 bool startswith(const std::string &arg, const std::string &match)
 {
     size_t matchLen = match.size();
@@ -17,11 +21,17 @@ bool startswith(const std::string &arg, const std::string &match)
     return arg.compare(0, matchLen, match) == 0;
 }
 
+/**
+ * Returns true if arg starts with match
+ */
 bool startswith(const std::string &arg, const char * match)
 {
     return startswith(arg, (std::string)match);
 }
 
+/**
+ * Returns true if arg ends with match
+ */
 bool endswith(const std::string &arg, const std::string &match)
 {
     size_t matchLen = match.size();
@@ -30,11 +40,19 @@ bool endswith(const std::string &arg, const std::string &match)
     return arg.compare(arg.size() - matchLen, matchLen, match) == 0;
 }
 
+/**
+ * Returns true if arg ends with match
+ */
 bool endswith(const std::string &arg, char const* match)
 {
     return endswith(arg, (std::string)match);
 }
 
+/**
+ * Converts wide strings to ANSI (standard) strings
+ * 
+ * Converts wstring to string
+ */
 std::string ConvertWideToANSI(const std::wstring &wstr)
 {
     int count = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), wstr.length(), NULL, 0, NULL, NULL);
@@ -43,6 +61,11 @@ std::string ConvertWideToANSI(const std::wstring &wstr)
     return str;
 }
 
+/**
+ * Converts standard strings to wide strings
+ * 
+ * Converts string to wstring
+ */
 std::wstring ConvertAnsiToWide(const std::string &str)
 {
     int count = MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), NULL, 0);
@@ -51,6 +74,12 @@ std::wstring ConvertAnsiToWide(const std::string &str)
     return wstr;
 }
 
+/**
+ * Decomposes the input string into a list separated by
+ * delim
+ * 
+ * Returns the list produced by breaking up input string s on delim
+ */
 StrList split(const std::string &s, const std::string &delim)
 {
     size_t pos_start = 0, pos_end;
@@ -72,6 +101,11 @@ StrList split(const std::string &s, const std::string &delim)
     return res;
 }
 
+/**
+ * Strips substring from the end of input string s
+ * 
+ * Returns stripped version of s
+ */
 std::string strip(const std::string &s, const std::string &substr)
 {
     if(!endswith(s, substr))
@@ -79,6 +113,11 @@ std::string strip(const std::string &s, const std::string &substr)
     return s.substr(0, s.size()-substr.size());
 }
 
+/**
+ * Strips substring from the beginning of input string s
+ * 
+ * Returns stripped version of s
+ */
 std::string lstrip(const std::string &s, const std::string &substr)
 {
     if(!startswith(s, substr))
@@ -86,6 +125,9 @@ std::string lstrip(const std::string &s, const std::string &substr)
     return s.substr(substr.size()-1, s.size());
 }
 
+/**
+ * combines list of strings into one string joined on join_char
+ */
 std::string join(const StrList &args, const std::string &join_char)
 {
     std::string joined_path;
@@ -112,58 +154,84 @@ bool isRelocate(const char * arg)
     return strcmp(arg, "relocate") == 0;
 }
 
-
-void redefinedArgCheck(const std::map<std::string, std::string> &args, const char * arg, const char * cli_name)
+/**
+ * Checks if an argument has already been defined on the command line
+ */
+int redefinedArgCheck(const std::map<std::string, std::string> &args, const char * arg, const char * cli_name)
 {
     if ( args.find(arg) != args.end()) {
-        char * error_line = strcat("Invalid command line, too many values for argument: ", cli_name);
-        throw SpackException(error_line);
+        std::cerr << "Invalid command line, too many values for argument: " << cli_name << "\n";
+        return 1;
     }
+    return 0;
 }
 
-void checkArgumentPresence(const std::map<std::string, std::string> &args, const char * val, bool required = true)
+/**
+ * Check for the presense of an argument in the argument map
+ */
+int checkArgumentPresence(const std::map<std::string, std::string> &args, const char * val, bool required = true)
 {
     if (args.find(val) == args.end()) {
+        std::cerr << "Warning! Argument (" << val << ") not present";
         if (required) {
-            throw SpackException(strcat("Required argument not present", val));
-        }
-        else {
-            std::cout << "Warning! Argument (" << val << ") not present";
+            return 0;
         }
     }
+    return 1;
 }
 
+/**
+ * Parse the command line arguments supportin the relocate command
+ */
 std::map<std::string, std::string> parseRelocate(const char ** args, int argc) {
     std::map<std::string, std::string> opts;
     for (int i = 0; i < argc; i++){
         if (strcmp(args[i], "--pe")) {
-            redefinedArgCheck(opts, "pe", "--pe");
+            if(redefinedArgCheck(opts, "pe", "--pe")) {
+                opts.clear();
+                return opts;
+            }
             opts.insert(std::pair<std::string, std::string>("pe", args[++i]));
         }
         else if (endswith((std::string)args[i], ".dll")) {
-            redefinedArgCheck(opts, "pe", "pe");
+            if(redefinedArgCheck(opts, "pe", "pe")) {
+                opts.clear();
+                return opts;
+            }
             opts.insert(std::pair<std::string, std::string>("pe", args[i]));
         }
         else if (endswith((std::string)args[i], ".exe")) {
-            redefinedArgCheck(opts, "pe", "pe");
+            if(redefinedArgCheck(opts, "pe", "pe")) {
+                opts.clear();
+                return opts;
+            }
             opts.insert(std::pair<std::string, std::string>("pe", args[i]));
         }
         else if (strcmp(args[i], "--full")) {
-            redefinedArgCheck(opts, "full", "--full");
+            if(redefinedArgCheck(opts, "full", "--full")) {
+                opts.clear();
+                return opts;
+            }
             opts.insert(std::pair<std::string, std::string>("full", "full"));
         }
         else if (strcmp(args[i], "--export")) {
             // export and deploy are mutually exclusive, if one is defined
             // the other cannot be
-            redefinedArgCheck(opts, "export", "--export");
-            redefinedArgCheck(opts, "deploy", "--deploy");
+            if(redefinedArgCheck(opts, "export", "--export") 
+                || !redefinedArgCheck(opts, "deploy", "--deploy")) {
+                opts.clear();
+                return opts;
+            }
             opts.insert(std::pair<std::string, std::string>("cmd", "export"));
         }
         else if (strcmp(args[i], "--deploy")) {
             // export and deploy are mutually exclusive, if one is defined
             // the other cannot be
-            redefinedArgCheck(opts, "export", "--export");
-            redefinedArgCheck(opts, "deploy", "--deploy");
+            if(redefinedArgCheck(opts, "export", "--export")
+               || !redefinedArgCheck(opts, "deploy", "--deploy")) {
+                opts.clear();
+                return opts;
+            } 
             opts.insert(std::pair<std::string, std::string>("cmd", "deploy"));
         }
         else {
@@ -171,28 +239,36 @@ std::map<std::string, std::string> parseRelocate(const char ** args, int argc) {
             std::cerr << "Unknown argument :" << args[i] << "will be ignored\n";
         }
     }
-    if(!opts.count("full")){
-        opts.insert(std::pair<std::string, std::string>("full", std::string()));
+    if(!checkArgumentPresence(opts, "pe")) {
+        opts.clear();
+        return opts;
     }
-    if(!opts.count("cmd")){
-        opts.insert(std::pair<std::string, std::string>("cmd", std::string()));
-    }
-    checkArgumentPresence(opts, "pe");
-    checkArgumentPresence(opts, "full");
-    checkArgumentPresence(opts, "cmd");
     return opts;
 }
 
-
+/**
+ * Given an environment variable name
+ * return the corresponding environment variable value
+ * or an empty string as appropriate
+ */
 std::string getSpackEnv(const char* env) {
     char* envVal = getenv(env);
     return envVal ? envVal : std::string();
 }
 
+/**
+ * Given an environment variable name
+ * return the corresponding environment variable value
+ * or an empty string as appropriate
+ */
 std::string getSpackEnv(const std::string &env) {
     return getSpackEnv(env.c_str());
 }
 
+/**
+ * Returns list of strings from environment variable value
+ * representing a list delineated by delim argument
+ */
 StrList getenvlist(const std::string &envVar, const std::string &delim) {
     std::string envValue = getSpackEnv(envVar);
     if (! envValue.empty())
@@ -241,10 +317,6 @@ int validate_spack_env() {
             return 0;
         }
     return 1;
-}
-
-void die(std::string &cli ) {
-    throw SpackCompilerException(cli);
 }
 
 
@@ -339,6 +411,10 @@ bool isPathAbsolute(const std::string &pth)
     return !PathIsRelativeA(pth.c_str());
 }
 
+/**
+ * Determines the file offset on disk from the relative virtual address of a given section
+ * header
+ */
 DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER section_header, DWORD number_of_sections, DWORD rva) {
 
     for (int i = 0; i < number_of_sections; ++i, ++section_header) {
@@ -458,4 +534,13 @@ int safeHandleCleanup(HANDLE &handle)
         }
     }
     return 1;
+}
+
+DWORD to_little_endian(DWORD val)
+{
+    DWORD little_endian_val = (val >> 24) | 
+    ((val & 0x00FF0000) >> 8) | 
+    ((val & 0x0000FF00) << 8) | 
+    (val << 24);
+    return little_endian_val;
 }

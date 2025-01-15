@@ -109,6 +109,8 @@ DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER section_header, DWORD number_of_sect
 
 int safeHandleCleanup(HANDLE &handle);
 
+DWORD to_little_endian(DWORD val);
+
 class LibraryFinder {
 private:
     std::map<std::string, std::string> found_libs;

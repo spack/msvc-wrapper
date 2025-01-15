@@ -71,6 +71,11 @@ test : build_and_check_test_sample
 	tmp\test\tester.exe
 	move calc.dll tmp\calc.dll
 	test\run_failing_check.bat
+	tmp\test\relocate --executable tmp\test\tester.exe tmp
+	tmp\test\tester.exe
+	tmp\test\relocate --library tmp\calc.dll --full
+	link $(LFLAGS) main.obj tmp\calc.lib /out:tester.exe
+	tester.exe
 	rmdir /q /s tmp
 
 

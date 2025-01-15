@@ -45,7 +45,7 @@ int LdInvocation::invokeToolchain()
         if(err_code != 0) {
             return err_code;
         }
-        CoffReader cr(abs_out_imp_lib_name);
+        CoffReaderWriter cr(abs_out_imp_lib_name);
         CoffParser coff(&cr);
         coff.parse();
         coff.normalize_name();

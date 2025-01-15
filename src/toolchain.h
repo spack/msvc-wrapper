@@ -4,6 +4,9 @@
 #include "spack_env.h"
 #include "execute.h"
 
+/**
+ * @brief
+ */
 class ToolChainInvocation{
 public:
     ToolChainInvocation(std::string command, char const* const* cli);

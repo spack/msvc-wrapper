@@ -15,6 +15,9 @@
 
 const std::string empty = std::string();
 
+/**
+ * @brief
+ */
 class ExecuteCommand {
 public:
     // constructor for single executable/arguments + command in one string

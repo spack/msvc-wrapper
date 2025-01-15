@@ -2,6 +2,15 @@
 
 #include "utils.h"
 
+/**
+ * Loads Spack relevant variables from the environment
+ * into the compiler wrapper for easy access
+ * with convenient interface.
+ * 
+ * ENV variables that are lists are decomposed as such
+ * by this method and are accessible as c++ lists
+ * Variables that are simple strings are also treated as such
+ */
 struct SpackEnvState{
     std::string addDebugFlags;
     StrList SpackFFlags;
