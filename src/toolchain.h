@@ -11,24 +11,23 @@ class ToolChainInvocation{
 public:
     ToolChainInvocation(std::string command, char const* const* cli);
     virtual ~ToolChainInvocation() {}
-    virtual void interpolateSpackEnv(SpackEnvState &spackenv);
-    virtual int invokeToolchain();
+    virtual void InterpolateSpackEnv(SpackEnvState &spackenv);
+    virtual int InvokeToolchain();
 protected:
-    virtual void parse_command_args(char const* const* cli);
-    virtual void loadToolchainDependentSpackVars(SpackEnvState &spackenv) = 0;
-    std::string composeIncludeArg(std::string &include);
-    std::string composeLibPathArg(std::string &libPath);
-    void addExtraLibPaths(StrList paths);
-    std::string composeCLI();
-    StrList composeCommandLists(std::vector<StrList> command_args);
+    virtual void ParseCommandArgs(char const* const* cli);
+    virtual void LoadToolchainDependentSpackVars(SpackEnvState &spackenv) = 0;
+    std::string ComposeIncludeArg(std::string &include);
+    std::string ComposeLibPathArg(std::string &libPath);
+    void AddExtraLibPaths(StrList paths);
+    StrList ComposeCommandLists(std::vector<StrList> command_args);
 
     std::string command;
     std::string lang;
-    StrList commandArgs;
-    StrList includeArgs;
-    StrList libDirArgs;
-    StrList libArgs;
-    StrList objArgs;
+    StrList command_args;
+    StrList include_args;
+    StrList lib_dir_args;
+    StrList lib_args;
+    StrList obj_args;
     ExecuteCommand executor;
-    std::string spackCommand;
+    std::string spack_command;
 };

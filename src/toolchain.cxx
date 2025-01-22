@@ -5,49 +5,49 @@
 ToolChainInvocation::ToolChainInvocation(std::string command, char const* const* cli)
 {
     this->command = command;
-    this->parse_command_args(cli);
+    this->ParseCommandArgs(cli);
 }
 
-void ToolChainInvocation::interpolateSpackEnv(SpackEnvState &spackenv) {
+void ToolChainInvocation::InterpolateSpackEnv(SpackEnvState &spackenv) {
     // inject Spack includes before the default includes
     for( auto &include: spackenv.SpackIncludeDirs )
     {
-        auto incArg = this->composeIncludeArg(include);
-        this->includeArgs.insert(this->includeArgs.begin(), incArg);
+        auto incArg = this->ComposeIncludeArg(include);
+        this->include_args.insert(this->include_args.begin(), incArg);
     }
     for( auto &lib: spackenv.SpackLdLibs )
     {
-        this->libArgs.push_back(lib);
+        this->lib_args.push_back(lib);
     }
-    this->addExtraLibPaths(spackenv.SpackLinkDirs);
-    this->addExtraLibPaths(spackenv.SpackRPathDirs);
-    this->addExtraLibPaths(spackenv.SpackCompilerExtraRPaths);
-    this->addExtraLibPaths(spackenv.SpackCompilerImplicitRPaths);
-    this->loadToolchainDependentSpackVars(spackenv);
+    this->AddExtraLibPaths(spackenv.SpackLinkDirs);
+    this->AddExtraLibPaths(spackenv.SpackRPathDirs);
+    this->AddExtraLibPaths(spackenv.SpackCompilerExtraRPaths);
+    this->AddExtraLibPaths(spackenv.SpackCompilerImplicitRPaths);
+    this->LoadToolchainDependentSpackVars(spackenv);
 }
 
-int ToolChainInvocation::invokeToolchain() {
-    StrList commandLine(this->composeCommandLists({
-        this->commandArgs,
-        this->includeArgs,
-        this->libArgs,
-        this->libDirArgs,
-        this->objArgs
+int ToolChainInvocation::InvokeToolchain() {
+    StrList commandLine(this->ComposeCommandLists({
+        this->command_args,
+        this->include_args,
+        this->lib_args,
+        this->lib_dir_args,
+        this->obj_args
     }));
 
-    this->executor = ExecuteCommand(  this->spackCommand,
+    this->executor = ExecuteCommand(  this->spack_command,
                                       commandLine
                                     );
     // Run first pass of command as requested by caller
-    int ret_code = this->executor.execute();
+    int ret_code = this->executor.Execute();
     if(!ret_code) {
         std::cerr << "Unable to launch process \n";
         return -9999;
     }
-    return this->executor.join();
+    return this->executor.Join();
 }
 
-void ToolChainInvocation::parse_command_args(char const* const* cli) {
+void ToolChainInvocation::ParseCommandArgs(char const* const* cli) {
     // Collect include args as we need to ensure Spack
     // Includes come first
     for( char const* const* c = cli; *c; c++ ){
@@ -59,9 +59,9 @@ void ToolChainInvocation::parse_command_args(char const* const* cli) {
             // "/I" and if not we consider the next
             // argument to be the include
             if (arg.size() > 2)
-                this->includeArgs.push_back(arg);
+                this->include_args.push_back(arg);
             else
-                this->includeArgs.push_back(std::string(*(++c)));
+                this->include_args.push_back(std::string(*(++c)));
         }
         else if( endswith(arg, ".lib") )
             // Lib args are just libraries
@@ -70,30 +70,30 @@ void ToolChainInvocation::parse_command_args(char const* const* cli) {
             // lib specification order does not matter
             // on MSVC but this is useful for filtering system libs
             // and adding all libs
-            this->libArgs.push_back(arg);
+            this->lib_args.push_back(arg);
         else if ( endswith(arg, ".obj") )
-            this->objArgs.push_back(arg);
+            this->obj_args.push_back(arg);
         else
-            this->commandArgs.push_back(arg);
+            this->command_args.push_back(arg);
     }
 }
 
-std::string ToolChainInvocation::composeIncludeArg(std::string &include) {
+std::string ToolChainInvocation::ComposeIncludeArg(std::string &include) {
     return "/external:I " + include;
 }
 
-std::string ToolChainInvocation::composeLibPathArg(std::string &libPath) {
+std::string ToolChainInvocation::ComposeLibPathArg(std::string &libPath) {
     return "/LIBPATH:" + libPath;
 }
 
-void ToolChainInvocation::addExtraLibPaths(StrList paths) {
+void ToolChainInvocation::AddExtraLibPaths(StrList paths) {
     for( auto &libDir: paths )
     {
-        this->libDirArgs.push_back(this->composeLibPathArg(libDir));
+        this->lib_dir_args.push_back(this->ComposeLibPathArg(libDir));
     }
 }
 
-StrList ToolChainInvocation::composeCommandLists(std::vector<StrList> command_args)
+StrList ToolChainInvocation::ComposeCommandLists(std::vector<StrList> command_args)
 {
     StrList commandLine;
     for(auto arg_list : command_args)

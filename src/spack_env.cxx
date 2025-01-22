@@ -1,35 +1,37 @@
 #include "spack_env.h"
 
 
-SpackEnvState SpackEnvState::loadSpackEnvState() {
+SpackEnvState SpackEnvState::LoadSpackEnvState() {
+    // For list type env variables, a second argument of
+    // " " denotes this is a space separated env list
     SpackEnvState spackenv = SpackEnvState();
-    spackenv.Spack = getSpackEnv("SPACK");
-    spackenv.SpackInstDir = getSpackEnv("SPACKINSTDIR");
-    spackenv.SpackCC = getSpackEnv("SPACK_CC");
-    spackenv.SpackCXX = getSpackEnv("SPACK_CXX");
-    spackenv.SpackFC = getSpackEnv("SPACK_FC");
-    spackenv.SpackF77 = getSpackEnv("SPACK_F77");
-    spackenv.SpackRoot = getSpackEnv("SPACK_ROOT");
-    spackenv.addDebugFlags = getSpackEnv("SPACK_ADD_DEBUG_FLAGS");
-    spackenv.SpackFFlags = getenvlist("SPACK_FFLAGS", " ");
-    spackenv.SpackCFlags = getenvlist("SPACK_CFLAGS", " ");
-    spackenv.SpackCxxFlags = getenvlist("SPACK_CXXFLAGS", " ");
-    spackenv.SpackLdFlags = getenvlist("SPACK_LDFLAGS", " ");
-    spackenv.SpackLdLibs = getenvlist("SPACK_LDLIBS", " ");
-    spackenv.SpackCompilerExtraRPaths = getenvlist("SPACK_COMPILER_EXTRA_RPATHS", "|");
-    spackenv.SpackCompilerImplicitRPaths = getenvlist("SPACK_COMPILER_IMPLICIT_RPATHS", "|");
-    spackenv.SpackIncludeDirs = getenvlist("SPACK_INCLUDE_DIRS", "|");
-    spackenv.SpackLinkDirs = getenvlist("SPACK_LINK_DIRS", "|");
-    spackenv.SpackCompilerFlagsKeep = getenvlist("SPACK_COMPILER_FLAGS_KEEP", "|");
-    spackenv.SpackCompilerFlagsReplace = getenvlist("SPACK_COMPILER_FLAGS_REPLACE", "|");
-    spackenv.SpackEnvPath = getenvlist("SPACK_ENV_PATH");
-    spackenv.SpackCCRPathArg = getSpackEnv("SPACK_CC_RPATH_ARG");
-    spackenv.SpackCXXRPathArg = getSpackEnv("SPACK_CXX_RPATH_ARG");
-    spackenv.SpackFCRPathArg = getSpackEnv("SPACK_FC_RPATH_ARG");
-    spackenv.SpackF77RPathArg = getSpackEnv("SPACK_F77_RPATH_ARG");
-    spackenv.SpackSystemDirs = getenvlist("SPACK_SYSTEM_DIRS", "|");
-    spackenv.SpackRPathDirs = getenvlist("SPACK_RPATH_DIRS", "|");
-    spackenv.SpackLinkerArg = getSpackEnv("SPACK_LINKER_ARG");
-    spackenv.SpackLD = getSpackEnv("SPACK_LD");
+    spackenv.Spack = GetSpackEnv("SPACK");
+    spackenv.SpackInstDir = GetSpackEnv("SPACKINSTDIR");
+    spackenv.SpackCC = GetSpackEnv("SPACK_CC");
+    spackenv.SpackCXX = GetSpackEnv("SPACK_CXX");
+    spackenv.SpackFC = GetSpackEnv("SPACK_FC");
+    spackenv.SpackF77 = GetSpackEnv("SPACK_F77");
+    spackenv.SpackRoot = GetSpackEnv("SPACK_ROOT");
+    spackenv.AddDebugFlags = GetSpackEnv("SPACK_ADD_DEBUG_FLAGS");
+    spackenv.SpackFFlags = GetEnvList("SPACK_FFLAGS", " ");
+    spackenv.SpackCFlags = GetEnvList("SPACK_CFLAGS", " ");
+    spackenv.SpackCxxFlags = GetEnvList("SPACK_CXXFLAGS", " ");
+    spackenv.SpackLdFlags = GetEnvList("SPACK_LDFLAGS", " ");
+    spackenv.SpackLdLibs = GetEnvList("SPACK_LDLIBS", " ");
+    spackenv.SpackCompilerExtraRPaths = GetEnvList("SPACK_COMPILER_EXTRA_RPATHS", "|");
+    spackenv.SpackCompilerImplicitRPaths = GetEnvList("SPACK_COMPILER_IMPLICIT_RPATHS", "|");
+    spackenv.SpackIncludeDirs = GetEnvList("SPACK_INCLUDE_DIRS", "|");
+    spackenv.SpackLinkDirs = GetEnvList("SPACK_LINK_DIRS", "|");
+    spackenv.SpackCompilerFlagsKeep = GetEnvList("SPACK_COMPILER_FLAGS_KEEP", "|");
+    spackenv.SpackCompilerFlagsReplace = GetEnvList("SPACK_COMPILER_FLAGS_REPLACE", "|");
+    spackenv.SpackEnvPath = GetEnvList("SPACK_ENV_PATH");
+    spackenv.SpackCCRPathArg = GetSpackEnv("SPACK_CC_RPATH_ARG");
+    spackenv.SpackCXXRPathArg = GetSpackEnv("SPACK_CXX_RPATH_ARG");
+    spackenv.SpackFCRPathArg = GetSpackEnv("SPACK_FC_RPATH_ARG");
+    spackenv.SpackF77RPathArg = GetSpackEnv("SPACK_F77_RPATH_ARG");
+    spackenv.SpackSystemDirs = GetEnvList("SPACK_SYSTEM_DIRS", "|");
+    spackenv.SpackRPathDirs = GetEnvList("SPACK_RPATH_DIRS", "|");
+    spackenv.SpackLinkerArg = GetSpackEnv("SPACK_LINKER_ARG");
+    spackenv.SpackLD = GetSpackEnv("SPACK_LD");
     return spackenv;
 }

@@ -1,54 +1,54 @@
 #include "ld.h"
 #include "winrpath.h"
 
-void LdInvocation::loadToolchainDependentSpackVars(SpackEnvState &spackenv) {
-    this->spackCommand = spackenv.SpackLD;
+void LdInvocation::LoadToolchainDependentSpackVars(SpackEnvState &spackenv) {
+    this->spack_command = spackenv.SpackLD;
 }
 
 
-int LdInvocation::invokeToolchain()
+int LdInvocation::InvokeToolchain()
 {
     // Run base linker invocation to produce initial
     // dll and import library
-    int ret_code = ToolChainInvocation::invokeToolchain();
+    int ret_code = ToolChainInvocation::InvokeToolchain();
     if(ret_code != 0){
         return ret_code;
     }
     // Next we want to construct the proper commmand line to
     // recreate the import library from the same set of obj files
     // and libs
-    LinkerInvocation link_run(this->composeCommandLists({
-        this->commandArgs,
-        this->includeArgs,
-        this->libArgs,
-        this->libDirArgs,
-        this->objArgs
+    LinkerInvocation link_run(this->ComposeCommandLists({
+        this->command_args,
+        this->include_args,
+        this->lib_args,
+        this->lib_dir_args,
+        this->obj_args
     }));
-    link_run.parse();
+    link_run.Parse();
     // We're creating a dll, we need to create an appropriate import lib
-    if(!link_run.is_exe_link()) {
+    if(!link_run.IsExeLink()) {
         std::string basename = link_run.get_name();
         std::string imp_lib_name = strip(basename, ".dll") + ".lib";
         std::string dll_name = link_run.get_mangled_out();
         std::string abs_out_imp_lib_name = basename + ".dll-abs.lib";
         // create command line to generate new import lib
-        this->rpath_executor = ExecuteCommand("lib.exe", this->composeCommandLists(
+        this->rpath_executor = ExecuteCommand("lib.exe", this->ComposeCommandLists(
             {
                 {"-def", "-name:" + dll_name, "-out:"+ abs_out_imp_lib_name},
-                this->objArgs,
-                this->libArgs,
-                this->libDirArgs,
+                this->obj_args,
+                this->lib_args,
+                this->lib_dir_args,
             }
         ));
-        this->rpath_executor.execute();
-        int err_code = this->rpath_executor.join();
+        this->rpath_executor.Execute();
+        int err_code = this->rpath_executor.Join();
         if(err_code != 0) {
             return err_code;
         }
         CoffReaderWriter cr(abs_out_imp_lib_name);
         CoffParser coff(&cr);
-        coff.parse();
-        if(!coff.normalize_name(dll_name)){
+        coff.Parse();
+        if(!coff.NormalizeName(dll_name)){
             return -9;
         }
         std::remove(imp_lib_name.c_str());

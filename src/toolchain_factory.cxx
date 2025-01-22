@@ -8,7 +8,7 @@
 std::unique_ptr<ToolChainInvocation> ToolChainFactory::ParseToolChain(char const* const * argv) {
     std::string command(*argv);
     char const* const* cli(++argv);
-    stripPathandExe(command);
+    StripPathAndExe(command);
     using lang = ToolChainFactory::Language;
     auto lang_it = SupportedTools.find(command);
     if (lang_it != SupportedTools.end())
@@ -21,21 +21,25 @@ std::unique_ptr<ToolChainInvocation> ToolChainFactory::ParseToolChain(char const
         else if(language == lang::Fortran) {
             Tool = std::unique_ptr<FortranInvocation>(new FortranInvocation(command, cli));
         }
-        else {
-            // If it's not c/c++ or fortran we're linking
+        else if(language == lang::link) {
+            // If it's not c/c++ or fortran, we're linking
             Tool = std::unique_ptr<LdInvocation>(new LdInvocation(command, cli));
+        }
+        else {
+            std::cerr << "Unable to determine wrapper language or link context for " << command << "\n"; 
+            return std::unique_ptr<ToolChainInvocation>(nullptr);
         }
         return Tool;
     }
     return std::unique_ptr<ToolChainInvocation>(nullptr);
 }
 
-void ToolChainFactory::stripPathandExe(std::string &command) {
-    stripPath(command);
-    stripExe(command);
+void ToolChainFactory::StripPathAndExe(std::string &command) {
+    StripPath(command);
+    StripExe(command);
 };
 
-void ToolChainFactory::stripExe(std::string &command) {
+void ToolChainFactory::StripExe(std::string &command) {
     // Normalize command to lowercase to avoid parsing issues
     std::transform(command.begin(), command.end(), command.begin(),
         [](unsigned char c){ return std::tolower(c); });
@@ -44,7 +48,7 @@ void ToolChainFactory::stripExe(std::string &command) {
         command.erase(loc);
 }
 
-void ToolChainFactory::stripPath(std::string &command) {
+void ToolChainFactory::StripPath(std::string &command) {
     command.erase(0, command.find_last_of("\\/") + 1);
 }
 

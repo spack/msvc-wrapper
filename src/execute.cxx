@@ -5,22 +5,22 @@
 ExecuteCommand::ExecuteCommand(std::string command) :
     ChildStdOut_Rd(NULL),
     ChildStdOut_Wd(NULL),
-    baseCommand(command)
+    base_command(command)
 {
-    this->createChildPipes();
-    this->setupExecute();
+    this->CreateChildPipes();
+    this->SetupExecute();
 }
 
 ExecuteCommand::ExecuteCommand(std::string arg, StrList args) :
     ChildStdOut_Rd(NULL),
     ChildStdOut_Wd(NULL),
-    baseCommand(arg)
+    base_command(arg)
 {
     for(const auto a: args) {
-        this->commandArgs.push_back(a);
+        this->command_args.push_back(a);
     }
-    this->createChildPipes();
-    this->setupExecute();
+    this->CreateChildPipes();
+    this->SetupExecute();
 }
 
 ExecuteCommand& ExecuteCommand::operator=(ExecuteCommand &&ec)
@@ -32,8 +32,8 @@ ExecuteCommand& ExecuteCommand::operator=(ExecuteCommand &&ec)
     this->saAttr = std::move(ec.saAttr);
     this->fileout = std::move(ec.fileout);
     this->write_to_file = std::move(ec.write_to_file);
-    this->baseCommand = std::move(ec.baseCommand);
-    this->commandArgs = std::move(ec.commandArgs);
+    this->base_command = std::move(ec.base_command);
+    this->command_args = std::move(ec.command_args);
     this->child_out_future = std::move(ec.child_out_future);
     this->exit_code_future = std::move(exit_code_future);
     return *this;
@@ -41,10 +41,10 @@ ExecuteCommand& ExecuteCommand::operator=(ExecuteCommand &&ec)
 
 ExecuteCommand::~ExecuteCommand()
 {
-    this->cleanupHandles();
+    this->CleanupHandles();
 }
 
-void ExecuteCommand::setupExecute()
+void ExecuteCommand::SetupExecute()
 {
     PROCESS_INFORMATION piProcInfo;
     STARTUPINFOW siStartInfo;
@@ -65,7 +65,7 @@ void ExecuteCommand::setupExecute()
  * Create pipes and handles to communicate with
  * child process
  */
-int ExecuteCommand::createChildPipes()
+int ExecuteCommand::CreateChildPipes()
 {
     SECURITY_ATTRIBUTES saAttr;
     // Set the bInheritHandle flag so pipe handles are inherited.
@@ -81,12 +81,13 @@ int ExecuteCommand::createChildPipes()
 }
 
 /*
- * Kick off subprocess executing a given toolchain
+ * Kick off subprocess executing a given toolchain, returns a value indicating
+ * whether the subprocess was created successfully
  */
-int ExecuteCommand::executeToolChainChild()
+bool ExecuteCommand::ExecuteToolChainChild()
 {
     LPVOID lpMsgBuf;
-    const std::wstring c_commandLine = ConvertAnsiToWide(this->composeCLI());
+    const std::wstring c_commandLine = ConvertAnsiToWide(this->ComposeCLI());
     wchar_t * nc_commandLine = _wcsdup(c_commandLine.c_str());
     if(! CreateProcessW(
         NULL,
@@ -115,7 +116,7 @@ int ExecuteCommand::executeToolChainChild()
         std::cerr << (char*)lpMsgBuf << "\n";
         free(nc_commandLine);
         this->cpw_initalization_failure = true;
-        return 0;
+        return false;
     }
     // We've suceeded in kicking off the toolchain run
     // Explicitly close write handle to child proc stdout
@@ -123,14 +124,15 @@ int ExecuteCommand::executeToolChainChild()
     // determine when child proc is done
     free(nc_commandLine);
     CloseHandle(this->ChildStdOut_Wd);
-    return 1;
+    return true;
 }
 
 /* 
- * Execute the command and then after it finishes collect all of 
- * its output.
+ * Reads for the member variable holding a pipe to the wrapped processes'
+ * STDOUT and writes either to this processes' STDOUT or a file, depending on
+ * how the process wrapper is configured
  */
-int ExecuteCommand::pipeChildToStdout()
+int ExecuteCommand::PipeChildToStdout()
 {
     DWORD dwRead, dwWritten;
     CHAR chBuf[BUFSIZE];
@@ -159,15 +161,15 @@ int ExecuteCommand::pipeChildToStdout()
  * Ensures handles and their underlying resources are
  * cleaned
  */
-int ExecuteCommand::cleanupHandles()
+int ExecuteCommand::CleanupHandles()
 {
     if(!this->cpw_initalization_failure) {
         if(this->fileout != INVALID_HANDLE_VALUE)
-            if(!safeHandleCleanup(this->fileout))
+            if(!SafeHandleCleanup(this->fileout))
                 return 0;
-        if(!safeHandleCleanup(this->procInfo.hProcess))
+        if(!SafeHandleCleanup(this->procInfo.hProcess))
             return 0;
-        if( !safeHandleCleanup(this->procInfo.hThread))
+        if( !SafeHandleCleanup(this->procInfo.hThread))
             return 0;
         return 1;
     }
@@ -175,7 +177,11 @@ int ExecuteCommand::cleanupHandles()
 
 }
 
-int ExecuteCommand::reportExitCode()
+/**
+ * Reports the exit code of a given process, used as a callback to report
+ * on the status of wrapped process which is performed asynchronously
+ */
+int ExecuteCommand::ReportExitCode()
 {
     DWORD exit_code;
     while(GetExitCodeProcess( this->procInfo.hProcess, &exit_code )) {
@@ -186,21 +192,27 @@ int ExecuteCommand::reportExitCode()
     return exit_code;
 }
 
-std::string ExecuteCommand::composeCLI()
+std::string ExecuteCommand::ComposeCLI()
 {
     std::string CLI;
-    CLI += this->baseCommand + " ";
-    for(auto arg: this->commandArgs){
+    CLI += this->base_command + " ";
+    for(auto arg: this->command_args){
         CLI += arg + " ";
     }
     return CLI;
 }
 
 /*
- * Execute command in subprocess, piping stdout to parent
- * and returning the exit code of the subprocess
+ * Execute the wrapped command in subprocess, creating the process, and
+ * allowing it, and the piping of its stdout to this process to run asychronously
+ * and storing the futures of each async operation to be waited on at a later point
+ * 
+ * If this instance has been configured to write to a file instead of stdout, opens that file
+ * and prepares it for writing
+ * 
+ * Returns a value indicating whether or not the subprocess has been created sucessfully
 */
-int ExecuteCommand::execute(const std::string &filename)
+bool ExecuteCommand::Execute(const std::string &filename)
 {
     if (!filename.empty()){
         this->write_to_file = true;
@@ -213,19 +225,19 @@ int ExecuteCommand::execute(const std::string &filename)
                                     NULL
                                     );
     }
-    int ret_code = this->executeToolChainChild();
+    int ret_code = this->ExecuteToolChainChild();
     if (ret_code) {
-        this->child_out_future = std::async(std::launch::async, &ExecuteCommand::pipeChildToStdout, this);
-        this->exit_code_future = std::async(std::launch::async, &ExecuteCommand::reportExitCode, this);
+        this->child_out_future = std::async(std::launch::async, &ExecuteCommand::PipeChildToStdout, this);
+        this->exit_code_future = std::async(std::launch::async, &ExecuteCommand::ReportExitCode, this);
     }
     return ret_code;
 }
 
 /*
  * Blocks until the command initiated by execute terminates
- * and reports exit code
+ * and reports exit code of the process
  */
-int ExecuteCommand::join()
+int ExecuteCommand::Join()
 {
     if(!this->child_out_future.get())
         return -999;

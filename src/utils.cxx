@@ -149,7 +149,7 @@ std::string getCmdOption(char ** begin, char ** end, const std::string & option)
     return 0;
 }
 
-bool isRelocate(const char * arg)
+bool IsRelocate(const char * arg)
 {
     return strcmp(arg, "relocate") == 0;
 }
@@ -183,7 +183,7 @@ int checkArgumentPresence(const std::map<std::string, std::string> &args, const 
 /**
  * Parse the command line arguments supportin the relocate command
  */
-std::map<std::string, std::string> parseRelocate(const char ** args, int argc) {
+std::map<std::string, std::string> ParseRelocate(const char ** args, int argc) {
     std::map<std::string, std::string> opts;
     for (int i = 0; i < argc; i++){
         if (strcmp(args[i], "--pe")) {
@@ -251,7 +251,7 @@ std::map<std::string, std::string> parseRelocate(const char ** args, int argc) {
  * return the corresponding environment variable value
  * or an empty string as appropriate
  */
-std::string getSpackEnv(const char* env) {
+std::string GetSpackEnv(const char* env) {
     char* envVal = getenv(env);
     return envVal ? envVal : std::string();
 }
@@ -261,16 +261,16 @@ std::string getSpackEnv(const char* env) {
  * return the corresponding environment variable value
  * or an empty string as appropriate
  */
-std::string getSpackEnv(const std::string &env) {
-    return getSpackEnv(env.c_str());
+std::string GetSpackEnv(const std::string &env) {
+    return GetSpackEnv(env.c_str());
 }
 
 /**
  * Returns list of strings from environment variable value
  * representing a list delineated by delim argument
  */
-StrList getenvlist(const std::string &envVar, const std::string &delim) {
-    std::string envValue = getSpackEnv(envVar);
+StrList GetEnvList(const std::string &envVar, const std::string &delim) {
+    std::string envValue = GetSpackEnv(envVar);
     if (! envValue.empty())
         return split(envValue, delim);
     else
@@ -296,7 +296,7 @@ char const * SpackCompilerContextException::what() {
     return msg.c_str();
 }
 
-int validate_spack_env() {
+int ValidateSpackEnv() {
     std::vector<std::string> SpackEnv{
 "SPACK_ENV_PATH",
 "SPACK_DEBUG_LOG_DIR",
@@ -364,7 +364,7 @@ bool print_help()
     return true;
 }
 
-bool checkAndPrintHelp(const char ** arg, int argc)
+bool CheckAndPrintHelp(const char ** arg, int argc)
 {
     if(argc < 2) {
         return print_help();
@@ -395,7 +395,7 @@ std::string basename(const std::string &file)
     return file.substr(0, last_path);
 }
 
-std::string getCWD()
+std::string GetCWD()
 {
     DWORD buf_size;
     buf_size = GetCurrentDirectoryW(0, NULL);
@@ -406,7 +406,7 @@ std::string getCWD()
     return ConvertWideToANSI(ws_cwd);
 }
 
-bool isPathAbsolute(const std::string &pth)
+bool IsPathAbsolute(const std::string &pth)
 {
     return !PathIsRelativeA(pth.c_str());
 }
@@ -432,26 +432,26 @@ DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER section_header, DWORD number_of_sect
 
 LibraryFinder::LibraryFinder() : search_vars{"SPACK_RELOCATE_PATH"} {}
 
-std::string LibraryFinder::find_library(const std::string &lib_name) {
+std::string LibraryFinder::FindLibrary(const std::string &lib_name) {
     // Read env variables and split into paths
     // Only ever run once
     // First check if lib is absolute path
-    if (this->is_system(lib_name)) {
+    if (this->IsSystem(lib_name)) {
         return std::string();
     }
     if (!PathIsRelativeW(ConvertAnsiToWide(lib_name).c_str()))
         return lib_name;
     // next search the CWD
-    std::string cwd(getCWD());
-    auto res = this->finder(cwd, lib_name);
+    std::string cwd(GetCWD());
+    auto res = this->Finder(cwd, lib_name);
     if (!res.empty())
         return res;
-    this->eval_search_paths();
+    this->EvalSearchPaths();
     // next search env variable paths
     for (std::string var: this->search_vars) {
         std::vector<std::string> searchable_paths = this->evald_search_paths.at(var);
         for (std::string pth: searchable_paths) {
-            auto res = this->finder(pth, lib_name);
+            auto res = this->Finder(pth, lib_name);
             if (!res.empty())
                 return res;
         }
@@ -459,7 +459,7 @@ std::string LibraryFinder::find_library(const std::string &lib_name) {
     return std::string();
 }
 
-void LibraryFinder::eval_search_paths() {
+void LibraryFinder::EvalSearchPaths() {
     if (!this->evald_search_paths.empty())
         return;
     for (std::string var: this->search_vars) {
@@ -469,7 +469,7 @@ void LibraryFinder::eval_search_paths() {
     }
 }
 
-std::string LibraryFinder::finder(const std::string &pth, const std::string &lib_name) {
+std::string LibraryFinder::Finder(const std::string &pth, const std::string &lib_name) {
     WIN32_FIND_DATAW findFileData;
     HANDLE hFind = FindFirstFileW(ConvertAnsiToWide(pth).c_str(), &findFileData);
 
@@ -515,7 +515,7 @@ std::vector<std::string> system_locations = {
     "OLEAUTH32"
 };
 
-bool LibraryFinder::is_system(const std::string &pth) {
+bool LibraryFinder::IsSystem(const std::string &pth) {
     for (auto loc: system_locations) {
         if (pth.find(loc) != std::string::npos) {
             return true;
@@ -524,7 +524,7 @@ bool LibraryFinder::is_system(const std::string &pth) {
     return false;
 }
 
-int safeHandleCleanup(HANDLE &handle)
+int SafeHandleCleanup(HANDLE &handle)
 {
     if(handle != INVALID_HANDLE_VALUE){
         if ( !CloseHandle(handle) ) {
@@ -536,11 +536,24 @@ int safeHandleCleanup(HANDLE &handle)
     return 1;
 }
 
-DWORD to_little_endian(DWORD val)
+DWORD ToLittleEndian(DWORD val)
 {
     DWORD little_endian_val = (val >> 24) | 
     ((val & 0x00FF0000) >> 8) | 
     ((val & 0x0000FF00) << 8) | 
     (val << 24);
     return little_endian_val;
+}
+
+char * findstr(char *search_str, const char * substr, int size)
+{
+    char * search = search_str;
+    int str_size = strlen(substr);
+    while (search < search_str+size) {
+        if (!strncmp(search, substr, str_size)) {
+            return search;
+        }
+        ++search;
+    }
+    return NULL;
 }

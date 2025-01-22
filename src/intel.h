@@ -10,7 +10,7 @@ class FortranInvocation : public ToolChainInvocation {
 public:
     using ToolChainInvocation::ToolChainInvocation;
 protected:
-    void loadToolchainDependentSpackVars(SpackEnvState &spackenv);
+    void LoadToolchainDependentSpackVars(SpackEnvState &spackenv);
     std::string lang = "intel fortran";
 };
 

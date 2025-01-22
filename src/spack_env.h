@@ -12,7 +12,7 @@
  * Variables that are simple strings are also treated as such
  */
 struct SpackEnvState{
-    std::string addDebugFlags;
+    std::string AddDebugFlags;
     StrList SpackFFlags;
     StrList SpackCFlags;
     StrList SpackCxxFlags;
@@ -35,11 +35,18 @@ struct SpackEnvState{
     std::string Spack;
     std::string SpackInstDir;
     std::string SpackCC;
-    std::string SpackCXX;
+    // SpackCXX is unused in the current implementation
+    // but is left here for future compatibility with
+    // compilers with distinct c/cxx compilers unlink MSVC
+    std::string SpackCXX; 
     std::string SpackFC;
     std::string SpackF77;
     std::string SpackRoot;
     std::string SpackLD;
 
-    static SpackEnvState loadSpackEnvState();
+    /**
+    * Loads spack related env variables from the environment
+    * and returns a SpackEnvState object
+    */
+    static SpackEnvState LoadSpackEnvState();
 };

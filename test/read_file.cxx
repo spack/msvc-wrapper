@@ -8,7 +8,7 @@ struct Coff {
     char signature[IMAGE_ARCHIVE_START_SIZE];
 };
 
-void read_sig(char *sig, std::fstream &stream){
+void ReadSig(char *sig, std::fstream &stream){
     stream.read(sig, 8);
 }
 
@@ -21,7 +21,7 @@ int main(int argc, char ** argv)
         return 1;
     }
     Coff coff;
-    read_sig(&coff.signature, in);
+    ReadSig(&coff.signature, in);
     std::cout << coff.signature << "\n";
     return 0;
 

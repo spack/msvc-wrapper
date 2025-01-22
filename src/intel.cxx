@@ -1,5 +1,5 @@
 #include "intel.h"
 
-void FortranInvocation::loadToolchainDependentSpackVars(SpackEnvState &spackenv) {
-    this->spackCommand = spackenv.SpackFC;
+void FortranInvocation::LoadToolchainDependentSpackVars(SpackEnvState &spackenv) {
+    this->spack_command = spackenv.SpackFC;
 }
