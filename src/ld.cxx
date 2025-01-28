@@ -2,7 +2,7 @@
 #include "winrpath.h"
 
 void LdInvocation::LoadToolchainDependentSpackVars(SpackEnvState &spackenv) {
-    this->spack_command = spackenv.SpackLD;
+    this->command = spackenv.SpackLD;
 }
 
 

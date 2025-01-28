@@ -16,6 +16,8 @@
 #define _STRING(m) #m
 #define STRING(m) _STRING(m)
 
+#define MAX_NAME_LEN 143
+
 typedef std::vector<std::string> StrList;
 
 // Environment Helper Methods

@@ -226,7 +226,7 @@ class LibRename {
 public:
     LibRename(std::string pe, bool full, bool deploy, bool replace);
     int ExecuteRename();
-    int ExecuteRename();
+    int ExecuteLibRename();
     int ExecutePERename();
     int ComputeDefFile();
     std::string ComputeRenameLink();

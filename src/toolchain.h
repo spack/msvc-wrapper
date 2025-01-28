@@ -29,5 +29,4 @@ protected:
     StrList lib_args;
     StrList obj_args;
     ExecuteCommand executor;
-    std::string spack_command;
 };

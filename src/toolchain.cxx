@@ -2,9 +2,9 @@
 
 #include <sstream>
 
-ToolChainInvocation::ToolChainInvocation(std::string command, char const* const* cli)
+ToolChainInvocation::ToolChainInvocation(std::string command, char const* const* cli) :
+    command(command)
 {
-    this->command = command;
     this->ParseCommandArgs(cli);
 }
 
@@ -34,8 +34,7 @@ int ToolChainInvocation::InvokeToolchain() {
         this->lib_dir_args,
         this->obj_args
     }));
-
-    this->executor = ExecuteCommand(  this->spack_command,
+    this->executor = ExecuteCommand(  this->command,
                                       commandLine
                                     );
     // Run first pass of command as requested by caller

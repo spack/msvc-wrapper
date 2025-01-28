@@ -277,25 +277,6 @@ StrList GetEnvList(const std::string &envVar, const std::string &delim) {
         return StrList();
 }
 
-char const* SpackException::what() {
-    return this->message.c_str();
-}
-
-char const * SpackUnknownCompilerException::what() {
-    std::string msg = "Unknown compiler" + this->message;
-    return msg.c_str();
-}
-
-char const * SpackCompilerException::what() {
-    std::string msg = "[spack cc] ERROR " + this->message;
-    return msg.c_str();
-}
-
-char const * SpackCompilerContextException::what() {
-    std::string msg = "Spack compiler must be run from Spack! Missing input: " + this->message;
-    return msg.c_str();
-}
-
 int ValidateSpackEnv() {
     std::vector<std::string> SpackEnv{
 "SPACK_ENV_PATH",
@@ -528,8 +509,6 @@ int SafeHandleCleanup(HANDLE &handle)
 {
     if(handle != INVALID_HANDLE_VALUE){
         if ( !CloseHandle(handle) ) {
-            std::stringstream os_error;
-            std::cerr << GetLastError();
             return 0;
         }
     }

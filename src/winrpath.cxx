@@ -31,7 +31,10 @@ void replace_special_characters(char in[], int len)
 {
     for (int i = 0; i < len; ++i) {
         if (special_character_to_path.count(in[i]))
+        {
             in[i] = special_character_to_path.at(in[i]);
+        }
+            
     }
 }
 
@@ -56,7 +59,7 @@ void replace_path_characters(char in[], int len)
  * \param str_size the length of the path
  * \param bsize the lengh of the padding to add
  */
-char * pad_path(const char *pth, DWORD str_size, DWORD bsize = MAX_PATH)
+char * pad_path(const char *pth, DWORD str_size, DWORD bsize = MAX_NAME_LEN)
 {
     size_t extended_buf = bsize - str_size;
     char * padded_path = new char[bsize+1];
@@ -382,7 +385,7 @@ void CoffParser::ParseFullImport(coff_member *member)
     if (size_of_string_table > 4) {
         // string table size bytes are included in the total size count for the
         // string table
-        string_table = member->data+string_table_offset+4;
+        string_table = member->data+string_table_offset+sizeof(DWORD);
     }
     // We're done reading a given member's data field
     long_import_member *lm = new long_import_member;
@@ -512,6 +515,7 @@ bool CoffParser::NormalizeName(std::string &name)
         // import member names from spack are of the form "      /n" where n is their place
         // in the longnames member, other members are "/[/]        "
         // This allows us to determine if we're looking at an import member, and where the offset is
+        // Non Spack no linker/longname members are of the form "    /name-of-dll"
         while(i < 16 && mem.header->Name[i] != ' ') {
             ++i;
         }
@@ -520,17 +524,16 @@ bool CoffParser::NormalizeName(std::string &name)
             // We have an import member
             // Name is longer than 16 bytes, need to lookup name in longname offset
             int longname_offset = std::stoi(name_ref.substr(1, std::string::npos));
+            // Reconstruct name from location in longnames member
+            int long_name_len = strlen(this->coff_.members[2].member->data+longname_offset);
             // Longnames member is always the third member if it exists
             // We know it exists at this point due to the success of the conditional above
-            std::vector<char> long_name;
-            // Reconstruct name from location in longnames member
-            int i;
-            for (i = longname_offset; this->coff_.members[2].member->data[i] != '\0'; ++i)
-                long_name.push_back(this->coff_.members[2].member->data[i]);
+            char* long_name = new char[long_name_len];
+            strncpy(long_name, this->coff_.members[2].member->data+longname_offset, long_name_len);
             // Ensure Dll name is the one we're looking to perform the rename for
-            if (!strcmp(name.c_str(), std::string(long_name.begin(), long_name.end()).c_str())) {
+            if (!strcmp(name.c_str(), long_name)) {
                 // If so, unmangle it
-                replace_special_characters((char *)&long_name[0], i-longname_offset);
+                replace_special_characters(long_name, long_name_len);
                 // offset of actual longname member
                 int offset = std::streamoff(this->coff_.members[2].offset);
                 this->coffStream->seek(0);
@@ -538,8 +541,9 @@ bool CoffParser::NormalizeName(std::string &name)
                 this->coffStream->seek(offset);
                 // Seek to offset within longname member for a given import name
                 this->coffStream->seek(sizeof(IMAGE_ARCHIVE_MEMBER_HEADER) + longname_offset, std::ios_base::cur);
-                this->coffStream->write(long_name.data(), long_name.size());
+                this->coffStream->write(long_name, long_name_len);
             }
+            delete long_name;
             // Import member name has been renamed
             // Now we rename the other DLL references
             // Import members have two forms, long and short, check for short
@@ -552,16 +556,17 @@ bool CoffParser::NormalizeName(std::string &name)
                 strcpy(new_name, mem.member->short_member->short_dll);
                 replace_special_characters(new_name, name_len);
                 // ensure it's the name we're looking to rename
-                if(!strcmp(name.c_str(), new_name)) {
+                if(!strcmp(name.c_str(), mem.member->short_member->short_dll)) {
                     // Member offset in file
                     int offset = std::streamoff(mem.offset);
                     // Member header offset
-                    offset += sizeof(mem.header);
+                    offset += sizeof(IMAGE_ARCHIVE_MEMBER_HEADER);
                     // Now need relative offset to dll name in member
                     // First entry in short import member is the import header
                     offset += sizeof(IMPORT_OBJECT_HEADER);
                     // Next is the symbol name, which is a null terminated string
-                    offset += strlen(mem.member->short_member->short_name);
+                    // +1 to preserve the null terminator in the coff member
+                    offset += strlen(mem.member->short_member->short_name) + 1;
                     this->coffStream->seek(0);
                     this->coffStream->seek(offset);
                     this->coffStream->write(new_name, strlen(new_name));
@@ -572,8 +577,8 @@ bool CoffParser::NormalizeName(std::string &name)
                 // Rename standard import members
                 // First perform the section data renames
                 WORD section_data_count = mem.member->long_member->pfile_h->NumberOfSections;
-                for(int i=0; i<section_data_count; ++i) {
-                    PIMAGE_SECTION_HEADER psec_header =  *(mem.member->long_member->pp_sections+i);
+                for(int j=0; j<section_data_count; ++j) {
+                    PIMAGE_SECTION_HEADER psec_header =  *(mem.member->long_member->pp_sections+j);
                     // Get section data size from corresponding section header
                     int data_size = psec_header->SizeOfRawData;
                     int virtual_size = psec_header->Misc.VirtualSize;
@@ -584,7 +589,7 @@ bool CoffParser::NormalizeName(std::string &name)
                     // section start offset in file
                     DWORD section_data_start_offset = std::streamoff(mem.offset) + sizeof(IMAGE_ARCHIVE_MEMBER_HEADER) + psec_header->PointerToRawData;
                     // section start is longmember section pointer + index
-                    char * section = *(mem.member->long_member->section_data+i);
+                    char * section = *(mem.member->long_member->section_data+j);
                     char * section_search_start = &*section;
                     char * search_terminator = section+data_size;
                     // search section data for full name
@@ -624,26 +629,26 @@ bool CoffParser::NormalizeName(std::string &name)
                     }
                 }
                 // Section data rename is complete, now rename string table
-                int relative_string_table_start_offset = std::streamoff(mem.offset) + sizeof(IMAGE_ARCHIVE_MEMBER_HEADER) + mem.member->long_member->string_table_offset;
+                int relative_string_table_start_offset = std::streamoff(mem.offset) + sizeof(IMAGE_ARCHIVE_MEMBER_HEADER) + mem.member->long_member->string_table_offset + sizeof(DWORD);
                 char * string_table_start, *string_table = mem.member->long_member->string_table;
                 int symbol_count = mem.member->long_member->pfile_h->NumberOfSymbols;
                 PIMAGE_SYMBOL * symbols = mem.member->long_member->symbol_table;
-                for(int i=0;i<symbol_count;++i) {
-                    PIMAGE_SYMBOL symbol = *(symbols+i);
+                for(int j=0;j<symbol_count;++j) {
+                    PIMAGE_SYMBOL symbol = *(symbols+j);
                     if(symbol->N.Name.Short == 0) {
                         // name is longer than 8 bytes, it's a Spack name, search
-                        DWORD name_string_table_offset = symbol->N.Name.Long;
+                        DWORD name_string_table_offset = symbol->N.Name.Long-sizeof(DWORD);
                         string_table_start = strstr((string_table+name_string_table_offset), name_no_ext.c_str());
                         if (string_table_start && (string_table_start < string_table+mem.member->long_member->size_of_string_table)) {
                             ptrdiff_t offset = string_table_start - string_table;
                             int name_len = name_no_ext.size();
-                            char * new_name = new char[name_len];
-                            strncpy(string_table_start, new_name, name_len);
-                            replace_special_characters(new_name, name_len);
+                            char * new_no_ext_name = new char[name_len];
+                            strncpy(new_no_ext_name, string_table_start, name_len);
+                            replace_special_characters(new_no_ext_name, name_len);
                             this->coffStream->seek(0);
                             this->coffStream->seek(relative_string_table_start_offset + offset);
-                            this->coffStream->write(new_name, name_len);
-                            delete new_name;
+                            this->coffStream->write(new_no_ext_name, name_len);
+                            delete new_no_ext_name;
                         }
                     }
                 }
@@ -659,7 +664,7 @@ bool CoffParser::NormalizeName(std::string &name)
             int current_relative_offset = 0;
             if (mem.member->first_link) {
                 int member_offset = sizeof(DWORD) + mem.member->first_link->symbols*sizeof(DWORD);
-                for (int i=0; i < mem.member->first_link->symbols; ++i) {
+                for (int j=0; j < mem.member->first_link->symbols; ++j) {
                     int name_len = strlen(mem.member->first_link->strings+current_relative_offset);
                     char * new_name = new char[name_len];
                     strcpy(new_name, mem.member->first_link->strings+current_relative_offset);
@@ -676,7 +681,7 @@ bool CoffParser::NormalizeName(std::string &name)
             else {
                 // rename second linker member names
                 int member_offset = sizeof(DWORD) + sizeof(DWORD) * mem.member->second_link->members + sizeof(DWORD) + sizeof(WORD) * mem.member->second_link->symbols;
-                for(int i=0; i<mem.member->second_link->symbols;++i) {
+                for(int j=0; j<mem.member->second_link->symbols;++j) {
                     int name_len = strlen(mem.member->second_link->strings+current_relative_offset);
                     char * new_name = new char[name_len];
                     strcpy(new_name, mem.member->second_link->strings+current_relative_offset);
@@ -924,7 +929,7 @@ int LibRename::ExecuteRename()
         if(!this->ComputeDefFile()) {
             return 0;
         }
-        if(!this->ExecuteRename()) {
+        if(!this->ExecuteLibRename()) {
             return 0;
         }
     }
@@ -945,7 +950,7 @@ int LibRename::ExecuteRename()
  *   as its dll name, and then modifies that binary to correct
  *   and unmangle the mangled dll name
  */
-int LibRename::ExecuteRename()
+int LibRename::ExecuteLibRename()
 {
     this->lib_executor.Execute();
     int ret_code = this->lib_executor.Join();
