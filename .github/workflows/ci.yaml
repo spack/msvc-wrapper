@@ -19,15 +19,9 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ilammy/msvc-dev-cmd@v1
-      - name: "build wrapper"
+      - name: Remove Git Bash tools
         run: |
-          nmake cl.exe
-      - name: "create link wrapper"
-        run: |
-          mklink link.exe cl.exe
-      - name: "Test compiler wrapper"
-        run: |
-          nmake build_and_check_test_sample
+          rmdir /s /q "C:\Program Files\Git\usr"
       - name: "Test RPath"
         run: |
           nmake test  
