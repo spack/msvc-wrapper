@@ -293,7 +293,7 @@ bool CoffParser::Parse()
         std::cerr << "Unable to open coff file for reading: " << GetLastError() << "\n";
         return false;
     }
-    int invalid_valid_sig = this->coffStream->ReadSig(this->coff_);
+    int invalid_valid_sig = this->coffStream->ReadSig(this->coff);
     if(invalid_valid_sig) {
         std::cerr << "Invalid signature for expected COFF archive format file: " << this->coffStream->get_file() << "\n";
         return false;
@@ -317,7 +317,7 @@ bool CoffParser::Parse()
         std::cerr << "Unexpected end of file encountered. Please ensure input file is not corrupted\n";
         return false;
     }
-    this->coff_.members = members;
+    this->coff.members = members;
     this->coffStream->clear();
     return true;
 }
@@ -469,9 +469,9 @@ void CoffParser::ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *mem
         this->ParseShortImport(member);
     }
     else if (!strncmp((char*)header->Name, IMAGE_ARCHIVE_LINKER_MEMBER, 16)) {
-        if (!this->coff_.read_first_linker) {
+        if (!this->coff.read_first_linker) {
             this->ParseFirstLinkerMember(member);
-            this->coff_.read_first_linker = true;
+            this->coff.read_first_linker = true;
         }
         else {
             this->ParseSecondLinkerMember(member);
@@ -510,7 +510,7 @@ bool CoffParser::NormalizeName(std::string &name)
     std::string name_no_ext = strip(name, ".dll");
 
     // Iterate through the parsed COFF members
-    for (auto mem: this->coff_.members) {
+    for (auto mem: this->coff.members) {
         int i = 0;
         // import member names from spack are of the form "      /n" where n is their place
         // in the longnames member, other members are "/[/]        "
@@ -525,17 +525,17 @@ bool CoffParser::NormalizeName(std::string &name)
             // Name is longer than 16 bytes, need to lookup name in longname offset
             int longname_offset = std::stoi(name_ref.substr(1, std::string::npos));
             // Reconstruct name from location in longnames member
-            int long_name_len = strlen(this->coff_.members[2].member->data+longname_offset);
+            int long_name_len = strlen(this->coff.members[2].member->data+longname_offset);
             // Longnames member is always the third member if it exists
             // We know it exists at this point due to the success of the conditional above
             char* long_name = new char[long_name_len];
-            strncpy(long_name, this->coff_.members[2].member->data+longname_offset, long_name_len);
+            strncpy(long_name, this->coff.members[2].member->data+longname_offset, long_name_len);
             // Ensure Dll name is the one we're looking to perform the rename for
             if (!strcmp(name.c_str(), long_name)) {
                 // If so, unmangle it
                 replace_special_characters(long_name, long_name_len);
                 // offset of actual longname member
-                int offset = std::streamoff(this->coff_.members[2].offset);
+                int offset = std::streamoff(this->coff.members[2].offset);
                 this->coffStream->seek(0);
                 // Seek to longname header
                 this->coffStream->seek(offset);

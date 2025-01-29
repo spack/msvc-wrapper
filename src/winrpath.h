@@ -144,7 +144,7 @@ typedef struct coff {
 
 
 /**
- * @brief Encapsulates a stream reading a COFF file object
+ * @brief Encapsulates a stream for reading and writing to a coff object
  * 
  * Provides abstractions around many common istream stream operations
  * for simple manipulation of the underlying COFF stream by a parser.
@@ -188,7 +188,7 @@ public:
 class CoffParser {
 private:
     CoffReaderWriter* coffStream;
-    coff coff_;
+    coff coff;
     void ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *member);
     void ParseShortImport(coff_member *member);
     void ParseFullImport(coff_member *member);
