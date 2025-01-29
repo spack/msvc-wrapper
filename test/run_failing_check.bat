@@ -1,3 +1,7 @@
+::rem Copyright Spack Project Developers. See COPYRIGHT file for details.
+::
+::rem SPDX-License-Identifier: (Apache-2.0 OR MIT)
+
 @echo off
 
 .\tester.exe

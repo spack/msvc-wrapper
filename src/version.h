@@ -1,15 +1,7 @@
 /**
- * @file version.hxx
- * @author John Parent (john.parent@kitware.com)
- * @brief Versioning file for Spack MSVC compiler wrappers
- *        semantic versioning
- *        defines separate macro for major, minor, and patch
- *        versions, and a conjoined macro of major.minor.patch
- * @date 2023-11-02
- * @copyright  Copyright 2013-2023 Lawrence Livermore National Security, LLC and other
- *             Spack Project Developers. See the top-level COPYRIGHT file for details.
- *             SPDX-License-Identifier: (Apache-2.0 OR MIT)
- * 
+ * Copyright Spack Project Developers. See COPYRIGHT file for details.
+ *
+ * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #pragma once
 

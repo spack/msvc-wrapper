@@ -1,17 +1,7 @@
 /**
- * @file main.cxx
- * @author John Parent (john.parent@kitware.com)
- * @brief A C++ wrapper file for the MSVC c and c++ compilers and linkers
- *        created for the Spack package manager.
+ * Copyright Spack Project Developers. See COPYRIGHT file for details.
  *
- *        This file implements the functionality required to inject Spack's build logic
- *        into the compiler/linker interface and drives the main entrypoint.
- * @date 2023-10-20
- *
- * @copyright  Copyright 2013-2024 Lawrence Livermore National Security, LLC and other
- *             Spack Project Developers. See the top-level COPYRIGHT file for details.
- *             SPDX-License-Identifier: (Apache-2.0 OR MIT)
- *
+ * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 
 #include "toolchain_factory.h"

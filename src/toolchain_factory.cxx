@@ -1,3 +1,8 @@
+/**
+ * Copyright Spack Project Developers. See COPYRIGHT file for details.
+ *
+ * SPDX-License-Identifier: (Apache-2.0 OR MIT)
+ */
 #include "toolchain_factory.h"
 #include "cl.h"
 #include "ld.h"

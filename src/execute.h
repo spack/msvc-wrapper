@@ -1,3 +1,8 @@
+/**
+ * Copyright Spack Project Developers. See COPYRIGHT file for details.
+ *
+ * SPDX-License-Identifier: (Apache-2.0 OR MIT)
+ */
 #pragma once
 
 #include <iostream>
@@ -35,7 +40,12 @@ private:
     int CreateChildPipes();
     int CleanupHandles();
     int ReportExitCode();
+    // Holds the exit code of the
+    // pipe from child process stdout
+    // to parent std out or file
     std::future<int> child_out_future;
+    // Holds the exit code of the 
+    // command wrapped by this class
     std::future<int> exit_code_future;
     std::string ComposeCLI();
     HANDLE ChildStdOut_Rd;

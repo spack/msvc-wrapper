@@ -1,3 +1,8 @@
+/**
+ * Copyright Spack Project Developers. See COPYRIGHT file for details.
+ *
+ * SPDX-License-Identifier: (Apache-2.0 OR MIT)
+ */
 #pragma once
 
 #include <stdlib.h>
@@ -26,13 +31,13 @@
  * @brief
  */
 typedef struct long_import_member {
+    long long string_table_offset;
+    DWORD size_of_string_table;
     PIMAGE_FILE_HEADER pfile_h;
     PIMAGE_SECTION_HEADER * pp_sections;
-    char ** section_data;
     PIMAGE_SYMBOL * symbol_table;
+    char ** section_data;
     char * string_table;
-    DWORD size_of_string_table;
-    long long string_table_offset;
     ~long_import_member() {
         for (int i=0; i<this->pfile_h->NumberOfSymbols; ++i) {
             delete *(this->symbol_table+i);
@@ -54,9 +59,9 @@ typedef struct long_import_member {
  * @brief
  */
 typedef struct short_import_member {
+    IMPORT_OBJECT_HEADER *im_h;
     char * short_name;
     char * short_dll;
-    IMPORT_OBJECT_HEADER *im_h;
 } short_import_member;
 
 /**
@@ -73,8 +78,8 @@ typedef struct first_linker_member {
  */
 typedef struct second_linker_member {
     DWORD members;
-    PDWORD offsets;
     DWORD symbols;
+    PDWORD offsets;
     PWORD indicies;
     char * strings;
 } second_linker_member;
@@ -92,11 +97,11 @@ typedef struct longnames_member {
  */
 typedef struct coff_member {
     char * data;
-    bool is_short;
     short_import_member *short_member;
     long_import_member *long_member;
     first_linker_member *first_link;
     second_linker_member *second_link;
+    bool is_short;
     coff_member() {
         this->is_short = false;
         this->first_link = NULL;
@@ -105,12 +110,8 @@ typedef struct coff_member {
         this->long_member = NULL;
     }
     ~coff_member () {
-        if (this->is_short) {
-            delete short_member;
-        }
-        else {
-            delete long_member;
-        }
+        delete short_member;
+        delete long_member;
         delete first_link;
         delete second_link;
         delete data;
