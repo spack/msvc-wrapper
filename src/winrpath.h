@@ -22,8 +22,6 @@
 // and define our own in the cases winnt
 // misses some
 
-#pragma pack(push, r1, 1)
-
 /**
  * @brief
  */
@@ -139,8 +137,6 @@ typedef struct coff {
         this->read_first_linker = false;
     }
 } coff;
-
-#pragma pack(pop, r1)
 
 
 /**
