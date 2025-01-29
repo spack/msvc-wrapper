@@ -50,7 +50,6 @@ install : cl.exe
 
 setup_test: cl.exe
 	del *.obj
-	test\setup_spack_env.bat
 	mkdir tmp\test
 	cd tmp\test
 	copy ..\..\cl.exe cl.exe

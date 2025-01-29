@@ -24,4 +24,4 @@ jobs:
           rmdir /s /q "C:\Program Files\Git\usr"
       - name: "Test RPath"
         run: |
-          nmake test  
+          test\setup_and_drive_test.bat 
