@@ -1,0 +1,31 @@
+# Copyright Spack Project Developers. See COPYRIGHT file for details.
+#
+# SPDX-License-Identifier: (Apache-2.0 OR MIT)
+
+name: ci
+
+on: [pull_request, push]
+
+
+concurrency:
+  group: ci-${{github.ref}}-${{github.event.pull_request.number || github.run_number}}
+  cancel-in-progress: true
+
+jobs:
+  # Check which files have been updated by the PR
+  validate-wrapper:
+    defaults:
+      run:
+        shell: cmd
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Remove Git Bash tools
+        run: |
+          rmdir /s /q "C:\Program Files\Git\usr"
+      - name: "Test RPath"
+        run: |
+          test\setup_and_drive_test.bat 

@@ -2,6 +2,18 @@
 
 /build/
 /install/
+/tmp/
 
-# Ignore .cxx build artifacts
+# Ignore .cxx and compiler wrapper build artifacts
 *.obj
+*.exe
+*.ilk
+*.pdb
+*.lib
+*.dll
+*.exp
+*.hex
+*.def
+
+# Vscode 
+/.vscode/

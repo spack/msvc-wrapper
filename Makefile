@@ -1,6 +1,7 @@
-# Copyright 2013-2023 Lawrence Livermore National Security, LLC and other
-# Spack Project Developers. See the top-level COPYRIGHT file for details.
+# Copyright Spack Project Developers. See COPYRIGHT file for details.
+#
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
+
 
 # Makefile (flavor nmake) for the MSVC compiler wrapper for the Spack package manager
 # Useful arguments to be provided to nmake
@@ -12,8 +13,9 @@
 # Vendored targets:
 # 	cl 		- builds just the compiler wrapper
 # 	install - builds and installs the compiler wrapper
-#   all 	- default target, same as install, will be run if no target
+#   all 	- default target, install + test, will be run if no target
 #		        is provided to nmake
+#   test    - 
 
 !IFNDEF "$(PREFIX)"
 PREFIX="$(MAKEDIR)\install\"
@@ -29,14 +31,56 @@ CFLAGS = $(BASE_CFLAGS) $(BUILD_CFLAGS) $(CLFLAGS)
 LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
 
 
-.cxx.obj:
-	$(CC) /c $(cflags) $(cvars) $*.cxx
+{src}.cxx{}.obj::
+	$(CC) /c $(CFLAGS) $(CVARS) /I:src $<	
 
-all: install
+{test}.cxx{test}.obj::
+	$(CC) /c $(CFLAGS) $(CVARS) /I:test $<
 
-cl.exe : cl.obj
-	link $(LFLAGS) cl.obj /out:cl.exe
+all : install test
+
+cl.exe : cl.obj execute.obj intel.obj ld.obj main.obj spack_env.obj toolchain.obj toolchain_factory.obj utils.obj winrpath.obj 
+	link $(LFLAGS) $** Shlwapi.lib /out:cl.exe
 
 install : cl.exe
 	mkdir $(PREFIX)
-	copy cl.exe $(PREFIX)
+	move cl.exe $(PREFIX)
+	mklink $(PREFIX)/link.exe $(PREFIX)/cl.exe
+	mklink $(PREFIX)/ifx.exe $(PREFIX)/cl.exe
+	mklink $(PREFIX)/relocate.exe $(PREFIX)/cl.exe
+
+setup_test: cl.exe
+	del *.obj
+	mkdir tmp\test
+	cd tmp\test
+	copy ..\..\cl.exe cl.exe
+	mklink link.exe cl.exe
+
+build_and_check_test_sample : setup_test
+	cl /c /EHsc ..\..\test\calc.cxx /DCALC_EXPORTS
+	cl /c /EHsc ..\..\test\main.cxx
+	link $(LFLAGS) calc.obj /out:calc.dll /DLL
+	link $(LFLAGS) main.obj calc.lib /out:tester.exe
+	tester.exe
+
+test : build_and_check_test_sample
+	cd ..
+	move test\tester.exe .\tester.exe
+	.\tester.exe
+	mkdir tmp_bin
+	move test\calc.dll tmp_bin\calc.dll
+	..\test\run_failing_check.bat
+	cd ..
+	rmdir /q /s tmp
+
+
+clean :
+	del *.obj
+	del *.exe
+	del *.dll
+	del *.lib
+	del *.exp
+	del *.pdb
+
+clean-cl :
+	del cl.exe
