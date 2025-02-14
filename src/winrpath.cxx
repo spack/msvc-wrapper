@@ -927,10 +927,21 @@ int LibRename::ComputeDefFile()
  *  and then generates an import library with absolute paths to the
  *  corresponding dll or generates a dll with absolute paths to its
  *  dependencies depending on the context
+ * On standard deployment, we don't do anything
+ * On standard extraction, we want to regenerate the import library
+ *  from out dll or exe pointing to the new location of the dll/exe
+ *  post buildcache extraction
+ * 
+ * On a full deployment, we mark the spack based DLL names in the binary
+ *  with a spack sigil <sp!>
+ * 
+ * On a full extraction, in addition to the standard extraction operation
+ *  we rename the Dll names marked with the spack sigil (<sp!>)
+ *
  */
 int LibRename::ExecuteRename()
 {
-    if(!this->deploy || this->is_exe){
+    if(!this->deploy){
         if(!this->ComputeDefFile()) {
             return 0;
         }
@@ -938,7 +949,7 @@ int LibRename::ExecuteRename()
             return 0;
         }
     }
-    if (this->full || this->is_exe) {
+    if (this->full) {
         if(!this->ExecutePERename()) {
             std::cerr << "Unable to execute rename of "
                 "referenced components in PE file: " << this->name << "\n";
@@ -959,7 +970,7 @@ int LibRename::ExecuteLibRename()
 {
     this->lib_executor.Execute();
     int ret_code = this->lib_executor.Join();
-    if(ret_code) {
+    if(!ret_code) {
         std::cerr << GetLastError();
         return ret_code;
     }
@@ -969,7 +980,7 @@ int LibRename::ExecuteLibRename()
     CoffReaderWriter cr(this->new_lib);
     CoffParser coff(&cr);
     if (!coff.Parse()) {
-        std::cerr << "Unable to parse\n";
+        std::cerr << "Unable to parse generated import library {" << this->new_lib <<"}\n";
         return 0;
     }
     if(!coff.NormalizeName(mangle_name(this->pe) )) {
