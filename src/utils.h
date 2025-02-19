@@ -68,6 +68,16 @@ std::string stem(const std::string &file);
 // Returns file basename
 std::string basename(const std::string &file);
 
+// Strips parent paths from path
+void StripPath(std::string &command);
+
+// Strips .exe extension from path
+void StripExe(std::string &command);
+
+// Drives both StripPath and StripExe on the same path
+// resulting in a parentless, non exe extensioned path
+void StripPathAndExe(std::string &command);
+
 // Implementation of strstr but serch is bounded at size and
 // does not terminate on the first read nullptr
 char * findstr(char * search_str, const char * substr, int size);
@@ -96,7 +106,7 @@ bool IsPathAbsolute(const std::string &pth);
 // File and File handle helpers //
 
 // Returns File offset given RVA
-DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER section_header, DWORD number_of_sections, DWORD rva);
+DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER &section_header, DWORD number_of_sections, DWORD rva);
 
 // Error checked handle cleanup to ensure all file handles are appropriately closed
 // while avoiding closing an already closed or in use handle

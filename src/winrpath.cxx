@@ -374,7 +374,7 @@ void CoffParser::ParseFullImport(coff_member *member)
 
     }
     // Parse Coff Symbol table
-    IMAGE_SYMBOL ** symbol_table = new IMAGE_SYMBOL*[file_h->NumberOfSymbols];
+    PIMAGE_SYMBOL * symbol_table = new PIMAGE_SYMBOL[file_h->NumberOfSymbols];
     DWORD symbol_table_offset = file_h->PointerToSymbolTable;
     for(int i=0; i<file_h->NumberOfSymbols;++i) {
         PIMAGE_SYMBOL im_sym = (PIMAGE_SYMBOL)(member->data+symbol_table_offset+(sizeof(IMAGE_SYMBOL)*i));
@@ -385,7 +385,7 @@ void CoffParser::ParseFullImport(coff_member *member)
     // Parse string table
     DWORD string_table_offset = symbol_table_offset+sizeof(IMAGE_SYMBOL)*file_h->NumberOfSymbols;
     // first four bytes of string table give size of string table
-    DWORD size_of_string_table = (DWORD)(member->data+string_table_offset);
+    DWORD size_of_string_table = *(PDWORD)(member->data+string_table_offset);
     char * string_table;
     if (size_of_string_table > 4) {
         // string table size bytes are included in the total size count for the
@@ -756,7 +756,7 @@ bool LibRename::SpackCheckForDll(const std::string &name)
  *                  that we'll look for a version of on the current system and rename
  *                  the dll name found at `name_loc` to the absolute path of
 */
-int LibRename::RenameDll(DWORD name_loc, const std::string &dll_name)
+int LibRename::RenameDll(char* name_loc, const std::string &dll_name)
 {
     if(this->deploy) {
         int padding_len = get_padding_length(dll_name);
@@ -764,11 +764,11 @@ int LibRename::RenameDll(DWORD name_loc, const std::string &dll_name)
             // path is too long to mark as a Spack path
             // use shorter sigil
             char short_sigil[] = "<sp>";
-            snprintf((char*)name_loc, sizeof(short_sigil), short_sigil); 
+            snprintf(name_loc, sizeof(short_sigil), "%s", short_sigil); 
         }
         else {
             char long_sigil[] = "<!spack>";
-            snprintf((char*)name_loc, sizeof(long_sigil), long_sigil);
+            snprintf(name_loc, sizeof(long_sigil), "%s", long_sigil);
         }
     }
     else {
@@ -783,7 +783,7 @@ int LibRename::RenameDll(DWORD name_loc, const std::string &dll_name)
             std::cerr << "Unable to find library for relocation" << "\n";
             return -1;
         }
-        *((LPDWORD) name_loc) = (DWORD)(new_library_loc.c_str());
+        snprintf(name_loc, new_library_loc.size(), "%s", new_library_loc.c_str());
     }
     return 1;
 }
@@ -823,16 +823,16 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
     // Establish base PE headers
     PIMAGE_DOS_HEADER dos_header = (PIMAGE_DOS_HEADER)basepointer;
     PIMAGE_NT_HEADERS nt_header = 
-        (PIMAGE_NT_HEADERS)((DWORD)basepointer + dos_header->e_lfanew);
+        (PIMAGE_NT_HEADERS)((char*)basepointer + dos_header->e_lfanew);
 
     PIMAGE_FILE_HEADER coff_header = 
-        (PIMAGE_FILE_HEADER)((DWORD)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature));
+        (PIMAGE_FILE_HEADER)((char*)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature));
         
     PIMAGE_OPTIONAL_HEADER optional_header = 
-        (PIMAGE_OPTIONAL_HEADER)((DWORD)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader));
+        (PIMAGE_OPTIONAL_HEADER)((char*)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader));
         
     PIMAGE_SECTION_HEADER section_header = 
-        (PIMAGE_SECTION_HEADER)((DWORD)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader) + sizeof(nt_header->OptionalHeader));
+        (PIMAGE_SECTION_HEADER)((char*)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader) + sizeof(nt_header->OptionalHeader));
     
     DWORD number_of_rva_and_sections = optional_header->NumberOfRvaAndSizes;
     if(number_of_rva_and_sections == 0) {
@@ -848,11 +848,11 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
     // Data directory #2 points to the RVA of the import section
     DWORD RVA_import_directory = nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
     DWORD import_section_file_offset = RvaToFileOffset(section_header, number_of_sections, RVA_import_directory);
-    DWORD import_table_offset = (DWORD)basepointer + import_section_file_offset;
+    char * import_table_offset = (char*)basepointer + import_section_file_offset;
     PIMAGE_IMPORT_DESCRIPTOR import_image_descriptor = (PIMAGE_IMPORT_DESCRIPTOR)(import_table_offset);
     //DLL Imports
     for (; import_image_descriptor->Name != 0; import_image_descriptor++) {
-        DWORD Imported_DLL = import_table_offset + (import_image_descriptor->Name - RVA_import_directory);
+        char* Imported_DLL = import_table_offset + (import_image_descriptor->Name - RVA_import_directory);
         std::ostringstream str_stream;
         str_stream << Imported_DLL;
         if(this->SpackCheckForDll(str_stream.str())) {

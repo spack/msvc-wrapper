@@ -5,6 +5,7 @@
  */
 #include "utils.h"
 
+#include <algorithm>
 #include <map>
 #include <iostream>
 #include <string>
@@ -154,9 +155,30 @@ std::string getCmdOption(char ** begin, char ** end, const std::string & option)
     return 0;
 }
 
+void StripPathAndExe(std::string &command) {
+    StripPath(command);
+    StripExe(command);
+};
+
+void StripExe(std::string &command) {
+    // Normalize command to lowercase to avoid parsing issues
+    std::transform(command.begin(), command.end(), command.begin(),
+        [](unsigned char c){ return std::tolower(c); });
+    std::string::size_type loc = command.rfind(".exe");
+    if ( std::string::npos != loc )
+        command.erase(loc);
+}
+
+void StripPath(std::string &command) {
+    command.erase(0, command.find_last_of("\\/") + 1);
+}
+
+
 bool IsRelocate(const char * arg)
 {
-    return strcmp(arg, "relocate") == 0;
+    std::string normalized_arg(arg);
+    StripPathAndExe(normalized_arg);
+    return strcmp(normalized_arg.c_str(), "relocate") == 0;
 }
 
 /**
@@ -191,7 +213,7 @@ int checkArgumentPresence(const std::map<std::string, std::string> &args, const 
 std::map<std::string, std::string> ParseRelocate(const char ** args, int argc) {
     std::map<std::string, std::string> opts;
     for (int i = 0; i < argc; i++){
-        if (strcmp(args[i], "--pe")) {
+        if (!strcmp(args[i], "--pe")) {
             if(redefinedArgCheck(opts, "pe", "--pe")) {
                 opts.clear();
                 return opts;
@@ -212,28 +234,28 @@ std::map<std::string, std::string> ParseRelocate(const char ** args, int argc) {
             }
             opts.insert(std::pair<std::string, std::string>("pe", args[i]));
         }
-        else if (strcmp(args[i], "--full")) {
+        else if (!strcmp(args[i], "--full")) {
             if(redefinedArgCheck(opts, "full", "--full")) {
                 opts.clear();
                 return opts;
             }
             opts.insert(std::pair<std::string, std::string>("full", "full"));
         }
-        else if (strcmp(args[i], "--export")) {
+        else if (!strcmp(args[i], "--export")) {
             // export and deploy are mutually exclusive, if one is defined
             // the other cannot be
             if(redefinedArgCheck(opts, "export", "--export") 
-                || !redefinedArgCheck(opts, "deploy", "--deploy")) {
+                || redefinedArgCheck(opts, "deploy", "--deploy")) {
                 opts.clear();
                 return opts;
             }
             opts.insert(std::pair<std::string, std::string>("cmd", "export"));
         }
-        else if (strcmp(args[i], "--deploy")) {
+        else if (!strcmp(args[i], "--deploy")) {
             // export and deploy are mutually exclusive, if one is defined
             // the other cannot be
             if(redefinedArgCheck(opts, "export", "--export")
-               || !redefinedArgCheck(opts, "deploy", "--deploy")) {
+               || redefinedArgCheck(opts, "deploy", "--deploy")) {
                 opts.clear();
                 return opts;
             } 
@@ -401,7 +423,7 @@ bool IsPathAbsolute(const std::string &pth)
  * Determines the file offset on disk from the relative virtual address of a given section
  * header
  */
-DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER section_header, DWORD number_of_sections, DWORD rva) {
+DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER &section_header, DWORD number_of_sections, DWORD rva) {
 
     for (int i = 0; i < number_of_sections; ++i, ++section_header) {
         DWORD sectionStartRVA = section_header->VirtualAddress;

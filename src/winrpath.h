@@ -232,7 +232,7 @@ public:
 private:
     int FindDllAndRename(HANDLE &pe_in);
     bool SpackCheckForDll(const std::string &dll_name);
-    int RenameDll(DWORD pos, const std::string &new_name);
+    int RenameDll(char* pos, const std::string &new_name);
     ExecuteCommand def_executor;
     ExecuteCommand lib_executor;
     std::string pe;

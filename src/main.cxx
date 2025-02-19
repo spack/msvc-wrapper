@@ -17,7 +17,7 @@ int main(int argc, const char* argv[]) {
         return 0;
     }
     if (IsRelocate(argv[0])) {
-        std::map<std::string, std::string> patch_args = ParseRelocate(argv, argc);
+        std::map<std::string, std::string> patch_args = ParseRelocate(argv+1, argc-1);
         if(patch_args.empty()) {
             std::cerr << "Unable to parse command line for relocation\n" 
                 << "run command with --help flag for accepted command line arguments\n";
