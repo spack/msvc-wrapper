@@ -26,10 +26,29 @@ int main(int argc, const char* argv[]) {
         bool full = !(patch_args.find("full") == patch_args.end());
         bool deploy = !(patch_args.find("cmd") == patch_args.end()) 
             && patch_args.at("cmd") == "deploy";
-        LibRename rpath_lib(patch_args.at("pe"), full, deploy, true);
+        bool report = !(patch_args.find("report") == patch_args.end());
+        LibRename rpath_lib(patch_args.at("pe"), full, deploy, true, report);
         if(!rpath_lib.ExecuteRename()){
             std::cerr << "Library rename failed\n";
             return 9;
+        }
+    }
+    else if(IsReport(argv[0])) {
+        std::map<std::string, std::string> report_args = ParseReport(argc-1, argv+1);
+        if (report_args.empty()) {
+            std::cerr << "Unable to parse command line for reporting\n" 
+            << "run command with --help flag for accepted command line arguments\n";
+            return -1;
+        }
+        if (report_args.find("pe") != report_args.end()) {
+            LibRename pe(report_args.at("pe"), false, false, false, true);
+            pe.ExecuteRename();
+        }
+        else {
+            CoffReaderWriter cr(report_args.at("coff"));
+            CoffParser coff(&cr);
+            coff.Parse();
+            report_coff(coff);
         }
     }
     else {

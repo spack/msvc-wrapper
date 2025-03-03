@@ -221,7 +221,7 @@ private:
 
 class LibRename {
 public:
-    LibRename(std::string pe, bool full, bool deploy, bool replace);
+    LibRename(std::string pe, bool full, bool deploy, bool replace, bool report);
     int ExecuteRename();
     int ExecuteLibRename();
     int ExecutePERename();
@@ -243,4 +243,5 @@ private:
     bool deploy;
     bool replace;
     bool is_exe;
+    bool report;
 };

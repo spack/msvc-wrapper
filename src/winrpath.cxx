@@ -892,7 +892,7 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
  * \param deploy a flag indicating if we're deploying a binary to a Spack build cache or extracting it
  * \param replace a flag indicating if we're replacing the renamed import lib or making a copy with absolute dll names
 */
-LibRename::LibRename(std::string pe, bool full, bool deploy, bool replace)
+LibRename::LibRename(std::string pe, bool full, bool deploy, bool replace, bool report)
 : replace(replace), full(full), pe(pe), deploy(deploy)
 {
     this->name = stem(this->pe);

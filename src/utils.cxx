@@ -174,11 +174,22 @@ void StripPath(std::string &command) {
 }
 
 
-bool IsRelocate(const char * arg)
+bool CLICheck(const char * arg, const char * check)
 {
     std::string normalized_arg(arg);
     StripPathAndExe(normalized_arg);
-    return strcmp(normalized_arg.c_str(), "relocate") == 0;
+    return strcmp(normalized_arg.c_str(), check) == 0;
+}
+
+
+bool IsRelocate(const char * arg)
+{
+    return CLICheck(arg, "relocate");
+}
+
+bool IsReport(const char * arg)
+{
+    return CLICheck(arg, "report");
 }
 
 /**
@@ -271,6 +282,15 @@ std::map<std::string, std::string> ParseRelocate(const char ** args, int argc) {
         return opts;
     }
     return opts;
+}
+
+
+std::map<std::string, std::string> ParseReport(int &argc, const char** args)
+{
+    std::map<std::string, std::string> opts;
+    for(int i=0; i<argc; ++i){
+
+    }
 }
 
 /**
@@ -368,6 +388,7 @@ bool print_help()
     std::cout << "                                                           Instructs relocate to either prepare the\n";
     std::cout << "                                                           dynamic library for exporting to build cache\n";
     std::cout << "                                                           or for extraction from bc onto new host system\n";
+    std::cout << "          --report                                      = Report information about the parsed PE/Coff files\n";
     std::cout << "\n";
     return true;
 }
