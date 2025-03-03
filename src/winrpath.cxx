@@ -371,7 +371,6 @@ void CoffParser::ParseFullImport(coff_member *member)
     for(int i=0; i<file_h->NumberOfSections; ++i) {
         int data_loc = (*p_sections+i)->PointerToRawData;
         *(section_data+i) = member->data+data_loc;
-
     }
     // Parse Coff Symbol table
     PIMAGE_SYMBOL * symbol_table = new PIMAGE_SYMBOL[file_h->NumberOfSymbols];
@@ -711,6 +710,8 @@ bool CoffParser::NormalizeName(std::string &name)
         else {
             // If it's not an archive member or a long names offset based name, its either something we don't recognize
             // or it's a non Spack derived import
+            // TODO: Optionally warn rather than always report to std error, for externals this
+            // will create way too much noise
             std::cerr << "Unrecognized or non Spack based import member: " << mem.header->Name << "\n";
         }        
     }
