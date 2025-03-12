@@ -285,12 +285,33 @@ std::map<std::string, std::string> ParseRelocate(const char ** args, int argc) {
 }
 
 
-std::map<std::string, std::string> ParseReport(int &argc, const char** args)
+std::map<std::string, std::string> ParseReport(int argc, const char** args)
 {
     std::map<std::string, std::string> opts;
     for(int i=0; i<argc; ++i){
-
+        if (endswith((std::string)args[i], ".dll")) {
+            if(redefinedArgCheck(opts, "pe", "pe")) {
+                opts.clear();
+                return opts;
+            }
+            opts.insert(std::pair<std::string, std::string>("pe", args[i]));
+        }
+        else if (endswith((std::string)args[i], ".exe")) {
+            if(redefinedArgCheck(opts, "pe", "pe")) {
+                opts.clear();
+                return opts;
+            }
+            opts.insert(std::pair<std::string, std::string>("pe", args[i]));
+        }
+        else if (endswith((std::string)args[i], ".lib")) {
+            if(redefinedArgCheck(opts, "coff", "coff")) {
+                opts.clear();
+                return opts;
+            }
+            opts.insert(std::pair<std::string, std::string>("coff", args[i]));
+        }
     }
+    return opts;
 }
 
 /**
@@ -373,9 +394,9 @@ bool print_help()
     std::cout << "\n";
     std::cout << "      cl.exe /c foo.c";
     std::cout << "\n";
-    std::cout << "      To preform relocation, invoke the 'relocate' symlink to this file:\n";
+    std::cout << "     To preform relocation, invoke the 'relocate' symlink to this file:\n";
     std::cout << "\n";
-    std::cout << "      options:\n";
+    std::cout << "      Options:\n";
     std::cout << "          [--pe] <path to pe file>                     = PE file to be relocated\n";
     std::cout << "          --full                                       = Relocate dynamic references inside\n";
     std::cout << "                                                          the dll in addition to re-generating\n";
@@ -389,6 +410,11 @@ bool print_help()
     std::cout << "                                                           dynamic library for exporting to build cache\n";
     std::cout << "                                                           or for extraction from bc onto new host system\n";
     std::cout << "          --report                                      = Report information about the parsed PE/Coff files\n";
+    std::cout << "\n";
+    std::cout << "     To report on PE/COFF files, invoke the 'reporter' symlink to this executable or use the --report flag when invoking 'relocate'";
+    std::cout << "\n";
+    std::cout << "     Options:\n";
+    std::cout << "         <path to file>                                 = Path to any PE or COFF file\n";
     std::cout << "\n";
     return true;
 }

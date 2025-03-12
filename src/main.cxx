@@ -48,7 +48,7 @@ int main(int argc, const char* argv[]) {
             CoffReaderWriter cr(report_args.at("coff"));
             CoffParser coff(&cr);
             coff.Parse();
-            report_coff(coff);
+            return report_coff(coff);
         }
     }
     else {

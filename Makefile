@@ -63,7 +63,7 @@ build_and_check_test_sample : setup_test
 	link $(LFLAGS) main.obj calc.lib /out:tester.exe
 	tester.exe
 
-test : build_and_check_test_sample
+test_wrapper : build_and_check_test_sample
 	cd ..
 	move test\tester.exe .\tester.exe
 	.\tester.exe
@@ -72,6 +72,16 @@ test : build_and_check_test_sample
 	..\test\run_failing_check.bat
 	cd ..
 	rmdir /q /s tmp
+
+test_relocate: build_and_check_test_sample
+	mklink relocate.exe cl.exe
+	cd ..
+	move test\calc.dll .\calc.dll
+	cd test
+	relocate.exe tester.exe
+	tester.exe
+
+test: test_relocate test_wrapper
 
 
 clean :

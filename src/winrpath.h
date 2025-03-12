@@ -84,16 +84,10 @@ typedef struct second_linker_member {
     char * strings;
 } second_linker_member;
 
-/**
- * 
- */
-typedef struct longnames_member {
-    char * names_field;
-} longnames_member;
 
 
 /**
- * @brief
+ * @brief coff member 
  */
 typedef struct coff_member {
     char * data;
@@ -191,11 +185,14 @@ private:
     void ParseFullImport(coff_member *member);
     void ParseFirstLinkerMember(coff_member *member);
     void ParseSecondLinkerMember(coff_member *member);
+    void ReportLongImportMember(long_import_member *li);
+    void ReportShortImportMember(short_import_member *si);
 public:
     CoffParser(CoffReaderWriter * cr);
     ~CoffParser() = default;
     bool Parse();
     bool NormalizeName(std::string &name);
+    void Report();
 };
 
 class LinkerInvocation {
@@ -245,3 +242,6 @@ private:
     bool is_exe;
     bool report;
 };
+
+
+int reportCoff(CoffParser &coff);

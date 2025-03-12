@@ -5,7 +5,7 @@
  */
 #pragma once
 #include "winrpath.h"
-#include "utils.h"
+#include "coff_pe_reporter.h"
 
 #include <sstream>
 
@@ -717,6 +717,46 @@ bool CoffParser::NormalizeName(std::string &name)
     }
     this->coffStream->Close();
     return true;
+}
+
+
+void CoffParser::ReportLongImportMember(long_import_member *li)
+{
+    reportFileHeader(li->pfile_h);
+    reportCoffSections(li);
+    reportCoffSymbols(li);    
+}
+
+
+void CoffParser::ReportShortImportMember(short_import_member *si)
+{
+    reportImportObjectHeader(si->im_h);
+    std::cout << "  DLL: " <<si->short_dll << "\n";
+    std::cout << "  Name: " << si->short_name << "\n";
+}
+
+
+void CoffParser::Report()
+{
+    for (auto mem: this->coff.members) {
+        reportArchiveHeader(mem.header);
+        if(mem.member->long_member) {
+            this->ReportLongImportMember(mem.member->long_member);
+        }
+        else if(mem.member->short_member) {
+            this->ReportShortImportMember(mem.member->short_member);
+        }
+    }
+}
+
+
+int reportCoff(CoffParser &coff)
+{
+    if(!coff.Parse()){
+        return 1;
+    }
+    coff.Report();
+    return 0;
 }
 
 /*
