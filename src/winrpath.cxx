@@ -805,11 +805,14 @@ int LibRename::RenameDll(char* name_loc, const std::string &dll_name)
             // path is too long to mark as a Spack path
             // use shorter sigil
             char short_sigil[] = "<sp>";
-            snprintf(name_loc, sizeof(short_sigil), "%s", short_sigil); 
+            // use _snprintf as it does not null terminate and we're writing into the middle
+            // of a null terminated string we want to later read from properly
+            _snprintf(name_loc, sizeof(short_sigil)-1, "%s", short_sigil); 
         }
         else {
             char long_sigil[] = "<!spack>";
-            snprintf(name_loc, sizeof(long_sigil), "%s", long_sigil);
+            // See _snprintf comment above for use context
+            _snprintf(name_loc, sizeof(long_sigil)-1, "%s", long_sigil);
         }
     }
     else {
@@ -898,10 +901,9 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
     //DLL Imports
     for (; import_image_descriptor->Name != 0; import_image_descriptor++) {
         char* Imported_DLL = import_table_offset + (import_image_descriptor->Name - RVA_import_directory);
-        std::ostringstream str_stream;
-        str_stream << Imported_DLL;
-        if(this->SpackCheckForDll(str_stream.str())) {
-            if(!this->RenameDll(Imported_DLL, str_stream.str())) {
+        std::string str_stream = Imported_DLL;
+        if(this->SpackCheckForDll(str_stream)) {
+            if(!this->RenameDll(Imported_DLL, str_stream)) {
                 std::cerr << "Unable to relocate DLL\n";
                 return 0;
             }

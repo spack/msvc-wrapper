@@ -443,11 +443,11 @@ std::string stem(const std::string &file)
 
 std::string basename(const std::string &file)
 {
-    std:size_t last_path = file.find_last_of("\\");
+    std:size_t last_path = file.find_last_of("\\")+1;
     if (last_path == std::string::npos) {
         return std::string();
     }
-    return file.substr(0, last_path);
+    return file.substr(last_path);
 }
 
 std::string GetCWD()
@@ -494,8 +494,6 @@ std::string LibraryFinder::FindLibrary(const std::string &lib_name) {
     if (this->IsSystem(lib_name)) {
         return std::string();
     }
-    if (!PathIsRelativeW(ConvertAnsiToWide(lib_name).c_str()))
-        return lib_name;
     // next search the CWD
     std::string cwd(GetCWD());
     auto res = this->Finder(cwd, lib_name);

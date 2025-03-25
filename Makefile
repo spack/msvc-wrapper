@@ -78,7 +78,8 @@ test_relocate: build_and_check_test_sample
 	cd ..
 	move test\calc.dll .\calc.dll
 	cd test
-	relocate.exe tester.exe
+	relocate.exe tester.exe --deploy --full 
+	relocate.exe tester.exe --export --full
 	tester.exe
 
 test: test_relocate test_wrapper
