@@ -45,9 +45,9 @@ cl.exe : cl.obj execute.obj intel.obj ld.obj main.obj spack_env.obj toolchain.ob
 install : cl.exe
 	mkdir $(PREFIX)
 	move cl.exe $(PREFIX)
-	mklink $(PREFIX)/link.exe $(PREFIX)/cl.exe
-	mklink $(PREFIX)/ifx.exe $(PREFIX)/cl.exe
-	mklink $(PREFIX)/relocate.exe $(PREFIX)/cl.exe
+	mklink $(PREFIX)\link.exe $(PREFIX)\cl.exe
+	mklink $(PREFIX)\ifx.exe $(PREFIX)\cl.exe
+	mklink $(PREFIX)\relocate.exe $(PREFIX)\cl.exe
 
 setup_test: cl.exe
 	del *.obj

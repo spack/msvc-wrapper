@@ -9,9 +9,6 @@
 #include "utils.h"
 
 int main(int argc, const char* argv[]) {
-#ifdef __SANITIZE_ADDRESS__
-    std::cout << "asan" << std::endl;
-#endif
     
     if(CheckAndPrintHelp(argv, argc)) {
         return 0;
@@ -27,6 +24,14 @@ int main(int argc, const char* argv[]) {
         bool deploy = !(patch_args.find("cmd") == patch_args.end()) 
             && patch_args.at("cmd") == "deploy";
         bool report = !(patch_args.find("report") == patch_args.end());
+        bool is_exe = endswith(patch_args.at("pe"), ".exe");
+        // Without full with a DLL we re-produce the import lib from the
+        // relocated DLL, but with an EXE there is nothing to do
+        if (is_exe && !full)
+        {
+            std::cerr << "Executable file provided but --full not specified, nothing to do...\n";
+            return 0;
+        }
         LibRename rpath_lib(patch_args.at("pe"), full, deploy, true, report);
         if(!rpath_lib.ExecuteRename()){
             std::cerr << "Library rename failed\n";
@@ -47,8 +52,7 @@ int main(int argc, const char* argv[]) {
         else {
             CoffReaderWriter cr(report_args.at("coff"));
             CoffParser coff(&cr);
-            coff.Parse();
-            return report_coff(coff);
+            return reportCoff(coff);
         }
     }
     else {

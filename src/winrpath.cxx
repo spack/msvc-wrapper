@@ -122,10 +122,10 @@ std::string mangle_name(const std::string &name)
     char * chr_abs_out = new char [abs_out.length()];
     strcpy(chr_abs_out, abs_out.c_str());
     replace_path_characters(chr_abs_out, abs_out.length());
-    // char * padded_path = pad_path(chr_abs_out, abs_out.length(), MAX_PATH);
-    mangled_abs_out = chr_abs_out;
+    char * padded_path = pad_path(chr_abs_out, abs_out.length());
+    mangled_abs_out = padded_path;
     free(chr_abs_out);
-    // free(padded_path);
+    free(padded_path);
     return mangled_abs_out;
 }
 
@@ -782,7 +782,7 @@ bool LibRename::SpackCheckForDll(const std::string &name)
         return false;
     }
     else {
-        return (!(name.find("<!spack>") == std::string::npos));
+        return (!(name.find("<!spack>") == std::string::npos) || !(name.find("<sp>" == std::string::npos)));
     }
 }
 
@@ -824,6 +824,8 @@ int LibRename::RenameDll(char* name_loc, const std::string &dll_name)
             std::cerr << "Unable to find library for relocation" << "\n";
             return -1;
         }
+        // c_str returns a proper (i.e. null terminated) value, so we dont need to worry about
+        // size differences w.r.t the path to the new library
         snprintf(name_loc, new_library_loc.size(), "%s", new_library_loc.c_str());
     }
     return 1;
@@ -853,7 +855,9 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
 {
     HANDLE hMapObject = CreateFileMapping(pe_in, NULL, PAGE_READWRITE, 0, 0, NULL);
     if(!hMapObject){
-        std::cerr << "Unable to create mapping object\n";
+        DWORD error = ::GetLastError();
+        std::string error_message = std::system_category().message(error);
+        std::cerr << "Unable to create mapping object: " << error_message <<"\n";
         return -5;
     }
     LPVOID basepointer = (char*)MapViewOfFile(hMapObject, FILE_MAP_WRITE, 0, 0, 0);
@@ -970,7 +974,7 @@ int LibRename::ComputeDefFile()
  *  dependencies depending on the context
  * On standard deployment, we don't do anything
  * On standard extraction, we want to regenerate the import library
- *  from out dll or exe pointing to the new location of the dll/exe
+ *  from our dll or exe pointing to the new location of the dll/exe
  *  post buildcache extraction
  * 
  * On a full deployment, we mark the spack based DLL names in the binary
@@ -982,7 +986,12 @@ int LibRename::ComputeDefFile()
  */
 int LibRename::ExecuteRename()
 {
-    if(!this->deploy){
+    // If we're not deploying, we're extracting
+    // recompute the .def and .lib for dlls
+    // exes do not typically have import libs so we don't handle
+    // that case
+    if(!this->deploy && !this->is_exe){
+        // Extract DLL 
         if(!this->ComputeDefFile()) {
             return 0;
         }
@@ -1038,10 +1047,10 @@ int LibRename::ExecutePERename()
 {
     LPCWSTR lib_name = ConvertAnsiToWide(this->pe).c_str();
     HANDLE pe_handle = CreateFileW(lib_name, (GENERIC_READ|GENERIC_WRITE), FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (!pe_handle){
-        std::stringstream os_error;
-        os_error << GetLastError();
-        std::cerr << "Unable to acquire file handle: " << os_error.str() << "\n";
+    if (!pe_handle || pe_handle == INVALID_HANDLE_VALUE){
+        DWORD error = GetLastError();
+        std::string os_error = std::system_category().message(error);
+        std::cerr << "Unable to acquire file handle to "<< lib_name << ": " << os_error << "\n";
         return 0;
     }
     return this->FindDllAndRename(pe_handle);
