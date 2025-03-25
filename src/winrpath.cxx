@@ -782,7 +782,7 @@ bool LibRename::SpackCheckForDll(const std::string &name)
         return false;
     }
     else {
-        return (!(name.find("<!spack>") == std::string::npos) || !(name.find("<sp>" == std::string::npos)));
+        return (!(name.find("<!spack>") == std::string::npos) || !(name.find("<sp>") == std::string::npos));
     }
 }
 
