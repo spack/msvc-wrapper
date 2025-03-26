@@ -487,11 +487,11 @@ DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER &section_header, DWORD number_of_sec
 
 LibraryFinder::LibraryFinder() : search_vars{"SPACK_RELOCATE_PATH"} {}
 
-std::string LibraryFinder::FindLibrary(const std::string &lib_name) {
+std::string LibraryFinder::FindLibrary(const std::string &lib_name, const std::string &lib_path) {
     // Read env variables and split into paths
     // Only ever run once
     // First check if lib is absolute path
-    if (this->IsSystem(lib_name)) {
+    if (this->IsSystem(lib_path)) {
         return std::string();
     }
     // next search the CWD
@@ -500,6 +500,9 @@ std::string LibraryFinder::FindLibrary(const std::string &lib_name) {
     if (!res.empty())
         return res;
     this->EvalSearchPaths();
+    if (this->evald_search_paths.empty()) {
+        return std::string();
+    }
     // next search env variable paths
     for (std::string var: this->search_vars) {
         std::vector<std::string> searchable_paths = this->evald_search_paths.at(var);
@@ -516,7 +519,7 @@ void LibraryFinder::EvalSearchPaths() {
     if (!this->evald_search_paths.empty())
         return;
     for (std::string var: this->search_vars) {
-        std::string envVal = getenv(var.c_str());
+        std::string envVal = GetSpackEnv(var.c_str());
         if (!envVal.empty())
             this->evald_search_paths[var] = split(envVal, ";");
     }
@@ -524,7 +527,8 @@ void LibraryFinder::EvalSearchPaths() {
 
 std::string LibraryFinder::Finder(const std::string &pth, const std::string &lib_name) {
     WIN32_FIND_DATAW findFileData;
-    HANDLE hFind = FindFirstFileW(ConvertAnsiToWide(pth).c_str(), &findFileData);
+    std::string searcher = pth + "\\*";
+    HANDLE hFind = FindFirstFileW(ConvertAnsiToWide(searcher).c_str(), &findFileData);
 
     if (hFind == INVALID_HANDLE_VALUE) {
         std::cerr << "FindFirstFile failed (" << GetLastError() << ")" << std::endl;
@@ -533,9 +537,9 @@ std::string LibraryFinder::Finder(const std::string &pth, const std::string &lib
     
     do {
         if (std::wcsstr(findFileData.cFileName, ConvertAnsiToWide(lib_name).c_str())){
-            return ConvertWideToANSI(findFileData.cFileName);
+            return pth + "\\" + ConvertWideToANSI(findFileData.cFileName);
         }
-    } while (FindNextFileW(hFind, &findFileData) != 0);
+    } while (FindNextFileW(hFind, &findFileData));
 
     DWORD dwError = GetLastError();
     if (dwError != ERROR_NO_MORE_FILES) {

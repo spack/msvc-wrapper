@@ -147,6 +147,6 @@ private:
     bool IsSystem(const std::string &pth);
 public:
     LibraryFinder();
-    std::string FindLibrary(const std::string &lib_name);
+    std::string FindLibrary(const std::string &lib_name, const std::string &lib_path);
     void EvalSearchPaths();
 };

@@ -797,10 +797,10 @@ bool LibRename::SpackCheckForDll(const std::string &name)
  *                  that we'll look for a version of on the current system and rename
  *                  the dll name found at `name_loc` to the absolute path of
 */
-int LibRename::RenameDll(char* name_loc, const std::string &dll_name)
+int LibRename::RenameDll(char* name_loc, const std::string &dll_path)
 {
     if(this->deploy) {
-        int padding_len = get_padding_length(dll_name);
+        int padding_len = get_padding_length(dll_path);
         if(padding_len < 8) {
             // path is too long to mark as a Spack path
             // use shorter sigil
@@ -816,16 +816,16 @@ int LibRename::RenameDll(char* name_loc, const std::string &dll_name)
         }
     }
     else {
-        std::string file_name = basename(dll_name);
+        std::string file_name = basename(dll_path);
         if(file_name.empty()) {
             std::cerr << "Unable to extract filename from dll for relocation" << "\n";
-            return -1;
+            return 0;
         }
         LibraryFinder lf;
-        std::string new_library_loc = lf.FindLibrary(file_name);
+        std::string new_library_loc = lf.FindLibrary(file_name, dll_path);
         if(new_library_loc.empty()) {
             std::cerr << "Unable to find library for relocation" << "\n";
-            return -1;
+            return 0;
         }
         // c_str returns a proper (i.e. null terminated) value, so we dont need to worry about
         // size differences w.r.t the path to the new library
@@ -901,9 +901,9 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
     //DLL Imports
     for (; import_image_descriptor->Name != 0; import_image_descriptor++) {
         char* Imported_DLL = import_table_offset + (import_image_descriptor->Name - RVA_import_directory);
-        std::string str_stream = Imported_DLL;
-        if(this->SpackCheckForDll(str_stream)) {
-            if(!this->RenameDll(Imported_DLL, str_stream)) {
+        std::string str_dll_name = std::string(Imported_DLL);
+        if(this->SpackCheckForDll(str_dll_name)) {
+            if(!this->RenameDll(Imported_DLL, str_dll_name )) {
                 std::cerr << "Unable to relocate DLL\n";
                 return 0;
             }
