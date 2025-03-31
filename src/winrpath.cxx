@@ -749,14 +749,18 @@ void CoffParser::Report()
     }
 }
 
-
+/**
+ * Reports information about parsed coff file
+ * 
+ * Returns 1 on success, 0 if the coff file could not be parsed
+ */
 int reportCoff(CoffParser &coff)
 {
     if(!coff.Parse()){
-        return 1;
+        return 0;
     }
     coff.Report();
-    return 0;
+    return 1;
 }
 
 
@@ -810,6 +814,8 @@ bool LibRename::SpackCheckForDll(const std::string &name)
  * \param dll_name The dll, in the case we're doing an extraction from the buildcache
  *                  that we'll look for a version of on the current system and rename
  *                  the dll name found at `name_loc` to the absolute path of
+ * 
+ * Returns 0 on failure, 1 on success
 */
 int LibRename::RenameDll(char* name_loc, const std::string &dll_path)
 {
@@ -870,6 +876,9 @@ int LibRename::RenameDll(char* name_loc, const std::string &dll_path)
  * This approach is heavily based on https://www.ired.team/miscellaneous-reversing-forensics/windows-kernel-internals/pe-file-header-parser-in-c++#first-dll-name
  * 
  * \param pe_in the PE file for which to perform the imported DLL rename procedure
+ * 
+ * Returns 0 on failure, 1 on success
+ * 
 */
 int LibRename::FindDllAndRename(HANDLE &pe_in)
 {
@@ -878,12 +887,12 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
         DWORD error = ::GetLastError();
         std::string error_message = std::system_category().message(error);
         std::cerr << "Unable to create mapping object: " << error_message <<"\n";
-        return -5;
+        return 0;
     }
     LPVOID basepointer = (char*)MapViewOfFile(hMapObject, FILE_MAP_WRITE, 0, 0, 0);
     if(!basepointer){
         std::cerr << "Unable to create file map view\n";
-        return -6;
+        return 0;
     }
     // Establish base PE headers
     PIMAGE_DOS_HEADER dos_header = (PIMAGE_DOS_HEADER)basepointer;
@@ -902,11 +911,11 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
     DWORD number_of_rva_and_sections = optional_header->NumberOfRvaAndSizes;
     if(number_of_rva_and_sections == 0) {
         std::cerr << "PE file does not import symbols" << "\n";
-        return -1;
+        return 0;
     }
     else if(number_of_rva_and_sections < 2) {
         std::cerr << "PE file contains insufficient data directories, likely corrupted" << "\n";
-        return -2;
+        return 0;
     }
 
     DWORD number_of_sections = coff_header->NumberOfSections;
@@ -927,7 +936,7 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
         }
     }
     if(!SafeHandleCleanup(basepointer) || !SafeHandleCleanup(hMapObject)) {
-        return -3;
+        return 0;
     }
     return 1;
 }
@@ -954,6 +963,7 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
  * \param full a flag indicating whether or not we're renaming a PE file and import lib or just an import lib
  * \param deploy a flag indicating if we're deploying a binary to a Spack build cache or extracting it
  * \param replace a flag indicating if we're replacing the renamed import lib or making a copy with absolute dll names
+ * \param report a flag indicating if we should be reporting the contents of the PE/COFF file we're parsing to stdout
 */
 LibRename::LibRename(std::string pe, bool full, bool deploy, bool replace, bool report)
 : replace(replace), full(full), pe(pe), deploy(deploy)
@@ -979,6 +989,8 @@ std::string LibRename::ComputeDefLine()
 /**
  * Drives the process of running dumpbin.exe on a PE file to determine its exports
  * and produce a `.def` file
+ * 
+ * Returns the return code of the Def file computation operation
  */
 int LibRename::ComputeDefFile()
 {
@@ -991,6 +1003,9 @@ int LibRename::ComputeDefFile()
  *  and then generates an import library with absolute paths to the
  *  corresponding dll or generates a dll with absolute paths to its
  *  dependencies depending on the context
+ * 
+ * Returns 0 on failure, 1 otherwise
+ * 
  * On standard deployment, we don't do anything
  * On standard extraction, we want to regenerate the import library
  *  from our dll or exe pointing to the new location of the dll/exe
@@ -1011,7 +1026,7 @@ int LibRename::ExecuteRename()
     // that case
     if(!this->deploy && !this->is_exe){
         // Extract DLL 
-        if(!this->ComputeDefFile()) {
+        if(this->ComputeDefFile()) {
             return 0;
         }
         if(!this->ExecuteLibRename()) {
@@ -1034,14 +1049,18 @@ int LibRename::ExecuteRename()
  *   a mangled variation of the absolute path to the dll
  *   as its dll name, and then modifies that binary to correct
  *   and unmangle the mangled dll name
+ * 
+ * Returns 0 on failure, 1 on success
  */
 int LibRename::ExecuteLibRename()
 {
     this->lib_executor.Execute();
     int ret_code = this->lib_executor.Join();
-    if(!ret_code) {
-        std::cerr << GetLastError();
-        return ret_code;
+    if(ret_code != 0) {
+        DWORD error = GetLastError();
+        std::string os_error = std::system_category().message(error);
+        std::cerr << os_error << "\n";
+        return 0;
     }
     // import library has been generated with
     // mangled abs path to dll -
@@ -1061,6 +1080,8 @@ int LibRename::ExecuteLibRename()
 
 /**
  * Drives the rename process for 
+ * 
+ * Returns 0 on failure, 1 on success
  */
 int LibRename::ExecutePERename()
 {
