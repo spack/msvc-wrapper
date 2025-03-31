@@ -759,6 +759,16 @@ int reportCoff(CoffParser &coff)
     return 0;
 }
 
+
+bool hasPathCharacters(std::string &name) {
+    for(std::map<char, char>::const_iterator it = path_to_special_characters.begin(); it != path_to_special_characters.end(); ++it){
+        if(!(name.find(it->first) == std::string::npos)){
+            return true;
+        }
+    }
+    return false;
+}
+
 /*
  * Checks a DLL name for special characters, if we're deploying, a path character, if we're
  * relocating a spack sigil
@@ -774,15 +784,19 @@ int reportCoff(CoffParser &coff)
 bool LibRename::SpackCheckForDll(const std::string &name)
 {
     if(this->deploy){
-        for(std::map<char, char>::const_iterator it = path_to_special_characters.begin(); it != path_to_special_characters.end(); ++it){
-            if(!(name.find(it->first) == std::string::npos)){
-                return true;
-            }
-        }
-        return false;
+        return hasPathCharacters(name);
     }
     else {
-        return (!(name.find("<!spack>") == std::string::npos) || !(name.find("<sp>") == std::string::npos));
+        // First check for the case we're relocating out of a buildcache
+        bool reloc_spack = false;
+        if (!(name.find("<!spack>") == std::string::npos) || !(name.find("<sp>") == std::string::npos)) {
+            reloc_spack = true;
+        }
+        // If not, maybe we're just relocating a binary on the same system
+        if (!reloc_spack) {
+            reloc_spack = hasPathCharacters(name);
+        }
+        return reloc_spack;
     }
 }
 
@@ -827,9 +841,12 @@ int LibRename::RenameDll(char* name_loc, const std::string &dll_path)
             std::cerr << "Unable to find library for relocation" << "\n";
             return 0;
         }
+        char * new_lib = pad_path(new_library_loc.c_str(), new_library_loc.size());
+        replace_special_characters(new_lib, MAX_NAME_LEN);
+
         // c_str returns a proper (i.e. null terminated) value, so we dont need to worry about
         // size differences w.r.t the path to the new library
-        snprintf(name_loc, new_library_loc.size(), "%s", new_library_loc.c_str());
+        snprintf(name_loc, MAX_NAME_LEN, "%s", new_lib);
     }
     return 1;
 }

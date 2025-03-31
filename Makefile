@@ -30,6 +30,8 @@ BASE_CFLAGS = /EHsc
 CFLAGS = $(BASE_CFLAGS) $(BUILD_CFLAGS) $(CLFLAGS)
 LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
 
+!if [set SPACK_RELOCATE_PATH=1]
+!endif
 
 {src}.cxx{}.obj::
 	$(CC) /c $(CFLAGS) $(CVARS) /I:src $<	
@@ -50,39 +52,45 @@ install : cl.exe
 	mklink $(PREFIX)\relocate.exe $(PREFIX)\cl.exe
 
 setup_test: cl.exe
-	del *.obj
-	mkdir tmp\test
+	-@ if NOT EXIST "tmp\test" mkdir "tmp\test"
 	cd tmp\test
 	copy ..\..\cl.exe cl.exe
-	mklink link.exe cl.exe
+	-@ if NOT EXIST "link.exe" mklink link.exe cl.exe
+	cd ..\..
 
 build_and_check_test_sample : setup_test
+	cd tmp\test
 	cl /c /EHsc ..\..\test\calc.cxx /DCALC_EXPORTS
 	cl /c /EHsc ..\..\test\main.cxx
 	link $(LFLAGS) calc.obj /out:calc.dll /DLL
 	link $(LFLAGS) main.obj calc.lib /out:tester.exe
 	tester.exe
+	cd ..\..
 
 test_wrapper : build_and_check_test_sample
-	cd ..
+	cd tmp
 	move test\tester.exe .\tester.exe
 	.\tester.exe
 	mkdir tmp_bin
 	move test\calc.dll tmp_bin\calc.dll
 	..\test\run_failing_check.bat
+	move tmp_bin\calc.dll test\calc.dll
+	move tester.exe test\testter.exe
+	rmdir /q /s tmp_bin
 	cd ..
-	rmdir /q /s tmp
 
 test_relocate: build_and_check_test_sample
+	cd tmp\test
 	mklink relocate.exe cl.exe
+	move calc.dll ..\calc.dll
 	cd ..
-	move test\calc.dll .\calc.dll
+	SPACK_RELOCATE_PATH=%%CD%%
 	cd test
-	relocate.exe tester.exe --deploy --full 
+	relocate.exe tester.exe --deploy --full
 	relocate.exe tester.exe --export --full
 	tester.exe
 
-test: test_relocate test_wrapper
+test: test_wrapper test_relocate 
 
 
 clean :
@@ -92,6 +100,7 @@ clean :
 	del *.lib
 	del *.exp
 	del *.pdb
+	del *.ilk
 
 clean-cl :
 	del cl.exe

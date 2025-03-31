@@ -536,7 +536,7 @@ std::string LibraryFinder::Finder(const std::string &pth, const std::string &lib
     }
     
     do {
-        if (std::wcsstr(findFileData.cFileName, ConvertAnsiToWide(lib_name).c_str())){
+        if (!wcscmp(findFileData.cFileName, ConvertAnsiToWide(lib_name).c_str())){
             return pth + "\\" + ConvertWideToANSI(findFileData.cFileName);
         }
     } while (FindNextFileW(hFind, &findFileData));
