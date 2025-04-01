@@ -7,6 +7,7 @@
 #include "toolchain_factory.h"
 #include "winrpath.h"
 #include "utils.h"
+#include "commandline.h"
 
 int main(int argc, const char* argv[]) {
     
