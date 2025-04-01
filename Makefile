@@ -41,7 +41,7 @@ LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
 
 all : install test
 
-cl.exe : cl.obj execute.obj intel.obj ld.obj main.obj spack_env.obj toolchain.obj toolchain_factory.obj utils.obj winrpath.obj 
+cl.exe : cl.obj execute.obj intel.obj ld.obj main.obj spack_env.obj toolchain.obj toolchain_factory.obj utils.obj commandline.obj winrpath.obj 
 	link $(LFLAGS) $** Shlwapi.lib /out:cl.exe
 
 install : cl.exe
