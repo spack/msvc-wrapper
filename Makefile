@@ -75,16 +75,16 @@ test_wrapper : build_and_check_test_sample
 	move test\calc.dll tmp_bin\calc.dll
 	..\test\run_failing_check.bat
 	move tmp_bin\calc.dll test\calc.dll
-	move tester.exe test\testter.exe
+	move tester.exe test\tester.exe
 	rmdir /q /s tmp_bin
 	cd ..
 
 test_relocate: build_and_check_test_sample
 	cd tmp\test
-	mklink relocate.exe cl.exe
+	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
 	move calc.dll ..\calc.dll
 	cd ..
-	SPACK_RELOCATE_PATH=%%CD%%
+	set SPACK_RELOCATE_PATH=%%CD%%
 	cd test
 	relocate.exe tester.exe --deploy --full
 	relocate.exe tester.exe --export --full
@@ -101,6 +101,7 @@ clean :
 	del *.exp
 	del *.pdb
 	del *.ilk
+	rmdir /q /s tmp
 
 clean-cl :
 	del cl.exe
