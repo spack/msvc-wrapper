@@ -282,6 +282,13 @@ DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER &section_header, DWORD number_of_sec
     return 0;
 }
 
+
+std::string reportLastError()
+{
+    DWORD error = GetLastError();
+    return std::system_category().message(error);
+}
+
 LibraryFinder::LibraryFinder() : search_vars{"SPACK_RELOCATE_PATH"} {}
 
 std::string LibraryFinder::FindLibrary(const std::string &lib_name, const std::string &lib_path) {
@@ -338,7 +345,8 @@ std::string LibraryFinder::Finder(const std::string &pth, const std::string &lib
     HANDLE hFind = FindFirstFileW(ConvertAnsiToWide(searcher).c_str(), &findFileData);
 
     if (hFind == INVALID_HANDLE_VALUE) {
-        std::cerr << "FindFirstFile failed (" << GetLastError() << ")" << std::endl;
+        std::cerr << "Find file failed: " << reportLastError() << " " << searcher << "\n";
+        FindClose(hFind);
         return std::string();
     }
     
@@ -350,7 +358,7 @@ std::string LibraryFinder::Finder(const std::string &pth, const std::string &lib
 
     DWORD dwError = GetLastError();
     if (dwError != ERROR_NO_MORE_FILES) {
-        std::cerr << "FindNextFile failed (" << dwError << ")" << std::endl;
+        std::cerr << "Find file failed: "<< reportLastError() << "\n";
     }
     FindClose(hFind);
     return std::string();

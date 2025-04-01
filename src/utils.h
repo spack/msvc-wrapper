@@ -99,6 +99,9 @@ DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER &section_header, DWORD number_of_sec
 // while avoiding closing an already closed or in use handle
 int SafeHandleCleanup(HANDLE &handle);
 
+// System Helpers //
+std::string reportLastError();
+
 // Data helpers //
 
 // Converts big endian data to little endian form

@@ -26,12 +26,9 @@ BUILD_CFLAGS = /Zi
 BUILD_LINK = /DEBUG
 !ENDIF
 
-BASE_CFLAGS = /EHsc
+BASE_CFLAGS = /EHsc 
 CFLAGS = $(BASE_CFLAGS) $(BUILD_CFLAGS) $(CLFLAGS)
 LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
-
-!if [set SPACK_RELOCATE_PATH=1]
-!endif
 
 {src}.cxx{}.obj::
 	$(CC) /c $(CFLAGS) $(CVARS) /I:src $<	
@@ -83,9 +80,6 @@ test_relocate: build_and_check_test_sample
 	cd tmp\test
 	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
 	move calc.dll ..\calc.dll
-	cd ..
-	set SPACK_RELOCATE_PATH=%%CD%%
-	cd test
 	relocate.exe tester.exe --deploy --full
 	relocate.exe tester.exe --export --full
 	tester.exe
@@ -93,7 +87,7 @@ test_relocate: build_and_check_test_sample
 test: test_wrapper test_relocate 
 
 
-clean :
+clean : clean-test clean-cl
 	del *.obj
 	del *.exe
 	del *.dll
@@ -101,7 +95,9 @@ clean :
 	del *.exp
 	del *.pdb
 	del *.ilk
-	rmdir /q /s tmp
 
 clean-cl :
 	del cl.exe
+
+clean-test:
+	rmdir /q /s tmp
