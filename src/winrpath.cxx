@@ -764,7 +764,7 @@ int reportCoff(CoffParser &coff)
 }
 
 
-bool hasPathCharacters(std::string &name) {
+bool hasPathCharacters(const std::string &name) {
     for(std::map<char, char>::const_iterator it = path_to_special_characters.begin(); it != path_to_special_characters.end(); ++it){
         if(!(name.find(it->first) == std::string::npos)){
             return true;
