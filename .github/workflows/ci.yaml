@@ -28,4 +28,9 @@ jobs:
           rmdir /s /q "C:\Program Files\Git\usr"
       - name: "Test RPath"
         run: |
-          test\setup_and_drive_test.bat 
+          test\setup_and_drive_test.bat
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tester
+          path: tmp/test/tester.exe
