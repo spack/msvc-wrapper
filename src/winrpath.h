@@ -34,17 +34,13 @@ typedef struct long_import_member {
     long long string_table_offset;
     DWORD size_of_string_table;
     PIMAGE_FILE_HEADER pfile_h;
-    PIMAGE_SECTION_HEADER * pp_sections;
-    PIMAGE_SYMBOL * symbol_table;
+    PIMAGE_SECTION_HEADER pp_sections;
+    PIMAGE_SYMBOL symbol_table;
     char ** section_data;
     char * string_table;
     ~long_import_member() {
-        for (int i=0; i<this->pfile_h->NumberOfSymbols; ++i) {
-            delete *(this->symbol_table+i);
-        }
         for (int i=0; i< this->pfile_h->NumberOfSections; ++i) {
             delete *(this->section_data+i);
-            delete *(this->pp_sections+i);
         }
         delete this->symbol_table;
         delete this->section_data;

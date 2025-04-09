@@ -84,7 +84,7 @@ void reportImportObjectHeader(const IMPORT_OBJECT_HEADER* imp_h)
 void reportCoffSections(const long_import_member *mem)
 {
     for(int i=0; i < mem->pfile_h->NumberOfSections; ++i) {
-        PIMAGE_SECTION_HEADER head = *(mem->pp_sections+i);
+        PIMAGE_SECTION_HEADER head = mem->pp_sections+i;
         reportSectionHeader(head);
         int section_size = head->SizeOfRawData;
         int virtual_size = head->Misc.VirtualSize;
@@ -101,7 +101,7 @@ void reportCoffSections(const long_import_member *mem)
 void reportCoffSymbols(const long_import_member *mem)
 {
     for(int i=0; i < mem->pfile_h->NumberOfSymbols; ++i) {
-        PIMAGE_SYMBOL sym = *(mem->symbol_table+i);
+        PIMAGE_SYMBOL sym = mem->symbol_table+i;
         reportImageSymbol(sym);
         DWORD name_string_table_offset;
         if (!sym->N.Name.Short){
