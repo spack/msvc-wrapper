@@ -8,7 +8,9 @@
 #include "toolchain.h"
 #include "utils.h"
 /**
- * @brief 
+ * @brief Factory class dispatching the appropriate wrapper toolchain 
+ * instantiation based on the provided command line invocation
+ * of a toolchain
  */
 class ToolChainFactory{
 public:

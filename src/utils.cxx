@@ -331,8 +331,6 @@ void LibraryFinder::EvalSearchPaths() {
 
 /**
  * Searches files located at pth for a file called lib_name
- *  Globs all files at the provided path and matches to search
- *  for lib name
  * \param pth the path at which to search for a given file
  * \param lib_name the file to be seached for
  * 
@@ -341,6 +339,8 @@ void LibraryFinder::EvalSearchPaths() {
  */
 std::string LibraryFinder::Finder(const std::string &pth, const std::string &lib_name) {
     WIN32_FIND_DATAW findFileData;
+    // Globs all files at the provided path and matches to search
+    // for lib name
     std::string searcher = pth + "\\*";
     HANDLE hFind = FindFirstFileW(ConvertAnsiToWide(searcher).c_str(), &findFileData);
 

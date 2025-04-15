@@ -215,17 +215,17 @@ private:
 class LibRename {
 public:
     LibRename(std::string pe, bool full, bool deploy, bool replace, bool report);
-    int ExecuteRename();
-    int ExecuteLibRename();
-    int ExecutePERename();
+    bool ExecuteRename();
+    bool ExecuteLibRename();
+    bool ExecutePERename();
     int ComputeDefFile();
     std::string ComputeRenameLink();
     std::string ComputeDefLine();
 
 private:
-    int FindDllAndRename(HANDLE &pe_in);
+    bool FindDllAndRename(HANDLE &pe_in);
     bool SpackCheckForDll(const std::string &dll_path);
-    int RenameDll(char* pos, const std::string &dll_path);
+    bool RenameDll(char* pos, const std::string &dll_path);
     ExecuteCommand def_executor;
     ExecuteCommand lib_executor;
     std::string pe;
@@ -240,4 +240,4 @@ private:
 };
 
 
-int reportCoff(CoffParser &coff);
+bool reportCoff(CoffParser &coff);

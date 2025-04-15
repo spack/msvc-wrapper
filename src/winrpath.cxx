@@ -70,7 +70,7 @@ char * pad_path(const char *pth, DWORD str_size, DWORD bsize = MAX_NAME_LEN)
 {
     size_t extended_buf = bsize - str_size + 2;
     char * padded_path = new char[bsize+1];
-    for(int i = 0, j = 0; i < bsize, j < str_size; ++i){
+    for(int i = 0, j = 0; i < bsize && j < str_size; ++i){
         if(i < 2){
             padded_path[i] = pth[j];
             ++j;
@@ -757,15 +757,14 @@ void CoffParser::Report()
 /**
  * Reports information about parsed coff file
  * 
- * Returns 1 on success, 0 if the coff file could not be parsed
  */
-int reportCoff(CoffParser &coff)
+bool reportCoff(CoffParser &coff)
 {
     if(!coff.Parse()){
-        return 0;
+        return false;
     }
     coff.Report();
-    return 1;
+    return true;
 }
 
 
@@ -820,9 +819,8 @@ bool LibRename::SpackCheckForDll(const std::string &name)
  *                  that we'll look for a version of on the current system and rename
  *                  the dll name found at `name_loc` to the absolute path of
  * 
- * Returns 0 on failure, 1 on success
 */
-int LibRename::RenameDll(char* name_loc, const std::string &dll_path)
+bool LibRename::RenameDll(char* name_loc, const std::string &dll_path)
 {
     if(this->deploy) {
         int padding_len = get_padding_length(dll_path);
@@ -844,13 +842,13 @@ int LibRename::RenameDll(char* name_loc, const std::string &dll_path)
         std::string file_name = basename(dll_path);
         if(file_name.empty()) {
             std::cerr << "Unable to extract filename from dll for relocation" << "\n";
-            return 0;
+            return false;
         }
         LibraryFinder lf;
         std::string new_library_loc = lf.FindLibrary(file_name, dll_path);
         if(new_library_loc.empty()) {
             std::cerr << "Unable to find library " << file_name << " at " << dll_path << " for relocation" << "\n";
-            return 0;
+            return false;
         }
         char * new_lib = pad_path(new_library_loc.c_str(), new_library_loc.size());
 
@@ -860,7 +858,7 @@ int LibRename::RenameDll(char* name_loc, const std::string &dll_path)
         // size differences w.r.t the path to the new library
         snprintf(name_loc, MAX_NAME_LEN+1, "%s", new_lib);
     }
-    return 1;
+    return true;
 }
 
 /*
@@ -883,20 +881,19 @@ int LibRename::RenameDll(char* name_loc, const std::string &dll_path)
  * 
  * \param pe_in the PE file for which to perform the imported DLL rename procedure
  * 
- * Returns 0 on failure, 1 on success
  * 
 */
-int LibRename::FindDllAndRename(HANDLE &pe_in)
+bool LibRename::FindDllAndRename(HANDLE &pe_in)
 {
     HANDLE hMapObject = CreateFileMapping(pe_in, NULL, PAGE_READWRITE, 0, 0, NULL);
     if(!hMapObject){
         std::cerr << "Unable to create mapping object: " << reportLastError() <<"\n";
-        return 0;
+        return false;
     }
     LPVOID basepointer = (char*)MapViewOfFile(hMapObject, FILE_MAP_WRITE, 0, 0, 0);
     if(!basepointer){
         std::cerr << "Unable to create file map view\n";
-        return 0;
+        return false;
     }
     // Establish base PE headers
     PIMAGE_DOS_HEADER dos_header = (PIMAGE_DOS_HEADER)basepointer;
@@ -915,11 +912,11 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
     DWORD number_of_rva_and_sections = optional_header->NumberOfRvaAndSizes;
     if(number_of_rva_and_sections == 0) {
         std::cerr << "PE file does not import symbols" << "\n";
-        return 0;
+        return false;
     }
     else if(number_of_rva_and_sections < 2) {
         std::cerr << "PE file contains insufficient data directories, likely corrupted" << "\n";
-        return 0;
+        return false;
     }
 
     DWORD number_of_sections = coff_header->NumberOfSections;
@@ -935,7 +932,7 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
         if(this->SpackCheckForDll(str_dll_name)) {
             if(!this->RenameDll(Imported_DLL, str_dll_name )) {
                 std::cerr << "Unable to relocate DLL reference: " << str_dll_name << "\n";
-                return 0;
+                return false;
             }
         }
     }
@@ -943,9 +940,9 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
     UnmapViewOfFile((LPCVOID)basepointer);
 
     if(!SafeHandleCleanup(hMapObject)) {
-        return 0;
+        return false;
     }
-    return 1;
+    return true;
 }
 
 /*
@@ -1025,7 +1022,7 @@ int LibRename::ComputeDefFile()
  *  we rename the Dll names marked with the spack sigil (<sp!>)
  *
  */
-int LibRename::ExecuteRename()
+bool LibRename::ExecuteRename()
 {
     // If we're not deploying, we're extracting
     // recompute the .def and .lib for dlls
@@ -1034,20 +1031,20 @@ int LibRename::ExecuteRename()
     if(!this->deploy && !this->is_exe){
         // Extract DLL 
         if(this->ComputeDefFile()) {
-            return 0;
+            return false;
         }
         if(!this->ExecuteLibRename()) {
-            return 0;
+            return false;
         }
     }
     if (this->full) {
         if(!this->ExecutePERename()) {
             std::cerr << "Unable to execute rename of "
                 "referenced components in PE file: " << this->name << "\n";
-            return 0;
+            return false;
         }
     }
-    return 1;
+    return true;
 }
 
 /**
@@ -1057,15 +1054,14 @@ int LibRename::ExecuteRename()
  *   as its dll name, and then modifies that binary to correct
  *   and unmangle the mangled dll name
  * 
- * Returns 0 on failure, 1 on success
  */
-int LibRename::ExecuteLibRename()
+bool LibRename::ExecuteLibRename()
 {
     this->lib_executor.Execute();
     int ret_code = this->lib_executor.Join();
     if(ret_code != 0) {
         std::cerr << "Lib Rename failed" << reportLastError() << "\n";
-        return 0;
+        return false;
     }
     // import library has been generated with
     // mangled abs path to dll -
@@ -1074,27 +1070,26 @@ int LibRename::ExecuteLibRename()
     CoffParser coff(&cr);
     if (!coff.Parse()) {
         std::cerr << "Unable to parse generated import library {" << this->new_lib <<"}\n";
-        return 0;
+        return false;
     }
     if(!coff.NormalizeName(mangle_name(this->pe) )) {
         std::cerr << "Unable to normalize name\n";
-        return 0;
+        return false;
     }
-    return 1;
+    return true;
 }
 
 /**
  * Drives the rename process for 
  * 
- * Returns 0 on failure, 1 on success
  */
-int LibRename::ExecutePERename()
+bool LibRename::ExecutePERename()
 {
     LPCWSTR lib_name = ConvertAnsiToWide(this->pe).c_str();
     HANDLE pe_handle = CreateFileW(lib_name, (GENERIC_READ|GENERIC_WRITE), FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (!pe_handle || pe_handle == INVALID_HANDLE_VALUE){
         std::cerr << "Unable to acquire file handle to "<< lib_name << ": " << reportLastError() << "\n";
-        return 0;
+        return false;
     }
     return this->FindDllAndRename(pe_handle);
 }
