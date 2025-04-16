@@ -165,7 +165,7 @@ void StripExe(std::string &command) {
     std::transform(command.begin(), command.end(), command.begin(),
         [](unsigned char c){ return std::tolower(c); });
     std::string::size_type loc = command.rfind(".exe");
-    if ( std::string::npos != loc )
+    if ( std::string::npos != loc && loc + 4 == command.length() )
         command.erase(loc);
 }
 

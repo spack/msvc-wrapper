@@ -59,7 +59,9 @@ void replace_path_characters(char in[], int len)
 
 /**
  * Pads a given path with an amount of padding of special characters
- * 
+ *  Paths are padded after the drive separator but before any path
+ *  characters, i.e. C:[\\\\\\\]\path\to\exe with the section in []
+ *  being the padded component
  * 
  * \param pth a pointer to the path to be padded
  * \param str_size the length of the path - not including any
