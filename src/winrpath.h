@@ -34,17 +34,13 @@ typedef struct long_import_member {
     long long string_table_offset;
     DWORD size_of_string_table;
     PIMAGE_FILE_HEADER pfile_h;
-    PIMAGE_SECTION_HEADER * pp_sections;
-    PIMAGE_SYMBOL * symbol_table;
+    PIMAGE_SECTION_HEADER pp_sections;
+    PIMAGE_SYMBOL symbol_table;
     char ** section_data;
     char * string_table;
     ~long_import_member() {
-        for (int i=0; i<this->pfile_h->NumberOfSymbols; ++i) {
-            delete *(this->symbol_table+i);
-        }
         for (int i=0; i< this->pfile_h->NumberOfSections; ++i) {
             delete *(this->section_data+i);
-            delete *(this->pp_sections+i);
         }
         delete this->symbol_table;
         delete this->section_data;
@@ -84,16 +80,10 @@ typedef struct second_linker_member {
     char * strings;
 } second_linker_member;
 
-/**
- * 
- */
-typedef struct longnames_member {
-    char * names_field;
-} longnames_member;
 
 
 /**
- * @brief
+ * @brief coff member 
  */
 typedef struct coff_member {
     char * data;
@@ -191,11 +181,14 @@ private:
     void ParseFullImport(coff_member *member);
     void ParseFirstLinkerMember(coff_member *member);
     void ParseSecondLinkerMember(coff_member *member);
+    void ReportLongImportMember(long_import_member *li);
+    void ReportShortImportMember(short_import_member *si);
 public:
     CoffParser(CoffReaderWriter * cr);
     ~CoffParser() = default;
     bool Parse();
     bool NormalizeName(std::string &name);
+    void Report();
 };
 
 class LinkerInvocation {
@@ -221,18 +214,18 @@ private:
 
 class LibRename {
 public:
-    LibRename(std::string pe, bool full, bool deploy, bool replace);
-    int ExecuteRename();
-    int ExecuteLibRename();
-    int ExecutePERename();
+    LibRename(std::string pe, bool full, bool deploy, bool replace, bool report);
+    bool ExecuteRename();
+    bool ExecuteLibRename();
+    bool ExecutePERename();
     int ComputeDefFile();
     std::string ComputeRenameLink();
     std::string ComputeDefLine();
 
 private:
-    int FindDllAndRename(HANDLE &pe_in);
-    bool SpackCheckForDll(const std::string &dll_name);
-    int RenameDll(DWORD pos, const std::string &new_name);
+    bool FindDllAndRename(HANDLE &pe_in);
+    bool SpackCheckForDll(const std::string &dll_path);
+    bool RenameDll(char* pos, const std::string &dll_path);
     ExecuteCommand def_executor;
     ExecuteCommand lib_executor;
     std::string pe;
@@ -243,4 +236,8 @@ private:
     bool deploy;
     bool replace;
     bool is_exe;
+    bool report;
 };
+
+
+bool reportCoff(CoffParser &coff);

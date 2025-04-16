@@ -6,17 +6,16 @@
 #pragma once
 
 #include "toolchain.h"
-
+#include "utils.h"
 /**
- * @brief 
+ * @brief Factory class dispatching the appropriate wrapper toolchain 
+ * instantiation based on the provided command line invocation
+ * of a toolchain
  */
 class ToolChainFactory{
 public:
     static std::unique_ptr<ToolChainInvocation> ParseToolChain(char const* const * argv);
 private:
-    static void StripPathAndExe(std::string &command);
-    static void StripExe(std::string &command);
-    static void StripPath(std::string &command);
     enum Language {
         cpp,
         Fortran,

@@ -68,22 +68,19 @@ std::string stem(const std::string &file);
 // Returns file basename
 std::string basename(const std::string &file);
 
+// Strips parent paths from path
+void StripPath(std::string &command);
+
+// Strips .exe extension from path
+void StripExe(std::string &command);
+
+// Drives both StripPath and StripExe on the same path
+// resulting in a parentless, non exe extensioned path
+void StripPathAndExe(std::string &command);
+
 // Implementation of strstr but serch is bounded at size and
 // does not terminate on the first read nullptr
 char * findstr(char * search_str, const char * substr, int size);
-
-// CLI HELPERS //
-
-// Determines if a command line invocation is for the relocate form
-// of this executable
-bool IsRelocate(const char * arg);
-
-// Parses the command line for an invocation of the relocate command
-// and returns the arguments mapped from argument name to value
-std::map<std::string, std::string> ParseRelocate(const char ** args, int argc);
-
-// Writes CLI help message to stdout
-bool CheckAndPrintHelp(const char ** arg, int argc);
 
 // FS/Path helpers //
 
@@ -96,11 +93,14 @@ bool IsPathAbsolute(const std::string &pth);
 // File and File handle helpers //
 
 // Returns File offset given RVA
-DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER section_header, DWORD number_of_sections, DWORD rva);
+DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER &section_header, DWORD number_of_sections, DWORD rva);
 
 // Error checked handle cleanup to ensure all file handles are appropriately closed
 // while avoiding closing an already closed or in use handle
 int SafeHandleCleanup(HANDLE &handle);
+
+// System Helpers //
+std::string reportLastError();
 
 // Data helpers //
 
@@ -129,6 +129,6 @@ private:
     bool IsSystem(const std::string &pth);
 public:
     LibraryFinder();
-    std::string FindLibrary(const std::string &lib_name);
+    std::string FindLibrary(const std::string &lib_name, const std::string &lib_path);
     void EvalSearchPaths();
 };

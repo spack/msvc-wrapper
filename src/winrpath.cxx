@@ -5,7 +5,7 @@
  */
 #pragma once
 #include "winrpath.h"
-#include "utils.h"
+#include "coff_pe_reporter.h"
 
 #include <sstream>
 
@@ -59,16 +59,20 @@ void replace_path_characters(char in[], int len)
 
 /**
  * Pads a given path with an amount of padding of special characters
+ *  Paths are padded after the drive separator but before any path
+ *  characters, i.e. C:[\\\\\\\]\path\to\exe with the section in []
+ *  being the padded component
  * 
  * \param pth a pointer to the path to be padded
- * \param str_size the length of the path
+ * \param str_size the length of the path - not including any
+ *                  null terminators.
  * \param bsize the lengh of the padding to add
  */
 char * pad_path(const char *pth, DWORD str_size, DWORD bsize = MAX_NAME_LEN)
 {
-    size_t extended_buf = bsize - str_size;
+    size_t extended_buf = bsize - str_size + 2;
     char * padded_path = new char[bsize+1];
-    for(int i = 0, j = 0; i < bsize, j < str_size; i++){
+    for(int i = 0, j = 0; i < bsize && j < str_size; ++i){
         if(i < 2){
             padded_path[i] = pth[j];
             ++j;
@@ -81,6 +85,7 @@ char * pad_path(const char *pth, DWORD str_size, DWORD bsize = MAX_NAME_LEN)
             ++j;
         }
     }
+    padded_path[bsize] = '\0';
     return padded_path;
 }
 
@@ -95,8 +100,9 @@ int get_padding_length(const std::string &name)
     int c = 0;
     std::string::const_iterator p = name.cbegin();
     p+=2;
-    while(p != name.end() && *p == '/') {
+    while(p != name.end() && *p == '\\') {
         ++c;
+        ++p;
     }
     return c;
 }
@@ -119,13 +125,14 @@ std::string mangle_name(const std::string &name)
         // relative paths, assume they're relative to the CWD of the linker (as they have to be)
         abs_out = join({GetCWD(), name}, "\\");
     }
-    char * chr_abs_out = new char [abs_out.length()];
+    char * chr_abs_out = new char [abs_out.length() + 1];
     strcpy(chr_abs_out, abs_out.c_str());
     replace_path_characters(chr_abs_out, abs_out.length());
-    // char * padded_path = pad_path(chr_abs_out, abs_out.length(), MAX_PATH);
-    mangled_abs_out = chr_abs_out;
+    char * padded_path = pad_path(chr_abs_out, abs_out.length());
+    mangled_abs_out = std::string(padded_path, MAX_NAME_LEN);
+
     free(chr_abs_out);
-    // free(padded_path);
+    free(padded_path);
     return mangled_abs_out;
 }
 
@@ -295,7 +302,7 @@ CoffParser::CoffParser(CoffReaderWriter * cr)
 bool CoffParser::Parse()
 {
     if(!this->coffStream->Open()) {
-        std::cerr << "Unable to open coff file for reading: " << GetLastError() << "\n";
+        std::cerr << "Unable to open coff file for reading: " << reportLastError() << "\n";
         return false;
     }
     int invalid_valid_sig = this->coffStream->ReadSig(this->coff);
@@ -360,32 +367,28 @@ void CoffParser::ParseFullImport(coff_member *member)
     // Parse image file header
     PIMAGE_FILE_HEADER file_h = (PIMAGE_FILE_HEADER)member->data;
     // Parse section headers
-    IMAGE_SECTION_HEADER** p_sections = new PIMAGE_SECTION_HEADER[file_h->NumberOfSections];
+    IMAGE_SECTION_HEADER* p_sections = new IMAGE_SECTION_HEADER[file_h->NumberOfSections];
     for(int i = 0; i < file_h->NumberOfSections; ++i) {
-        PIMAGE_SECTION_HEADER sec_h = (PIMAGE_SECTION_HEADER)(member->data + sizeof(IMAGE_FILE_HEADER) + sizeof(IMAGE_SECTION_HEADER)*i);
-        *(p_sections+i) = new IMAGE_SECTION_HEADER;
+        IMAGE_SECTION_HEADER sec_h = *(PIMAGE_SECTION_HEADER)(member->data + sizeof(IMAGE_FILE_HEADER) + sizeof(IMAGE_SECTION_HEADER)*i);
         *(p_sections+i) = sec_h;
     }
     // Parse section data
     char ** section_data = new char *[file_h->NumberOfSections];
     for(int i=0; i<file_h->NumberOfSections; ++i) {
-        int data_loc = (*p_sections+i)->PointerToRawData;
+        int data_loc = (p_sections+i)->PointerToRawData;
         *(section_data+i) = member->data+data_loc;
-
     }
     // Parse Coff Symbol table
-    IMAGE_SYMBOL ** symbol_table = new IMAGE_SYMBOL*[file_h->NumberOfSymbols];
+    PIMAGE_SYMBOL symbol_table = new IMAGE_SYMBOL[file_h->NumberOfSymbols];
     DWORD symbol_table_offset = file_h->PointerToSymbolTable;
     for(int i=0; i<file_h->NumberOfSymbols;++i) {
-        PIMAGE_SYMBOL im_sym = (PIMAGE_SYMBOL)(member->data+symbol_table_offset+(sizeof(IMAGE_SYMBOL)*i));
-        *(symbol_table+i) = new IMAGE_SYMBOL;
+        IMAGE_SYMBOL im_sym = *(PIMAGE_SYMBOL)(member->data+symbol_table_offset+(sizeof(IMAGE_SYMBOL)*i));
         *(symbol_table+i) = im_sym;
-        BYTE aux_sym = (*(symbol_table+i))->NumberOfAuxSymbols;
     }
     // Parse string table
     DWORD string_table_offset = symbol_table_offset+sizeof(IMAGE_SYMBOL)*file_h->NumberOfSymbols;
     // first four bytes of string table give size of string table
-    DWORD size_of_string_table = (DWORD)(member->data+string_table_offset);
+    DWORD size_of_string_table = *(PDWORD)(member->data+string_table_offset);
     char * string_table;
     if (size_of_string_table > 4) {
         // string table size bytes are included in the total size count for the
@@ -533,12 +536,12 @@ bool CoffParser::NormalizeName(std::string &name)
             int long_name_len = strlen(this->coff.members[2].member->data+longname_offset);
             // Longnames member is always the third member if it exists
             // We know it exists at this point due to the success of the conditional above
-            char* long_name = new char[long_name_len];
-            strncpy(long_name, this->coff.members[2].member->data+longname_offset, long_name_len);
+            char* long_name = new char[long_name_len+1];
+            strncpy(long_name, this->coff.members[2].member->data+longname_offset, long_name_len+1);
             // Ensure Dll name is the one we're looking to perform the rename for
             if (!strcmp(name.c_str(), long_name)) {
                 // If so, unmangle it
-                replace_special_characters(long_name, long_name_len);
+                replace_special_characters(long_name, long_name_len+1);
                 // offset of actual longname member
                 int offset = std::streamoff(this->coff.members[2].offset);
                 this->coffStream->seek(0);
@@ -546,7 +549,7 @@ bool CoffParser::NormalizeName(std::string &name)
                 this->coffStream->seek(offset);
                 // Seek to offset within longname member for a given import name
                 this->coffStream->seek(sizeof(IMAGE_ARCHIVE_MEMBER_HEADER) + longname_offset, std::ios_base::cur);
-                this->coffStream->write(long_name, long_name_len);
+                this->coffStream->write(long_name, long_name_len+1);
             }
             delete long_name;
             // Import member name has been renamed
@@ -556,7 +559,7 @@ bool CoffParser::NormalizeName(std::string &name)
                 // short import members are simple and easily parsed, we have
                 // direct access to the name we're looking for from the inital parsing pass
                 int name_len = strlen(mem.member->short_member->short_dll);
-                char * new_name = new char[name_len];
+                char * new_name = new char[name_len+1];
                 // unmangle it
                 strcpy(new_name, mem.member->short_member->short_dll);
                 replace_special_characters(new_name, name_len);
@@ -583,7 +586,7 @@ bool CoffParser::NormalizeName(std::string &name)
                 // First perform the section data renames
                 WORD section_data_count = mem.member->long_member->pfile_h->NumberOfSections;
                 for(int j=0; j<section_data_count; ++j) {
-                    PIMAGE_SECTION_HEADER psec_header =  *(mem.member->long_member->pp_sections+j);
+                    PIMAGE_SECTION_HEADER psec_header =  mem.member->long_member->pp_sections+j;
                     // Get section data size from corresponding section header
                     int data_size = psec_header->SizeOfRawData;
                     int virtual_size = psec_header->Misc.VirtualSize;
@@ -595,6 +598,7 @@ bool CoffParser::NormalizeName(std::string &name)
                     DWORD section_data_start_offset = std::streamoff(mem.offset) + sizeof(IMAGE_ARCHIVE_MEMBER_HEADER) + psec_header->PointerToRawData;
                     // section start is longmember section pointer + index
                     char * section = *(mem.member->long_member->section_data+j);
+                    // Make a copy of the pointer
                     char * section_search_start = &*section;
                     char * search_terminator = section+data_size;
                     // search section data for full name
@@ -618,7 +622,7 @@ bool CoffParser::NormalizeName(std::string &name)
                     name_len = name_no_ext.size();
                     section_search_start = &*section;
                     while(section_search_start && (section_search_start < search_terminator)) {
-                        section_search_start = findstr(section_search_start, name_no_ext.c_str(), name_len);
+                        section_search_start = findstr(section_search_start, name_no_ext.c_str(), data_size);
                         if (section_search_start) {
                             // we found a name, rename
                             ptrdiff_t offset = section_search_start - section;
@@ -637,9 +641,9 @@ bool CoffParser::NormalizeName(std::string &name)
                 int relative_string_table_start_offset = std::streamoff(mem.offset) + sizeof(IMAGE_ARCHIVE_MEMBER_HEADER) + mem.member->long_member->string_table_offset + sizeof(DWORD);
                 char * string_table_start, *string_table = mem.member->long_member->string_table;
                 int symbol_count = mem.member->long_member->pfile_h->NumberOfSymbols;
-                PIMAGE_SYMBOL * symbols = mem.member->long_member->symbol_table;
+                PIMAGE_SYMBOL symbols = mem.member->long_member->symbol_table;
                 for(int j=0;j<symbol_count;++j) {
-                    PIMAGE_SYMBOL symbol = *(symbols+j);
+                    PIMAGE_SYMBOL symbol = symbols+j;
                     if(symbol->N.Name.Short == 0) {
                         // name is longer than 8 bytes, it's a Spack name, search
                         DWORD name_string_table_offset = symbol->N.Name.Long-sizeof(DWORD);
@@ -671,7 +675,7 @@ bool CoffParser::NormalizeName(std::string &name)
                 int member_offset = sizeof(DWORD) + mem.member->first_link->symbols*sizeof(DWORD);
                 for (int j=0; j < mem.member->first_link->symbols; ++j) {
                     int name_len = strlen(mem.member->first_link->strings+current_relative_offset);
-                    char * new_name = new char[name_len];
+                    char * new_name = new char[name_len+1];
                     strcpy(new_name, mem.member->first_link->strings+current_relative_offset);
                     if(strstr(new_name, name_no_ext.c_str())) {
                         replace_special_characters(new_name, name_len);
@@ -681,6 +685,7 @@ bool CoffParser::NormalizeName(std::string &name)
                         this->coffStream->write(new_name, name_len);
                     }
                     current_relative_offset += name_len+1;
+                    free(new_name);
                 }
             }
             else {
@@ -688,7 +693,7 @@ bool CoffParser::NormalizeName(std::string &name)
                 int member_offset = sizeof(DWORD) + sizeof(DWORD) * mem.member->second_link->members + sizeof(DWORD) + sizeof(WORD) * mem.member->second_link->symbols;
                 for(int j=0; j<mem.member->second_link->symbols;++j) {
                     int name_len = strlen(mem.member->second_link->strings+current_relative_offset);
-                    char * new_name = new char[name_len];
+                    char * new_name = new char[name_len+1];
                     strcpy(new_name, mem.member->second_link->strings+current_relative_offset);
                     if(strstr(new_name, name_no_ext.c_str())) {
                         replace_special_characters(new_name, name_len);
@@ -698,6 +703,7 @@ bool CoffParser::NormalizeName(std::string &name)
                         this->coffStream->write(new_name, name_len);                        
                     }
                     current_relative_offset += name_len+1;
+                    free(new_name);
                 }
             }
         }
@@ -711,11 +717,66 @@ bool CoffParser::NormalizeName(std::string &name)
         else {
             // If it's not an archive member or a long names offset based name, its either something we don't recognize
             // or it's a non Spack derived import
+            // TODO: Optionally warn rather than always report to std error, for externals this
+            // will create way too much noise
             std::cerr << "Unrecognized or non Spack based import member: " << mem.header->Name << "\n";
         }        
     }
     this->coffStream->Close();
     return true;
+}
+
+
+void CoffParser::ReportLongImportMember(long_import_member *li)
+{
+    reportFileHeader(li->pfile_h);
+    reportCoffSections(li);
+    reportCoffSymbols(li);    
+}
+
+
+void CoffParser::ReportShortImportMember(short_import_member *si)
+{
+    reportImportObjectHeader(si->im_h);
+    std::cout << "  DLL: " <<si->short_dll << "\n";
+    std::cout << "  Name: " << si->short_name << "\n";
+}
+
+
+void CoffParser::Report()
+{
+    for (auto mem: this->coff.members) {
+        reportArchiveHeader(mem.header);
+        if(mem.member->long_member) {
+            this->ReportLongImportMember(mem.member->long_member);
+        }
+        else if(mem.member->short_member) {
+            this->ReportShortImportMember(mem.member->short_member);
+        }
+    }
+}
+
+/**
+ * Reports information about parsed coff file
+ * 
+ */
+bool reportCoff(CoffParser &coff)
+{
+    if(!coff.Parse()){
+        return false;
+    }
+    coff.Report();
+    return true;
+}
+
+
+bool hasPathCharacters(const std::string &name) {
+    for(std::map<char, char>::const_iterator it = path_to_special_characters.begin(); it != path_to_special_characters.end(); ++it){
+        if(!(name.find(it->first) == std::string::npos)){
+            return true;
+        }
+    }
+    return false;
 }
 
 /*
@@ -733,15 +794,19 @@ bool CoffParser::NormalizeName(std::string &name)
 bool LibRename::SpackCheckForDll(const std::string &name)
 {
     if(this->deploy){
-        for(std::map<char, char>::const_iterator it = path_to_special_characters.begin(); it != path_to_special_characters.end(); ++it){
-            if(!(name.find(it->first) == std::string::npos)){
-                return true;
-            }
-        }
-        return false;
+        return hasPathCharacters(name);
     }
     else {
-        return (!(name.find("<!spack>") == std::string::npos));
+        // First check for the case we're relocating out of a buildcache
+        bool reloc_spack = false;
+        if (!(name.find("<!spack>") == std::string::npos) || !(name.find("<sp>") == std::string::npos)) {
+            reloc_spack = true;
+        }
+        // If not, maybe we're just relocating a binary on the same system
+        if (!reloc_spack) {
+            reloc_spack = hasPathCharacters(name);
+        }
+        return reloc_spack;
     }
 }
 
@@ -755,37 +820,47 @@ bool LibRename::SpackCheckForDll(const std::string &name)
  * \param dll_name The dll, in the case we're doing an extraction from the buildcache
  *                  that we'll look for a version of on the current system and rename
  *                  the dll name found at `name_loc` to the absolute path of
+ * 
 */
-int LibRename::RenameDll(DWORD name_loc, const std::string &dll_name)
+bool LibRename::RenameDll(char* name_loc, const std::string &dll_path)
 {
     if(this->deploy) {
-        int padding_len = get_padding_length(dll_name);
+        int padding_len = get_padding_length(dll_path);
         if(padding_len < 8) {
             // path is too long to mark as a Spack path
             // use shorter sigil
             char short_sigil[] = "<sp>";
-            snprintf((char*)name_loc, sizeof(short_sigil), short_sigil); 
+            // use _snprintf as it does not null terminate and we're writing into the middle
+            // of a null terminated string we want to later read from properly
+            _snprintf(name_loc, sizeof(short_sigil)-1, "%s", short_sigil); 
         }
         else {
             char long_sigil[] = "<!spack>";
-            snprintf((char*)name_loc, sizeof(long_sigil), long_sigil);
+            // See _snprintf comment above for use context
+            _snprintf(name_loc, sizeof(long_sigil)-1, "%s", long_sigil);
         }
     }
     else {
-        std::string file_name = basename(dll_name);
+        std::string file_name = basename(dll_path);
         if(file_name.empty()) {
             std::cerr << "Unable to extract filename from dll for relocation" << "\n";
-            return -1;
+            return false;
         }
         LibraryFinder lf;
-        std::string new_library_loc = lf.FindLibrary(file_name);
+        std::string new_library_loc = lf.FindLibrary(file_name, dll_path);
         if(new_library_loc.empty()) {
-            std::cerr << "Unable to find library for relocation" << "\n";
-            return -1;
+            std::cerr << "Unable to find library " << file_name << " at " << dll_path << " for relocation" << "\n";
+            return false;
         }
-        *((LPDWORD) name_loc) = (DWORD)(new_library_loc.c_str());
+        char * new_lib = pad_path(new_library_loc.c_str(), new_library_loc.size());
+
+        replace_special_characters(new_lib, MAX_NAME_LEN);
+
+        // c_str returns a proper (i.e. null terminated) value, so we dont need to worry about
+        // size differences w.r.t the path to the new library
+        snprintf(name_loc, MAX_NAME_LEN+1, "%s", new_lib);
     }
-    return 1;
+    return true;
 }
 
 /*
@@ -807,65 +882,69 @@ int LibRename::RenameDll(DWORD name_loc, const std::string &dll_name)
  * This approach is heavily based on https://www.ired.team/miscellaneous-reversing-forensics/windows-kernel-internals/pe-file-header-parser-in-c++#first-dll-name
  * 
  * \param pe_in the PE file for which to perform the imported DLL rename procedure
+ * 
+ * 
 */
-int LibRename::FindDllAndRename(HANDLE &pe_in)
+bool LibRename::FindDllAndRename(HANDLE &pe_in)
 {
     HANDLE hMapObject = CreateFileMapping(pe_in, NULL, PAGE_READWRITE, 0, 0, NULL);
     if(!hMapObject){
-        std::cerr << "Unable to create mapping object\n";
-        return -5;
+        std::cerr << "Unable to create mapping object: " << reportLastError() <<"\n";
+        return false;
     }
     LPVOID basepointer = (char*)MapViewOfFile(hMapObject, FILE_MAP_WRITE, 0, 0, 0);
     if(!basepointer){
         std::cerr << "Unable to create file map view\n";
-        return -6;
+        return false;
     }
     // Establish base PE headers
     PIMAGE_DOS_HEADER dos_header = (PIMAGE_DOS_HEADER)basepointer;
     PIMAGE_NT_HEADERS nt_header = 
-        (PIMAGE_NT_HEADERS)((DWORD)basepointer + dos_header->e_lfanew);
+        (PIMAGE_NT_HEADERS)((char*)basepointer + dos_header->e_lfanew);
 
     PIMAGE_FILE_HEADER coff_header = 
-        (PIMAGE_FILE_HEADER)((DWORD)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature));
+        (PIMAGE_FILE_HEADER)((char*)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature));
         
     PIMAGE_OPTIONAL_HEADER optional_header = 
-        (PIMAGE_OPTIONAL_HEADER)((DWORD)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader));
+        (PIMAGE_OPTIONAL_HEADER)((char*)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader));
         
     PIMAGE_SECTION_HEADER section_header = 
-        (PIMAGE_SECTION_HEADER)((DWORD)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader) + sizeof(nt_header->OptionalHeader));
+        (PIMAGE_SECTION_HEADER)((char*)basepointer + dos_header->e_lfanew + sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader) + sizeof(nt_header->OptionalHeader));
     
     DWORD number_of_rva_and_sections = optional_header->NumberOfRvaAndSizes;
     if(number_of_rva_and_sections == 0) {
         std::cerr << "PE file does not import symbols" << "\n";
-        return -1;
+        return false;
     }
     else if(number_of_rva_and_sections < 2) {
         std::cerr << "PE file contains insufficient data directories, likely corrupted" << "\n";
-        return -2;
+        return false;
     }
 
     DWORD number_of_sections = coff_header->NumberOfSections;
     // Data directory #2 points to the RVA of the import section
     DWORD RVA_import_directory = nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
     DWORD import_section_file_offset = RvaToFileOffset(section_header, number_of_sections, RVA_import_directory);
-    DWORD import_table_offset = (DWORD)basepointer + import_section_file_offset;
+    char * import_table_offset = (char*)basepointer + import_section_file_offset;
     PIMAGE_IMPORT_DESCRIPTOR import_image_descriptor = (PIMAGE_IMPORT_DESCRIPTOR)(import_table_offset);
     //DLL Imports
     for (; import_image_descriptor->Name != 0; import_image_descriptor++) {
-        DWORD Imported_DLL = import_table_offset + (import_image_descriptor->Name - RVA_import_directory);
-        std::ostringstream str_stream;
-        str_stream << Imported_DLL;
-        if(this->SpackCheckForDll(str_stream.str())) {
-            if(!this->RenameDll(Imported_DLL, str_stream.str())) {
-                std::cerr << "Unable to relocate DLL\n";
-                return 0;
+        char* Imported_DLL = import_table_offset + (import_image_descriptor->Name - RVA_import_directory);
+        std::string str_dll_name = std::string(Imported_DLL);
+        if(this->SpackCheckForDll(str_dll_name)) {
+            if(!this->RenameDll(Imported_DLL, str_dll_name )) {
+                std::cerr << "Unable to relocate DLL reference: " << str_dll_name << "\n";
+                return false;
             }
         }
     }
-    if(!SafeHandleCleanup(basepointer) || !SafeHandleCleanup(hMapObject)) {
-        return -3;
+    FlushViewOfFile((LPCVOID)basepointer, 0);
+    UnmapViewOfFile((LPCVOID)basepointer);
+
+    if(!SafeHandleCleanup(hMapObject)) {
+        return false;
     }
-    return 1;
+    return true;
 }
 
 /*
@@ -890,8 +969,9 @@ int LibRename::FindDllAndRename(HANDLE &pe_in)
  * \param full a flag indicating whether or not we're renaming a PE file and import lib or just an import lib
  * \param deploy a flag indicating if we're deploying a binary to a Spack build cache or extracting it
  * \param replace a flag indicating if we're replacing the renamed import lib or making a copy with absolute dll names
+ * \param report a flag indicating if we should be reporting the contents of the PE/COFF file we're parsing to stdout
 */
-LibRename::LibRename(std::string pe, bool full, bool deploy, bool replace)
+LibRename::LibRename(std::string pe, bool full, bool deploy, bool replace, bool report)
 : replace(replace), full(full), pe(pe), deploy(deploy)
 {
     this->name = stem(this->pe);
@@ -915,6 +995,8 @@ std::string LibRename::ComputeDefLine()
 /**
  * Drives the process of running dumpbin.exe on a PE file to determine its exports
  * and produce a `.def` file
+ * 
+ * Returns the return code of the Def file computation operation
  */
 int LibRename::ComputeDefFile()
 {
@@ -927,25 +1009,44 @@ int LibRename::ComputeDefFile()
  *  and then generates an import library with absolute paths to the
  *  corresponding dll or generates a dll with absolute paths to its
  *  dependencies depending on the context
+ * 
+ * Returns 0 on failure, 1 otherwise
+ * 
+ * On standard deployment, we don't do anything
+ * On standard extraction, we want to regenerate the import library
+ *  from our dll or exe pointing to the new location of the dll/exe
+ *  post buildcache extraction
+ * 
+ * On a full deployment, we mark the spack based DLL names in the binary
+ *  with a spack sigil <sp!>
+ * 
+ * On a full extraction, in addition to the standard extraction operation
+ *  we rename the Dll names marked with the spack sigil (<sp!>)
+ *
  */
-int LibRename::ExecuteRename()
+bool LibRename::ExecuteRename()
 {
-    if(!this->deploy || this->is_exe){
-        if(!this->ComputeDefFile()) {
-            return 0;
+    // If we're not deploying, we're extracting
+    // recompute the .def and .lib for dlls
+    // exes do not typically have import libs so we don't handle
+    // that case
+    if(!this->deploy && !this->is_exe){
+        // Extract DLL 
+        if(this->ComputeDefFile()) {
+            return false;
         }
         if(!this->ExecuteLibRename()) {
-            return 0;
+            return false;
         }
     }
-    if (this->full || this->is_exe) {
+    if (this->full) {
         if(!this->ExecutePERename()) {
             std::cerr << "Unable to execute rename of "
                 "referenced components in PE file: " << this->name << "\n";
-            return 0;
+            return false;
         }
     }
-    return 1;
+    return true;
 }
 
 /**
@@ -954,14 +1055,15 @@ int LibRename::ExecuteRename()
  *   a mangled variation of the absolute path to the dll
  *   as its dll name, and then modifies that binary to correct
  *   and unmangle the mangled dll name
+ * 
  */
-int LibRename::ExecuteLibRename()
+bool LibRename::ExecuteLibRename()
 {
     this->lib_executor.Execute();
     int ret_code = this->lib_executor.Join();
-    if(ret_code) {
-        std::cerr << GetLastError();
-        return ret_code;
+    if(ret_code != 0) {
+        std::cerr << "Lib Rename failed" << reportLastError() << "\n";
+        return false;
     }
     // import library has been generated with
     // mangled abs path to dll -
@@ -969,28 +1071,27 @@ int LibRename::ExecuteLibRename()
     CoffReaderWriter cr(this->new_lib);
     CoffParser coff(&cr);
     if (!coff.Parse()) {
-        std::cerr << "Unable to parse\n";
-        return 0;
+        std::cerr << "Unable to parse generated import library {" << this->new_lib <<"}\n";
+        return false;
     }
     if(!coff.NormalizeName(mangle_name(this->pe) )) {
         std::cerr << "Unable to normalize name\n";
-        return 0;
+        return false;
     }
-    return 1;
+    return true;
 }
 
 /**
  * Drives the rename process for 
+ * 
  */
-int LibRename::ExecutePERename()
+bool LibRename::ExecutePERename()
 {
     LPCWSTR lib_name = ConvertAnsiToWide(this->pe).c_str();
     HANDLE pe_handle = CreateFileW(lib_name, (GENERIC_READ|GENERIC_WRITE), FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (!pe_handle){
-        std::stringstream os_error;
-        os_error << GetLastError();
-        std::cerr << "Unable to acquire file handle: " << os_error.str() << "\n";
-        return 0;
+    if (!pe_handle || pe_handle == INVALID_HANDLE_VALUE){
+        std::cerr << "Unable to acquire file handle to "<< lib_name << ": " << reportLastError() << "\n";
+        return false;
     }
     return this->FindDllAndRename(pe_handle);
 }

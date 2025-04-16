@@ -30,7 +30,6 @@ BASE_CFLAGS = /EHsc
 CFLAGS = $(BASE_CFLAGS) $(BUILD_CFLAGS) $(CLFLAGS)
 LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
 
-
 {src}.cxx{}.obj::
 	$(CC) /c $(CFLAGS) $(CVARS) /I:src $<	
 
@@ -39,48 +38,66 @@ LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
 
 all : install test
 
-cl.exe : cl.obj execute.obj intel.obj ld.obj main.obj spack_env.obj toolchain.obj toolchain_factory.obj utils.obj winrpath.obj 
+cl.exe : cl.obj execute.obj intel.obj ld.obj main.obj spack_env.obj toolchain.obj toolchain_factory.obj utils.obj commandline.obj winrpath.obj 
 	link $(LFLAGS) $** Shlwapi.lib /out:cl.exe
 
 install : cl.exe
 	mkdir $(PREFIX)
 	move cl.exe $(PREFIX)
-	mklink $(PREFIX)/link.exe $(PREFIX)/cl.exe
-	mklink $(PREFIX)/ifx.exe $(PREFIX)/cl.exe
-	mklink $(PREFIX)/relocate.exe $(PREFIX)/cl.exe
+	mklink $(PREFIX)\link.exe $(PREFIX)\cl.exe
+	mklink $(PREFIX)\ifx.exe $(PREFIX)\cl.exe
+	mklink $(PREFIX)\relocate.exe $(PREFIX)\cl.exe
 
 setup_test: cl.exe
-	del *.obj
-	mkdir tmp\test
+	-@ if NOT EXIST "tmp\test" mkdir "tmp\test"
 	cd tmp\test
 	copy ..\..\cl.exe cl.exe
-	mklink link.exe cl.exe
+	-@ if NOT EXIST "link.exe" mklink link.exe cl.exe
+	cd ..\..
 
 build_and_check_test_sample : setup_test
+	cd tmp\test
 	cl /c /EHsc ..\..\test\calc.cxx /DCALC_EXPORTS
 	cl /c /EHsc ..\..\test\main.cxx
 	link $(LFLAGS) calc.obj /out:calc.dll /DLL
 	link $(LFLAGS) main.obj calc.lib /out:tester.exe
 	tester.exe
+	cd ..\..
 
-test : build_and_check_test_sample
-	cd ..
+test_wrapper : build_and_check_test_sample
+	cd tmp
 	move test\tester.exe .\tester.exe
 	.\tester.exe
 	mkdir tmp_bin
 	move test\calc.dll tmp_bin\calc.dll
 	..\test\run_failing_check.bat
+	move tmp_bin\calc.dll test\calc.dll
+	move tester.exe test\tester.exe
+	rmdir /q /s tmp_bin
 	cd ..
-	rmdir /q /s tmp
+
+test_relocate: build_and_check_test_sample
+	cd tmp\test
+	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
+	move calc.dll ..\calc.dll
+	relocate.exe tester.exe --deploy --full
+	relocate.exe tester.exe --export --full
+	tester.exe
+
+test: test_wrapper test_relocate 
 
 
-clean :
+clean : clean-test clean-cl
 	del *.obj
 	del *.exe
 	del *.dll
 	del *.lib
 	del *.exp
 	del *.pdb
+	del *.ilk
 
 clean-cl :
 	del cl.exe
+
+clean-test:
+	rmdir /q /s tmp

@@ -8,8 +8,6 @@
 #include "ld.h"
 #include "intel.h"
 
-#include <algorithm>
-
 std::unique_ptr<ToolChainInvocation> ToolChainFactory::ParseToolChain(char const* const * argv) {
     std::string command(*argv);
     char const* const* cli(++argv);
@@ -37,24 +35,6 @@ std::unique_ptr<ToolChainInvocation> ToolChainFactory::ParseToolChain(char const
         return Tool;
     }
     return std::unique_ptr<ToolChainInvocation>(nullptr);
-}
-
-void ToolChainFactory::StripPathAndExe(std::string &command) {
-    StripPath(command);
-    StripExe(command);
-};
-
-void ToolChainFactory::StripExe(std::string &command) {
-    // Normalize command to lowercase to avoid parsing issues
-    std::transform(command.begin(), command.end(), command.begin(),
-        [](unsigned char c){ return std::tolower(c); });
-    std::string::size_type loc = command.rfind(".exe");
-    if ( std::string::npos != loc )
-        command.erase(loc);
-}
-
-void ToolChainFactory::StripPath(std::string &command) {
-    command.erase(0, command.find_last_of("\\/") + 1);
 }
 
 const std::map<std::string, ToolChainFactory::Language> ToolChainFactory::SupportedTools{

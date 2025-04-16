@@ -5,6 +5,7 @@
  */
 #include "utils.h"
 
+#include <algorithm>
 #include <map>
 #include <iostream>
 #include <string>
@@ -154,102 +155,24 @@ std::string getCmdOption(char ** begin, char ** end, const std::string & option)
     return 0;
 }
 
-bool IsRelocate(const char * arg)
-{
-    return strcmp(arg, "relocate") == 0;
+void StripPathAndExe(std::string &command) {
+    StripPath(command);
+    StripExe(command);
+};
+
+void StripExe(std::string &command) {
+    // Normalize command to lowercase to avoid parsing issues
+    std::transform(command.begin(), command.end(), command.begin(),
+        [](unsigned char c){ return std::tolower(c); });
+    std::string::size_type loc = command.rfind(".exe");
+    if ( std::string::npos != loc && loc + 4 == command.length() )
+        command.erase(loc);
 }
 
-/**
- * Checks if an argument has already been defined on the command line
- */
-int redefinedArgCheck(const std::map<std::string, std::string> &args, const char * arg, const char * cli_name)
-{
-    if ( args.find(arg) != args.end()) {
-        std::cerr << "Invalid command line, too many values for argument: " << cli_name << "\n";
-        return 1;
-    }
-    return 0;
+void StripPath(std::string &command) {
+    command.erase(0, command.find_last_of("\\/") + 1);
 }
 
-/**
- * Check for the presense of an argument in the argument map
- */
-int checkArgumentPresence(const std::map<std::string, std::string> &args, const char * val, bool required = true)
-{
-    if (args.find(val) == args.end()) {
-        std::cerr << "Warning! Argument (" << val << ") not present";
-        if (required) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
-/**
- * Parse the command line arguments supportin the relocate command
- */
-std::map<std::string, std::string> ParseRelocate(const char ** args, int argc) {
-    std::map<std::string, std::string> opts;
-    for (int i = 0; i < argc; i++){
-        if (strcmp(args[i], "--pe")) {
-            if(redefinedArgCheck(opts, "pe", "--pe")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("pe", args[++i]));
-        }
-        else if (endswith((std::string)args[i], ".dll")) {
-            if(redefinedArgCheck(opts, "pe", "pe")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("pe", args[i]));
-        }
-        else if (endswith((std::string)args[i], ".exe")) {
-            if(redefinedArgCheck(opts, "pe", "pe")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("pe", args[i]));
-        }
-        else if (strcmp(args[i], "--full")) {
-            if(redefinedArgCheck(opts, "full", "--full")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("full", "full"));
-        }
-        else if (strcmp(args[i], "--export")) {
-            // export and deploy are mutually exclusive, if one is defined
-            // the other cannot be
-            if(redefinedArgCheck(opts, "export", "--export") 
-                || !redefinedArgCheck(opts, "deploy", "--deploy")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("cmd", "export"));
-        }
-        else if (strcmp(args[i], "--deploy")) {
-            // export and deploy are mutually exclusive, if one is defined
-            // the other cannot be
-            if(redefinedArgCheck(opts, "export", "--export")
-               || !redefinedArgCheck(opts, "deploy", "--deploy")) {
-                opts.clear();
-                return opts;
-            } 
-            opts.insert(std::pair<std::string, std::string>("cmd", "deploy"));
-        }
-        else {
-            // Unknown argument, warn the user it will not be used
-            std::cerr << "Unknown argument :" << args[i] << "will be ignored\n";
-        }
-    }
-    if(!checkArgumentPresence(opts, "pe")) {
-        opts.clear();
-        return opts;
-    }
-    return opts;
-}
 
 /**
  * Given an environment variable name
@@ -260,6 +183,7 @@ std::string GetSpackEnv(const char* env) {
     char* envVal = getenv(env);
     return envVal ? envVal : std::string();
 }
+
 
 /**
  * Given an environment variable name
@@ -305,64 +229,6 @@ int ValidateSpackEnv() {
     return 1;
 }
 
-
-bool print_help()
-{
-    std::cout << "Spack's Windows compiler wrapper\n";
-    std::cout << "Version: " << STRING(MSVC_WRAPPER_VERSION) <<"\n";
-    std::cout << "\n";
-    std::cout << "  Description:\n";
-    std::cout << "      This compiler wrapper abstacts the functions \n";
-    std::cout << "      of the MSVC and Intel C/C++/Fortran compilers and linkers.\n";
-    std::cout << "      This wrapper modifies compilation and link time behavior by\n";
-    std::cout << "      injecting Spack specific paths, flags, and arguments to the\n";
-    std::cout << "      compiler and linker lines.\n";
-    std::cout << "      Link operations are amended to inject the absolute path to\n";
-    std::cout << "      a package's dll in its import library, allowing for RPATH\n";
-    std::cout << "      like link behavior.\n";
-    std::cout << "      Spack's Windows RPaths can be relocated by this wrapper\n";
-    std::cout << "      by invoking the 'relocate' form with the proper arguments\n";
-    std::cout << "\n\n";
-    std::cout << "  Useage:\n";
-    std::cout << "      To use this as a compiler/linker wrapper, simply invoke the compiler/linker\n";
-    std::cout << "      as normal, with the properly named link to this wrapper in the PATH\n";
-    std::cout << "      In this case, the CLI of this wrapper is identical to cl|ifx|link.\n";
-    std::cout << "      See https://learn.microsoft.com/en-us/cpp/build/reference/c-cpp-building-reference\n";
-    std::cout << "\n";
-    std::cout << "      cl.exe /c foo.c";
-    std::cout << "\n";
-    std::cout << "      To preform relocation, invoke the 'relocate' symlink to this file:\n";
-    std::cout << "\n";
-    std::cout << "      options:\n";
-    std::cout << "          [--pe] <path to pe file>                     = PE file to be relocated\n";
-    std::cout << "          --full                                       = Relocate dynamic references inside\n";
-    std::cout << "                                                          the dll in addition to re-generating\n";
-    std::cout << "                                                          the import library\n";
-    std::cout << "                                                          Note: this is assumed to be true if\n";
-    std::cout << "                                                           relocating an executable.\n";
-    std::cout << "                                                          If an executable is relocated, no import\n";
-    std::cout << "                                                          library operations are performed.\n";
-    std::cout << "          --export|--deploy                             = Mutually exclusive command modifier.\n";
-    std::cout << "                                                           Instructs relocate to either prepare the\n";
-    std::cout << "                                                           dynamic library for exporting to build cache\n";
-    std::cout << "                                                           or for extraction from bc onto new host system\n";
-    std::cout << "\n";
-    return true;
-}
-
-bool CheckAndPrintHelp(const char ** arg, int argc)
-{
-    if(argc < 2) {
-        return print_help();
-    }
-    else if(strcmp(arg[1], "--help") == 0 || strcmp(arg[1], "-h") == 0)
-    {
-        return print_help();
-    }
-    return false;
-
-}
-
 std::string stem(const std::string &file)
 {
     std::size_t last_dot = file.find_last_of('.');
@@ -374,11 +240,11 @@ std::string stem(const std::string &file)
 
 std::string basename(const std::string &file)
 {
-    std:size_t last_path = file.find_last_of("\\");
+    std:size_t last_path = file.find_last_of("\\")+1;
     if (last_path == std::string::npos) {
         return std::string();
     }
-    return file.substr(0, last_path);
+    return file.substr(last_path);
 }
 
 std::string GetCWD()
@@ -401,7 +267,7 @@ bool IsPathAbsolute(const std::string &pth)
  * Determines the file offset on disk from the relative virtual address of a given section
  * header
  */
-DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER section_header, DWORD number_of_sections, DWORD rva) {
+DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER &section_header, DWORD number_of_sections, DWORD rva) {
 
     for (int i = 0; i < number_of_sections; ++i, ++section_header) {
         DWORD sectionStartRVA = section_header->VirtualAddress;
@@ -416,23 +282,31 @@ DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER section_header, DWORD number_of_sect
     return 0;
 }
 
+
+std::string reportLastError()
+{
+    DWORD error = GetLastError();
+    return std::system_category().message(error);
+}
+
 LibraryFinder::LibraryFinder() : search_vars{"SPACK_RELOCATE_PATH"} {}
 
-std::string LibraryFinder::FindLibrary(const std::string &lib_name) {
+std::string LibraryFinder::FindLibrary(const std::string &lib_name, const std::string &lib_path) {
     // Read env variables and split into paths
     // Only ever run once
     // First check if lib is absolute path
-    if (this->IsSystem(lib_name)) {
+    if (this->IsSystem(lib_path)) {
         return std::string();
     }
-    if (!PathIsRelativeW(ConvertAnsiToWide(lib_name).c_str()))
-        return lib_name;
     // next search the CWD
     std::string cwd(GetCWD());
     auto res = this->Finder(cwd, lib_name);
     if (!res.empty())
         return res;
     this->EvalSearchPaths();
+    if (this->evald_search_paths.empty()) {
+        return std::string();
+    }
     // next search env variable paths
     for (std::string var: this->search_vars) {
         std::vector<std::string> searchable_paths = this->evald_search_paths.at(var);
@@ -449,30 +323,42 @@ void LibraryFinder::EvalSearchPaths() {
     if (!this->evald_search_paths.empty())
         return;
     for (std::string var: this->search_vars) {
-        std::string envVal = getenv(var.c_str());
+        std::string envVal = GetSpackEnv(var.c_str());
         if (!envVal.empty())
             this->evald_search_paths[var] = split(envVal, ";");
     }
 }
 
+/**
+ * Searches files located at pth for a file called lib_name
+ * \param pth the path at which to search for a given file
+ * \param lib_name the file to be seached for
+ * 
+ * \return an empty string if nothing is found, the absolute path to
+ * the discovered file with name lib_name
+ */
 std::string LibraryFinder::Finder(const std::string &pth, const std::string &lib_name) {
     WIN32_FIND_DATAW findFileData;
-    HANDLE hFind = FindFirstFileW(ConvertAnsiToWide(pth).c_str(), &findFileData);
+    // Globs all files at the provided path and matches to search
+    // for lib name
+    std::string searcher = pth + "\\*";
+    HANDLE hFind = FindFirstFileW(ConvertAnsiToWide(searcher).c_str(), &findFileData);
 
     if (hFind == INVALID_HANDLE_VALUE) {
-        std::cerr << "FindFirstFile failed (" << GetLastError() << ")" << std::endl;
+        std::cerr << "Find file failed: " << reportLastError() << " " << searcher << "\n";
+        FindClose(hFind);
         return std::string();
     }
     
     do {
-        if (std::wcsstr(findFileData.cFileName, ConvertAnsiToWide(lib_name).c_str())){
-            return ConvertWideToANSI(findFileData.cFileName);
+        if (!wcscmp(findFileData.cFileName, ConvertAnsiToWide(lib_name).c_str())){
+            return pth + "\\" + ConvertWideToANSI(findFileData.cFileName);
         }
-    } while (FindNextFileW(hFind, &findFileData) != 0);
+    } while (FindNextFileW(hFind, &findFileData));
 
     DWORD dwError = GetLastError();
     if (dwError != ERROR_NO_MORE_FILES) {
-        std::cerr << "FindNextFile failed (" << dwError << ")" << std::endl;
+        std::cerr << "Find file failed: "<< reportLastError() << "\n";
     }
     FindClose(hFind);
     return std::string();
