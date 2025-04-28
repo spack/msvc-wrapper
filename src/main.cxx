@@ -58,9 +58,9 @@ int main(int argc, const char* argv[]) {
     }
     else {
         // Ensure required variables are set
-        // if(!ValidateSpackEnv()) {
-        //     return -99;
-        // }
+        if(!ValidateSpackEnv()) {
+            return -99;
+        }
         // Determine which tool we're trying to run
         std::unique_ptr<ToolChainInvocation> tchain(ToolChainFactory::ParseToolChain(argv));
         if(!tchain) {

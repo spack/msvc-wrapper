@@ -206,27 +206,20 @@ StrList GetEnvList(const std::string &envVar, const std::string &delim) {
         return StrList();
 }
 
-int ValidateSpackEnv() {
+bool ValidateSpackEnv() {
     std::vector<std::string> SpackEnv{
-"SPACK_ENV_PATH",
+"SPACK_COMPILER_WRAPPER_PATH",
 "SPACK_DEBUG_LOG_DIR",
-// "SPACK_DEBUG_LOG_ID"
-"SPACK_COMPILER_SPEC",
-// "SPACK_CC_RPATH_ARG"
-// "SPACK_CXX_RPATH_ARG"
-// "SPACK_F77_RPATH_ARG"
-// "SPACK_FC_RPATH_ARG"
-// "SPACK_LINKER_ARG"
-// "SPACK_SHORT_SPEC"
+"SPACK_DEBUG_LOG_ID",
+"SPACK_SHORT_SPEC",
 "SPACK_SYSTEM_DIRS",
-"SPACK_CC",
-"SPACK_LD",};
+"SPACK_MANAGED_DIRS"};
     for(auto &var: SpackEnv)
         if(!getenv(var.c_str())){
             std::cerr << var + " isn't set in the environment and is expected to be\n";
-            return 0;
+            return false;
         }
-    return 1;
+    return true;
 }
 
 std::string stem(const std::string &file)
