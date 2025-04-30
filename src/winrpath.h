@@ -166,6 +166,7 @@ public:
     void seek(int bytes=-1, std::ios_base::seekdir way=std::ios_base::beg);
     int peek();
     void clear();
+    void flush();
     std::string get_file();
     std::streampos tell();
     bool end();
@@ -183,6 +184,10 @@ private:
     void ParseSecondLinkerMember(coff_member *member);
     void ReportLongImportMember(long_import_member *li);
     void ReportShortImportMember(short_import_member *si);
+    void NormalizeLinkerMember(const std::string &name, const int &base_offset, const int &offset, const char * strings, const DWORD symbols);
+    void NormalizeSectionNames(const std::string &name, char* section, const DWORD &section_data_start_offset, int data_size);
+    void NormalizeStringTable(PIMAGE_SYMBOL symbol, const char* string_table, const int &relative_offset, const int &size_of_string_table, const std::string &name);
+    int GetSectionDataSize(const int &rawDataSize, const int &virtualSize);
 public:
     CoffParser(CoffReaderWriter * cr);
     ~CoffParser() = default;
