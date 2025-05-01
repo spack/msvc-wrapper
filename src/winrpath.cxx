@@ -538,8 +538,8 @@ void CoffParser::NormalizeSectionNames(const std::string &name, char* section, c
         if (section_search_start) {
             // we found a name, rename
             offset = section_search_start - section;
-            char * new_name = new char[name_len+1];
-            strncpy(new_name, section_search_start, name_len+1);
+            char * new_name = new char[name_len];
+            strncpy(new_name, section_search_start, name_len);
             replace_special_characters(new_name, name_len);
             this->coffStream->seek(0);
             this->coffStream->seek(section_data_start_offset + offset);
