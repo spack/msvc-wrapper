@@ -299,6 +299,7 @@ std::string LibraryFinder::FindLibrary(const std::string &lib_name, const std::s
     }
     this->EvalSearchPaths();
     if (this->evald_search_paths.empty()) {
+        std::cout << "No paths to search" << "\n";
         return std::string();
     }
     // next search env variable paths
