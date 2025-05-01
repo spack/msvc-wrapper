@@ -557,7 +557,7 @@ void CoffParser::NormalizeSectionNames(const std::string &name, char* section, c
             this->coffStream->seek(section_data_start_offset + offset);
             // Reduce name len by one to prevent writing out the null terminator
             // that is part of the new_name
-            this->coffStream->write(new_name, name_len-1);    
+            this->coffStream->write(new_name, name_len);    
             delete new_name;
             section_search_start += name_len+1;
             offset = section_search_start - section;                
