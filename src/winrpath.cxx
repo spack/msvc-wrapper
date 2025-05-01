@@ -286,6 +286,14 @@ void CoffReaderWriter::write(char * in, int size)
     this->pe_stream.write(in, size);
 }
 
+/**
+ * Flushes the CoffReaderWriter's underlying stream to disk
+ * 
+ * This is primarily useful in debuging to ensure immediate
+ * writes to disk rather than waiting for the buffer to overflow
+ * so that operations performed on the coff file can be validated
+ * in real time
+ */
 void CoffReaderWriter::flush()
 {
     this->pe_stream.flush();
