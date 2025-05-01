@@ -181,9 +181,6 @@ void StripPath(std::string &command) {
  */
 std::string GetSpackEnv(const char* env) {
     char* envVal = getenv(env);
-    if (envVal){
-        std::cout << "env val for env variable: " << env << " is: " << envVal << "\n";
-    }
     return envVal ? envVal : std::string();
 }
 
@@ -308,14 +305,10 @@ std::string LibraryFinder::FindLibrary(const std::string &lib_name, const std::s
     for (std::string var: this->search_vars) {
         std::vector<std::string> searchable_paths = this->evald_search_paths.at(var);
         for (std::string pth: searchable_paths) {
-            std::cout << "Searching path: " << pth << " for binary: " << lib_name << "\n";
             auto res = this->Finder(pth, lib_name);
             if (!res.empty()){
-                std::cout << "Found " << lib_name << " at: " << res << "\n";
                 return res;
             }
-            std::cout << lib_name << " not found at: " << pth << "\n";
-            std::cout << "searching from " << var << "\n";
         }
     }
     return std::string();
@@ -327,7 +320,6 @@ void LibraryFinder::EvalSearchPaths() {
     for (std::string var: this->search_vars) {
         std::string envVal = GetSpackEnv(var.c_str());
         if (!envVal.empty()) {
-            std::cout << "unable to process env val "<< var << "\n";
             this->evald_search_paths[var] = split(envVal, ";");
         }
             
