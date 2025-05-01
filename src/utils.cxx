@@ -181,7 +181,9 @@ void StripPath(std::string &command) {
  */
 std::string GetSpackEnv(const char* env) {
     char* envVal = getenv(env);
-    std::cout << "env val for env variable: " << env << " is: " << envVal << "\n";
+    if (envVal){
+        std::cout << "env val for env variable: " << env << " is: " << envVal << "\n";
+    }
     return envVal ? envVal : std::string();
 }
 
