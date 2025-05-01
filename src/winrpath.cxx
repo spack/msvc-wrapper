@@ -131,8 +131,8 @@ std::string mangle_name(const std::string &name)
     char * padded_path = pad_path(chr_abs_out, abs_out.length());
     mangled_abs_out = std::string(padded_path, MAX_NAME_LEN);
 
-    free(chr_abs_out);
-    free(padded_path);
+    delete chr_abs_out;
+    delete padded_path;
     return mangled_abs_out;
 }
 
@@ -284,6 +284,19 @@ void CoffReaderWriter::read(char * out, int size)
 void CoffReaderWriter::write(char * in, int size)
 {
     this->pe_stream.write(in, size);
+}
+
+/**
+ * Flushes the CoffReaderWriter's underlying stream to disk
+ * 
+ * This is primarily useful in debuging to ensure immediate
+ * writes to disk rather than waiting for the buffer to overflow
+ * so that operations performed on the coff file can be validated
+ * in real time
+ */
+void CoffReaderWriter::flush()
+{
+    this->pe_stream.flush();
 }
 
 
@@ -496,6 +509,62 @@ void CoffParser::ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *mem
 }
 
 
+void CoffParser::NormalizeLinkerMember(
+    const std::string &name,
+    const int &offset,
+    const int &base_offset,
+    const char * strings,
+    const DWORD symbols
+)
+{
+    int offset_with_header = base_offset + sizeof(IMAGE_ARCHIVE_MEMBER_HEADER);
+    int current_relative_offset = 0;
+    for(int j=0; j<symbols;++j) {
+        int name_len = strlen(strings+current_relative_offset);
+        char * new_name = new char[name_len+1];
+        strcpy(new_name, strings+current_relative_offset);
+        if(strstr(new_name, name.c_str())) {
+            replace_special_characters(new_name, name_len);
+            int foffset = offset_with_header + offset + current_relative_offset;
+            this->coffStream->seek(0);
+            this->coffStream->seek(foffset);
+            this->coffStream->write(new_name, name_len);                        
+        }
+        current_relative_offset += name_len+1;
+        delete new_name;
+    }
+}
+
+void CoffParser::NormalizeSectionNames(const std::string &name, char* section, const DWORD &section_data_start_offset, int data_size)
+{
+    int name_len = name.size();
+    char * section_search_start = section;
+    char * search_terminator = section+data_size;
+    ptrdiff_t offset = 0;
+    while(section_search_start && (section_search_start < search_terminator)) {
+        // findstr's final parameter takes the size of the search domain
+        // data_size defines the entire section, if a name is found in a section
+        // subsequent searches must take the offset of the located name into account
+        // respective to the size of the search domain
+        section_search_start = findstr(section_search_start, name.c_str(), data_size-offset);
+        if (section_search_start) {
+            // we found a name, rename
+            offset = section_search_start - section;
+            char * new_name = new char[name_len];
+            strncpy(new_name, section_search_start, name_len);
+            replace_special_characters(new_name, name_len);
+            this->coffStream->seek(0);
+            this->coffStream->seek(section_data_start_offset + offset);
+            // Reduce name len by one to prevent writing out the null terminator
+            // that is part of the new_name
+            this->coffStream->write(new_name, name_len);    
+            delete new_name;
+            section_search_start += name_len+1;
+            offset = section_search_start - section;                
+        }
+    }
+}
+
 /**
  * Normalizes mangled DLL names that represent absolute paths in COFF
  * binary files
@@ -516,11 +585,13 @@ bool CoffParser::NormalizeName(std::string &name)
     // i.e. in the section data, it can be found with both an extension and extensionless
     //  whereas in the symbol table or linker member strings, it's always found without an extension
     std::string name_no_ext = strip(name, ".dll");
-
+    // Flag allowing us to skip multiple attempts
+    // to rename the long names member this name
+    bool long_name_renamed = false;
     // Iterate through the parsed COFF members
     for (auto mem: this->coff.members) {
         int i = 0;
-        // import member names from spack are of the form "      /n" where n is their place
+        // import member names from spack are of the form "/n      " where n is their place
         // in the longnames member, other members are "/[/]        "
         // This allows us to determine if we're looking at an import member, and where the offset is
         // Non Spack no linker/longname members are of the form "    /name-of-dll"
@@ -539,7 +610,7 @@ bool CoffParser::NormalizeName(std::string &name)
             char* long_name = new char[long_name_len+1];
             strncpy(long_name, this->coff.members[2].member->data+longname_offset, long_name_len+1);
             // Ensure Dll name is the one we're looking to perform the rename for
-            if (!strcmp(name.c_str(), long_name)) {
+            if (!strcmp(name.c_str(), long_name) && !long_name_renamed) {
                 // If so, unmangle it
                 replace_special_characters(long_name, long_name_len+1);
                 // offset of actual longname member
@@ -550,6 +621,7 @@ bool CoffParser::NormalizeName(std::string &name)
                 // Seek to offset within longname member for a given import name
                 this->coffStream->seek(sizeof(IMAGE_ARCHIVE_MEMBER_HEADER) + longname_offset, std::ios_base::cur);
                 this->coffStream->write(long_name, long_name_len+1);
+                long_name_renamed = true;
             }
             delete long_name;
             // Import member name has been renamed
@@ -598,44 +670,7 @@ bool CoffParser::NormalizeName(std::string &name)
                     DWORD section_data_start_offset = std::streamoff(mem.offset) + sizeof(IMAGE_ARCHIVE_MEMBER_HEADER) + psec_header->PointerToRawData;
                     // section start is longmember section pointer + index
                     char * section = *(mem.member->long_member->section_data+j);
-                    // Make a copy of the pointer
-                    char * section_search_start = &*section;
-                    char * search_terminator = section+data_size;
-                    // search section data for full name
-                    int name_len = name.size();
-                    while(section_search_start && (section_search_start < search_terminator)) {
-                        section_search_start = findstr(section_search_start, name.c_str(), data_size);
-                        if (section_search_start) {
-                            // we found a name, rename
-                            ptrdiff_t section_data_offset = section_search_start - section;
-                            char * new_name = new char[name_len];
-                            strncpy(new_name, section_search_start, name_len);
-                            replace_special_characters(new_name, name_len);
-                            this->coffStream->seek(0);
-                            this->coffStream->seek(section_data_start_offset + section_data_offset);
-                            this->coffStream->write(new_name, name_len);
-                            delete new_name;   
-                            section_search_start += name_len+1;                   
-                        }
-                    }
-                    // search section data for extensionless name
-                    name_len = name_no_ext.size();
-                    section_search_start = &*section;
-                    while(section_search_start && (section_search_start < search_terminator)) {
-                        section_search_start = findstr(section_search_start, name_no_ext.c_str(), data_size);
-                        if (section_search_start) {
-                            // we found a name, rename
-                            ptrdiff_t offset = section_search_start - section;
-                            char * new_name = new char[name_len];
-                            strncpy(new_name, section_search_start, name_len);
-                            replace_special_characters(new_name, name_len);
-                            this->coffStream->seek(0);
-                            this->coffStream->seek(section_data_start_offset + offset);
-                            this->coffStream->write(new_name, name_len);    
-                            delete new_name;
-                            section_search_start += name_len+1;                
-                        }
-                    }
+                    this->NormalizeSectionNames(name_no_ext, section, section_data_start_offset, data_size);
                 }
                 // Section data rename is complete, now rename string table
                 int relative_string_table_start_offset = std::streamoff(mem.offset) + sizeof(IMAGE_ARCHIVE_MEMBER_HEADER) + mem.member->long_member->string_table_offset + sizeof(DWORD);
@@ -669,42 +704,14 @@ bool CoffParser::NormalizeName(std::string &name)
             // symbols section and search the symbols for our mangled dll name.
             // if found, replace with the unmangled version
             int base_offset = std::streamoff(mem.offset);
-            int offset_with_header = base_offset + sizeof(IMAGE_ARCHIVE_MEMBER_HEADER);
-            int current_relative_offset = 0;
             if (mem.member->first_link) {
                 int member_offset = sizeof(DWORD) + mem.member->first_link->symbols*sizeof(DWORD);
-                for (int j=0; j < mem.member->first_link->symbols; ++j) {
-                    int name_len = strlen(mem.member->first_link->strings+current_relative_offset);
-                    char * new_name = new char[name_len+1];
-                    strcpy(new_name, mem.member->first_link->strings+current_relative_offset);
-                    if(strstr(new_name, name_no_ext.c_str())) {
-                        replace_special_characters(new_name, name_len);
-                        int offset = offset_with_header + member_offset + current_relative_offset;
-                        this->coffStream->seek(0);
-                        this->coffStream->seek(offset);
-                        this->coffStream->write(new_name, name_len);
-                    }
-                    current_relative_offset += name_len+1;
-                    free(new_name);
-                }
+                this->NormalizeLinkerMember(name_no_ext, member_offset, base_offset, mem.member->first_link->strings, mem.member->first_link->symbols);
             }
             else {
                 // rename second linker member names
                 int member_offset = sizeof(DWORD) + sizeof(DWORD) * mem.member->second_link->members + sizeof(DWORD) + sizeof(WORD) * mem.member->second_link->symbols;
-                for(int j=0; j<mem.member->second_link->symbols;++j) {
-                    int name_len = strlen(mem.member->second_link->strings+current_relative_offset);
-                    char * new_name = new char[name_len+1];
-                    strcpy(new_name, mem.member->second_link->strings+current_relative_offset);
-                    if(strstr(new_name, name_no_ext.c_str())) {
-                        replace_special_characters(new_name, name_len);
-                        int offset = offset_with_header + member_offset + current_relative_offset;
-                        this->coffStream->seek(0);
-                        this->coffStream->seek(offset);
-                        this->coffStream->write(new_name, name_len);                        
-                    }
-                    current_relative_offset += name_len+1;
-                    free(new_name);
-                }
+                this->NormalizeLinkerMember(name_no_ext, member_offset, base_offset, mem.member->second_link->strings, mem.member->second_link->symbols);
             }
         }
         else if (!strncmp((char*)mem.header->Name, IMAGE_ARCHIVE_LONGNAMES_MEMBER, 16)){
