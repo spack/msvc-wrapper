@@ -542,6 +542,10 @@ void CoffParser::NormalizeSectionNames(const std::string &name, char* section, c
     char * search_terminator = section+data_size;
     ptrdiff_t offset = 0;
     while(section_search_start && (section_search_start < search_terminator)) {
+        // findstr's final parameter takes the size of the search domain
+        // data_size defines the entire section, if a name is found in a section
+        // subsequent searches must take the offset of the located name into account
+        // respective to the size of the search domain
         section_search_start = findstr(section_search_start, name.c_str(), data_size-offset);
         if (section_search_start) {
             // we found a name, rename
