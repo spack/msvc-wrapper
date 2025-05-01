@@ -294,8 +294,9 @@ std::string LibraryFinder::FindLibrary(const std::string &lib_name, const std::s
     // next search the CWD
     std::string cwd(GetCWD());
     auto res = this->Finder(cwd, lib_name);
-    if (!res.empty())
-        return res;
+    if (!res.empty()){
+        return res;        
+    }
     this->EvalSearchPaths();
     if (this->evald_search_paths.empty()) {
         return std::string();
@@ -304,9 +305,14 @@ std::string LibraryFinder::FindLibrary(const std::string &lib_name, const std::s
     for (std::string var: this->search_vars) {
         std::vector<std::string> searchable_paths = this->evald_search_paths.at(var);
         for (std::string pth: searchable_paths) {
+            std::cout << "Searching path: " << pth << " for binary: " << lib_name << "\n";
             auto res = this->Finder(pth, lib_name);
-            if (!res.empty())
+            if (!res.empty()){
+                std::cout << "Found " << lib_name << " at: " << res << "\n";
                 return res;
+            }
+            std::cout << lib_name << " not found at: " << pth << "\n";
+            std::cout << "searching from " << var << "\n";
         }
     }
     return std::string();
