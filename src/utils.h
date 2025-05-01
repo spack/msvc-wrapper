@@ -29,7 +29,7 @@ typedef std::vector<std::string> StrList;
 std::string GetSpackEnv(const char* env);
 std::string GetSpackEnv(const std::string &env);
 StrList GetEnvList(const std::string &envVar, const std::string &delim = ";");
-int ValidateSpackEnv();
+bool ValidateSpackEnv();
 
 // String helper methods adding cxx20 features to cxx14 //
 
