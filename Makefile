@@ -31,10 +31,10 @@ CFLAGS = $(BASE_CFLAGS) $(BUILD_CFLAGS) $(CLFLAGS)
 LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
 
 {src}.cxx{}.obj::
-	$(CC) /c $(CFLAGS) $(CVARS) /I:src $<	
+	"$(CC)" /c $(CFLAGS) $(CVARS) /I:src $<	
 
 {test}.cxx{test}.obj::
-	$(CC) /c $(CFLAGS) $(CVARS) /I:test $<
+	"$(CC)" /c $(CFLAGS) $(CVARS) /I:test $<
 
 all : install test
 
