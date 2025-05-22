@@ -99,6 +99,9 @@ std::map<std::string, std::string> ParseRelocate(const char ** args, int argc) {
             } 
             opts.insert(std::pair<std::string, std::string>("cmd", "deploy"));
         }
+        else if (!strcmp(args[i], "--debug") || !strcmp(args[i], "-d")) {
+            opts.insert(std::pair<std::string, std::string>("debug", "on"));
+        }
         else {
             // Unknown argument, warn the user it will not be used
             std::cerr << "Unknown argument :" << args[i] << "will be ignored\n";
@@ -183,6 +186,7 @@ bool print_help()
     std::cout << "                                                           dynamic library for exporting to build cache\n";
     std::cout << "                                                           or for extraction from bc onto new host system\n";
     std::cout << "          --report                                      = Report information about the parsed PE/Coff files\n";
+    std::cout << "          --debug                                       = Debug relocate run\n";
     std::cout << "\n";
     std::cout << "     To report on PE/COFF files, invoke the 'reporter' symlink to this executable or use the --report flag when invoking 'relocate'";
     std::cout << "\n";
