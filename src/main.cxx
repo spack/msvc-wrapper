@@ -26,6 +26,7 @@ int main(int argc, const char* argv[]) {
             && patch_args.at("cmd") == "deploy";
         bool report = !(patch_args.find("report") == patch_args.end());
         bool is_exe = endswith(patch_args.at("pe"), ".exe");
+        bool debug = !(patch_args.find("debug") == patch_args.end());
         // Without full with a DLL we re-produce the import lib from the
         // relocated DLL, but with an EXE there is nothing to do
         if (is_exe && !full)
@@ -33,6 +34,7 @@ int main(int argc, const char* argv[]) {
             std::cerr << "Executable file provided but --full not specified, nothing to do...\n";
             return 0;
         }
+        DEBUG = debug;
         LibRename rpath_lib(patch_args.at("pe"), full, deploy, true, report);
         if(!rpath_lib.ExecuteRename()){
             std::cerr << "Library rename failed\n";
@@ -58,9 +60,9 @@ int main(int argc, const char* argv[]) {
     }
     else {
         // Ensure required variables are set
-        if(!ValidateSpackEnv()) {
-            return -99;
-        }
+        // if(!ValidateSpackEnv()) {
+        //     return -99;
+        // }
         // Determine which tool we're trying to run
         std::unique_ptr<ToolChainInvocation> tchain(ToolChainFactory::ParseToolChain(argv));
         if(!tchain) {
