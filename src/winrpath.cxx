@@ -160,16 +160,31 @@ LinkerInvocation::LinkerInvocation(const StrList &linkLine)
 void LinkerInvocation::Parse()
 {
     for (auto token = this->tokens.begin(); token != this->tokens.end(); ++token) {
-        if (endswith(*token, ".lib")) {
+        std::string normalToken = *token;
+        lower(normalToken);
+        debug("token: " + normalToken);
+        // implib specifies the eventuall import libraries name
+        // and thus will contain a ".lib" extension, which
+        // the next check will process as a library argument
+        if (normalToken.find("implib:") != std::string::npos) {
+            // If there was nothing after the ":", the
+            // previous link command would have failed
+            // and : is not a legal character in a name
+            // guarantees this split command produces a vec of
+            // len 2
+            StrList implibLine = split(*token, ":");
+            this->implibname = implibLine[1];
+        }
+        else if (endswith(normalToken, ".lib")) {
             this->libs.push_back(*token);
         }
-        else if (*token == "/dll" || *token == "/DLL") {
+        else if (normalToken == "/dll" || normalToken == "-dll") {
             this->is_exe = false;
         }
-        else if (startswith(*token, "-out") || startswith(*token, "/out")) {
+        else if (startswith(normalToken, "-out") || startswith(normalToken, "/out")) {
             this->output = split(*token, ":")[1];
         }
-        else if (endswith(*token, ".obj")) {
+        else if (endswith(normalToken, ".obj")) {
             this->objs.push_back(*token);
         }
     }
@@ -178,11 +193,19 @@ void LinkerInvocation::Parse()
         this->output = strip(this->objs.front(), ".obj") + ext;
     }
     this->name = strip(this->output, ext);
+    if (this->implibname.empty()) {
+        this->implibname = this->name + ".lib";
+    }
 }
 
 std::string LinkerInvocation::get_name()
 {
     return this->name;
+}
+
+std::string LinkerInvocation::get_implib_name()
+{
+    return this->implibname;
 }
 
 std::string LinkerInvocation::get_out()

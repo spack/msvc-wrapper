@@ -205,10 +205,13 @@ public:
     std::string get_name();
     std::string get_out();
     std::string get_mangled_out();
+    std::string get_implib_name();
+    
 private:
     std::string line;
     StrList tokens;
     std::string name;
+    std::string implibname;
     std::string output;
     StrList libs;
     StrList objs;
