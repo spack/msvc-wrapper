@@ -33,9 +33,9 @@ int LdInvocation::InvokeToolchain()
     // We're creating a dll, we need to create an appropriate import lib
     if(!link_run.IsExeLink()) {
         std::string basename = link_run.get_name();
-        std::string imp_lib_name = strip(basename, ".dll") + ".lib";
+        std::string imp_lib_name = link_run.get_implib_name();
         std::string dll_name = link_run.get_mangled_out();
-        std::string abs_out_imp_lib_name = basename + ".dll-abs.lib";
+        std::string abs_out_imp_lib_name = imp_lib_name + ".dll-abs.lib";
         // create command line to generate new import lib
         this->rpath_executor = ExecuteCommand("lib.exe", this->ComposeCommandLists(
             {
@@ -58,7 +58,6 @@ int LdInvocation::InvokeToolchain()
         }
         std::remove(imp_lib_name.c_str());
         std::rename(abs_out_imp_lib_name.c_str(), imp_lib_name.c_str());
-
     }
     return ret_code;
 }
