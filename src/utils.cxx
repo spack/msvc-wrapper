@@ -162,8 +162,7 @@ void StripPathAndExe(std::string &command) {
 
 void StripExe(std::string &command) {
     // Normalize command to lowercase to avoid parsing issues
-    std::transform(command.begin(), command.end(), command.begin(),
-        [](unsigned char c){ return std::tolower(c); });
+    lower(command);
     std::string::size_type loc = command.rfind(".exe");
     if ( std::string::npos != loc && loc + 4 == command.length() )
         command.erase(loc);
@@ -171,6 +170,16 @@ void StripExe(std::string &command) {
 
 void StripPath(std::string &command) {
     command.erase(0, command.find_last_of("\\/") + 1);
+}
+
+/**
+ * Converts a string to lowercase
+ * 
+ * \arg str - string to be made lowercase
+ */
+void lower(std::string &str) {
+    std::transform(str.begin(), str.end(), str.begin(),
+        [](unsigned char c){ return std::tolower(c); });
 }
 
 
@@ -275,6 +284,16 @@ DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER &section_header, DWORD number_of_sec
     return 0;
 }
 
+
+void debug(std::string dbgStmt) {
+    if (DEBUG || getenv("SPACK_DEBUG_WRAPPER")) {
+        std::cout << "DEBUG: " << dbgStmt << "\n";
+    }
+}
+
+void debug(char * dbgStmt, int len) {
+    debug(std::string(dbgStmt, len));
+}
 
 std::string reportLastError()
 {

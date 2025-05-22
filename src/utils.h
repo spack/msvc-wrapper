@@ -78,6 +78,8 @@ void StripExe(std::string &command);
 // resulting in a parentless, non exe extensioned path
 void StripPathAndExe(std::string &command);
 
+void lower(std::string &str);
+
 // Implementation of strstr but serch is bounded at size and
 // does not terminate on the first read nullptr
 char * findstr(char * search_str, const char * substr, int size);
@@ -109,6 +111,12 @@ std::string reportLastError();
 // files in big endian format
 DWORD ToLittleEndian(DWORD val);
 
+// Operating Utils //
+
+void debug(std::string dbgStmt);
+
+void debug(char * dbgStmt, int len);
+
 /**
  * Library Searching utility class
  *  Collection of heuristics and logic surrounding library
@@ -132,3 +140,5 @@ public:
     std::string FindLibrary(const std::string &lib_name, const std::string &lib_path);
     void EvalSearchPaths();
 };
+
+static bool DEBUG = false;
