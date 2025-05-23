@@ -433,12 +433,10 @@ DWORD ToLittleEndian(DWORD val)
 
 int get_slash_name_length(std::string &slash_name)
 {
-    size_t pos = slash_name.find('/'); // Find the first occurrence of '/'
+    size_t pos = slash_name.find('/');
     if (pos == std::string::npos) {
-        // If '/' is not found, return the full length of the string (until null terminator)
         return (int)slash_name.length();
     } else {
-        // If '/' is found, return its position (which is the length before the slash)
         return (int)pos;
     }
 }
