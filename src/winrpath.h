@@ -177,7 +177,8 @@ class CoffParser {
 private:
     CoffReaderWriter* coffStream;
     coff coff;
-    void ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *member);
+    bool verified = false;
+    bool ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *member);
     void ParseShortImport(coff_member *member);
     void ParseFullImport(coff_member *member);
     void ParseFirstLinkerMember(coff_member *member);
@@ -186,13 +187,15 @@ private:
     void ReportShortImportMember(short_import_member *si);
     void NormalizeLinkerMember(const std::string &name, const int &base_offset, const int &offset, const char * strings, const DWORD symbols);
     void NormalizeSectionNames(const std::string &name, char* section, const DWORD &section_data_start_offset, int data_size);
-
+    bool ValidateLongName(coff_member *member, int size);
 public:
     CoffParser(CoffReaderWriter * cr);
     ~CoffParser() = default;
     bool Parse();
     bool NormalizeName(std::string &name);
     void Report();
+    int Verify();
+    static int Validate(std::string &coff);
 };
 
 class LinkerInvocation {

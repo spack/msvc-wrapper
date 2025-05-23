@@ -362,7 +362,10 @@ bool CoffParser::Parse()
         std::streampos offset = this->coffStream->tell();
         this->coffStream->ReadHeader(header);
         this->coffStream->ReadMember(header, member);
-        this->ParseData(header, member);
+        if (!this->ParseData(header, member)) {
+            this->verified = true;
+            return false;
+        }
         coff_entry entry;
         entry.header = header;
         entry.member = member;
@@ -377,6 +380,22 @@ bool CoffParser::Parse()
     this->coff.members = members;
     this->coffStream->clear();
     return true;
+}
+
+int CoffParser::Verify()
+{
+    bool parseStatus = this->Parse();
+    if(!parseStatus && !this->verified) {
+        // actual error in parsing the library
+        return 2;
+    }
+    else if(!parseStatus && this->verified) {
+        // library is valid, it's just a static
+        // lib, not an import
+        return 1;
+    }
+    // otherwise, successful, it's an import lib
+    return 0;
 }
 
 /**
@@ -514,7 +533,7 @@ void CoffParser::ParseSecondLinkerMember(coff_member *member)
  * \param header A pointer to the archive member header corresponding to the member being parsed
  * \param member A pointer to the member data being parsed
  */
-void CoffParser::ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *member)
+bool CoffParser::ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *member)
 {
     IMPORT_OBJECT_HEADER * p_imp_header = (IMPORT_OBJECT_HEADER *)member->data;
     if((p_imp_header->Sig1 == IMAGE_FILE_MACHINE_UNKNOWN) && (p_imp_header->Sig2 == IMPORT_OBJECT_HDR_SIG2)) {
@@ -522,6 +541,10 @@ void CoffParser::ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *mem
         this->ParseShortImport(member);
     }
     else if (!strncmp((char*)header->Name, IMAGE_ARCHIVE_LINKER_MEMBER, 16)) {
+        int nameLen = get_slash_name_length(std::string((char*)header->Name));
+        if(findstr((char*)header->Name, ".obj",nameLen)) {
+            return false;
+        }
         if (!this->coff.read_first_linker) {
             this->ParseFirstLinkerMember(member);
             this->coff.read_first_linker = true;
@@ -531,13 +554,31 @@ void CoffParser::ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *mem
         }
     }
     else if (!strncmp((char*)header->Name, IMAGE_ARCHIVE_LONGNAMES_MEMBER, 16)) {
-        // Long names member doesn't provide us anything useful to parse
-        // at this stage
-        return;
+        // Check the long names member for values, if so, check the extension has a dll
+        if (!this->ValidateLongName(member, atoi((char*)header->Size))) {
+            return false;
+        }
     }
     else {
         this->ParseFullImport(member);
     }
+}
+
+bool CoffParser::ValidateLongName(coff_member* member, int size)
+{
+    if (!member->data) {
+        // If we have no member, by virtue of correctly processing
+        // the header to get to this point
+        // we have a valid header
+        return true;
+    }
+    // If a name has an object file, this is not an import
+    // member
+    char * objRes = findstr(member->data, ".obj", size);
+    if (!objRes) {
+        return true;
+    }
+    return false;
 }
 
 
@@ -793,6 +834,13 @@ void CoffParser::Report()
             this->ReportShortImportMember(mem.member->short_member);
         }
     }
+}
+
+int CoffParser::Validate(std::string &coff)
+{
+    CoffReaderWriter cr(coff);
+    CoffParser coffp(&cr);
+    return coffp.Verify();
 }
 
 /**
