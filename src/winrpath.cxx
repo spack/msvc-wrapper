@@ -518,6 +518,17 @@ void CoffParser::ParseSecondLinkerMember(coff_member *member)
     member->second_link = sl;
 }
 
+
+namespace {
+    bool nameCheck(BYTE* name)
+    {
+        int nameLen = get_slash_name_length(std::string((char*)name));
+        if(findstr((char*)name, ".obj", nameLen)) {
+            return false;
+        }
+        return true;
+    }
+}
 /**
  * Drive the parsing of the "data" section of an import library member
  * 
@@ -540,8 +551,7 @@ bool CoffParser::ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *mem
         this->ParseShortImport(member);
     }
     else if (!strncmp((char*)header->Name, IMAGE_ARCHIVE_LINKER_MEMBER, 16)) {
-        int nameLen = get_slash_name_length(std::string((char*)header->Name));
-        if(findstr((char*)header->Name, ".obj", nameLen)) {
+        if(!nameCheck(header->Name)){
             return false;
         }
         if (!this->coff.read_first_linker) {
@@ -559,6 +569,9 @@ bool CoffParser::ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *mem
         }
     }
     else {
+        if(!nameCheck(header->Name)) {
+            return false;
+        }
         this->ParseFullImport(member);
     }
     return true;
