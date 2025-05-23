@@ -219,4 +219,3 @@ bool CheckAndPrintHelp(const char ** arg, int argc)
     return false;
 
 }
-
