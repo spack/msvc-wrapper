@@ -36,10 +36,13 @@ int LdInvocation::InvokeToolchain()
         std::string imp_lib_name = link_run.get_implib_name();
         std::string dll_name = link_run.get_mangled_out();
         std::string abs_out_imp_lib_name = imp_lib_name + ".dll-abs.lib";
+        std::string def_file = link_run.get_def_file();
+        std::string def_line = "-def";
+        def_line += !def_file.empty() ? ":" + def_file : "";
         // create command line to generate new import lib
         this->rpath_executor = ExecuteCommand("lib.exe", this->ComposeCommandLists(
             {
-                {"-def", "-name:" + dll_name, "-out:"+ abs_out_imp_lib_name},
+                {def_line, "-name:" + dll_name, "-out:"+ abs_out_imp_lib_name},
                 this->obj_args,
                 this->lib_args,
                 this->lib_dir_args,

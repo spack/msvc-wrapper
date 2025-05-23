@@ -187,6 +187,10 @@ void LinkerInvocation::Parse()
         else if (endswith(normalToken, ".obj")) {
             this->objs.push_back(*token);
         }
+        else if (normalToken.find("def:") != std::string::npos) {
+            StrList defLine = split(*token, ":");
+            this->def_file = defLine[1];
+        }
     }
     std::string ext = this->is_exe ? ".exe" : ".dll";
     if (this->output.empty()){
@@ -206,6 +210,11 @@ std::string LinkerInvocation::get_name()
 std::string LinkerInvocation::get_implib_name()
 {
     return this->implibname;
+}
+
+std::string LinkerInvocation::get_def_file()
+{
+    return this->def_file;
 }
 
 std::string LinkerInvocation::get_out()
