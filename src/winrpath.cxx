@@ -162,7 +162,6 @@ void LinkerInvocation::Parse()
     for (auto token = this->tokens.begin(); token != this->tokens.end(); ++token) {
         std::string normalToken = *token;
         lower(normalToken);
-        debug("token: " + normalToken);
         // implib specifies the eventuall import libraries name
         // and thus will contain a ".lib" extension, which
         // the next check will process as a library argument
@@ -542,7 +541,7 @@ bool CoffParser::ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *mem
     }
     else if (!strncmp((char*)header->Name, IMAGE_ARCHIVE_LINKER_MEMBER, 16)) {
         int nameLen = get_slash_name_length(std::string((char*)header->Name));
-        if(findstr((char*)header->Name, ".obj",nameLen)) {
+        if(findstr((char*)header->Name, ".obj", nameLen)) {
             return false;
         }
         if (!this->coff.read_first_linker) {

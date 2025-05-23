@@ -55,10 +55,15 @@ int LdInvocation::InvokeToolchain()
         }
         CoffReaderWriter cr(abs_out_imp_lib_name);
         CoffParser coff(&cr);
-        coff.Parse();
-        if(!coff.NormalizeName(dll_name)){
+        if(!coff.Parse()) {
+            debug("Failed to parse COFF file: " + abs_out_imp_lib_name);
             return -9;
         }
+        if(!coff.NormalizeName(dll_name)){
+            debug("Failed to normalize name for COFF file: " + abs_out_imp_lib_name);
+            return -9;
+        }
+        debug("Renaming library from " + abs_out_imp_lib_name + " to " + imp_lib_name);
         std::remove(imp_lib_name.c_str());
         std::rename(abs_out_imp_lib_name.c_str(), imp_lib_name.c_str());
     }
