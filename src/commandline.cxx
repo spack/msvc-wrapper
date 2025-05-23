@@ -37,7 +37,7 @@ int redefinedArgCheck(const std::map<std::string, std::string> &args, const char
 int checkArgumentPresence(const std::map<std::string, std::string> &args, const char * val, bool required = true)
 {
     if (args.find(val) == args.end()) {
-        std::cerr << "Warning! Argument (" << val << ") not present";
+        std::cerr << "Warning! Argument (" << val << ") not present\n";
         if (required) {
             return 0;
         }
@@ -66,6 +66,13 @@ std::map<std::string, std::string> ParseRelocate(const char ** args, int argc) {
             opts.insert(std::pair<std::string, std::string>("pe", args[i]));
         }
         else if (endswith((std::string)args[i], ".exe")) {
+            if(redefinedArgCheck(opts, "pe", "pe")) {
+                opts.clear();
+                return opts;
+            }
+            opts.insert(std::pair<std::string, std::string>("pe", args[i]));
+        }
+        else if (endswith((std::string)args[i], ".lib")) {
             if(redefinedArgCheck(opts, "pe", "pe")) {
                 opts.clear();
                 return opts;
@@ -107,7 +114,7 @@ std::map<std::string, std::string> ParseRelocate(const char ** args, int argc) {
         }
         else {
             // Unknown argument, warn the user it will not be used
-            std::cerr << "Unknown argument :" << args[i] << "will be ignored\n";
+            std::cerr << "Unknown argument: " << args[i] << " will be ignored\n";
         }
     }
     if(!checkArgumentPresence(opts, "pe")) {
