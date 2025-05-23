@@ -59,6 +59,9 @@ StrList split(const std::string &s, const std::string &delim);
 //Strips substr off the RHS of the larger string
 std::string strip(const std::string& s, const std::string &substr);
 
+//Strips substr of LHS of the larger string
+std::string lstrip(const std::string& s, const std::string &substr);
+
 // Joins vector of strings by join character
 std::string join(const StrList &strs, const std::string &join_char = " ");
 

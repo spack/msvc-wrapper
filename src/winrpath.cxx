@@ -1076,6 +1076,7 @@ LibRename::LibRename(std::string pe, bool full, bool deploy, bool replace, bool 
 {
     this->name = stem(this->pe);
     this->is_exe = endswith(this->pe, ".exe");
+    this->tmp_def_file = this->name + "-tmp.def";
     this->def_file = this->name + ".def";
     this->def_executor = ExecuteCommand("dumpbin.exe", {this->ComputeDefLine()});
     this->lib_executor = ExecuteCommand("lib.exe", {this->ComputeRenameLink()});
@@ -1089,7 +1090,7 @@ LibRename::LibRename(std::string pe, bool full, bool deploy, bool replace, bool 
  */
 std::string LibRename::ComputeDefLine()
 {
-    return "/EXPORTS " + this->pe;
+    return "/NOLOGO /EXPORTS " + this->pe;
 }
 
 /**
@@ -1098,9 +1099,51 @@ std::string LibRename::ComputeDefLine()
  * 
  * Returns the return code of the Def file computation operation
  */
-int LibRename::ComputeDefFile()
+bool LibRename::ComputeDefFile()
 {
-    return this->def_executor.Execute(this->def_file);
+    this->def_executor.Execute(this->tmp_def_file);
+    int res = this->def_executor.Join();
+    if(res) {
+        return false;
+    }
+    // Need to process the produced def file because it's wrong
+    // Open input file
+    std::ifstream inputFile(this->tmp_def_file);
+    if (!inputFile.is_open()) {
+        std::cerr << "Error: Could not open input file " << tmp_def_file << std::endl;
+        return false;
+    }
+
+    // Open output file
+    std::ofstream outputFile(this->def_file);
+    if (!outputFile.is_open()) {
+        std::cerr << "Error: Could not open output file " << this->def_file << std::endl;
+        return false;
+    }
+
+    // Write the standard .def file header
+    // You might want to get the DLL name dynamically from the input filename or dumpbin output
+    outputFile << "EXPORTS\n";
+
+    std::string line;
+    // First 8 lines are templated output
+    // skip them
+    for (int i = 0; i < 7; ++i) { // Adjust this number if the header changes across dumpbin versions
+        if (!std::getline(inputFile, line)) break;
+    }
+    while (std::getline(inputFile, line)) {
+        if (line.empty()) {
+            continue;
+        } 
+        else if(line.find("Summary") != std::string::npos) { // Skip header in export block if still present
+            break;
+        }
+        outputFile << "    " << lstrip(line, "            ") << std::endl;
+    }
+    inputFile.close();
+    outputFile.close();
+    std::remove(this->tmp_def_file.c_str());
+    return true;
 }
 
 /**
@@ -1132,10 +1175,12 @@ bool LibRename::ExecuteRename()
     // that case
     if(!this->deploy && !this->is_exe){
         // Extract DLL 
-        if(this->ComputeDefFile()) {
+        if(!this->ComputeDefFile()) {
+            debug("Failed to compute def file");
             return false;
         }
         if(!this->ExecuteLibRename()) {
+            debug("Failed to create and rename import lib");
             return false;
         }
     }
@@ -1162,9 +1207,12 @@ bool LibRename::ExecuteLibRename()
     this->lib_executor.Execute();
     int ret_code = this->lib_executor.Join();
     if(ret_code != 0) {
-        std::cerr << "Lib Rename failed" << reportLastError() << "\n";
+        std::cerr << "Lib Rename failed: " << reportLastError() << "\n";
         return false;
     }
+    // replace former .lib with renamed .lib
+    std::remove(this->pe.c_str());
+    std::rename(this->new_lib.c_str(), this->pe.c_str());
     // import library has been generated with
     // mangled abs path to dll -
     // unmangle it
@@ -1229,7 +1277,8 @@ std::string LibRename::ComputeRenameLink()
         this->new_lib = name + ".abs-name.lib";
     }
     else {
-        this->new_lib = this->pe;
+        // Name must be different
+        this->new_lib = this->name+"-tmp.lib";
     }
     line += "-out:\""+ this->new_lib + "\"" + " " + this->pe;
     return line;

@@ -229,7 +229,7 @@ public:
     bool ExecuteRename();
     bool ExecuteLibRename();
     bool ExecutePERename();
-    int ComputeDefFile();
+    bool ComputeDefFile();
     std::string ComputeRenameLink();
     std::string ComputeDefLine();
 
@@ -243,6 +243,7 @@ private:
     std::string name;
     std::string new_lib;
     std::string def_file;
+    std::string tmp_def_file;
     bool full;
     bool deploy;
     bool replace;
