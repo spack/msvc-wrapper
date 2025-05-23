@@ -561,6 +561,7 @@ bool CoffParser::ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *mem
     else {
         this->ParseFullImport(member);
     }
+    return true;
 }
 
 bool CoffParser::ValidateLongName(coff_member* member, int size)
