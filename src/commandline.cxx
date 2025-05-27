@@ -178,7 +178,7 @@ bool print_help()
     std::cout << "      In this case, the CLI of this wrapper is identical to cl|ifx|link.\n";
     std::cout << "      See https://learn.microsoft.com/en-us/cpp/build/reference/c-cpp-building-reference\n";
     std::cout << "\n";
-    std::cout << "      cl.exe /c foo.c";
+    std::cout << "      cl.exe /c foo.c\n";
     std::cout << "\n";
     std::cout << "     To preform relocation, invoke the 'relocate' symlink to this file:\n";
     std::cout << "\n";
@@ -203,6 +203,7 @@ bool print_help()
     std::cout << "\n";
     std::cout << "     Options:\n";
     std::cout << "         <path to file>                                 = Path to any PE or COFF file\n";
+    std::cout << "     To debug any flavor of this wrapper, set the environment variable SPACK_DEBUG_WRAPPER to any value in the wrapper context.\n";
     std::cout << "\n";
     return true;
 }
