@@ -22,7 +22,7 @@ PREFIX="$(MAKEDIR)\install\"
 !ENDIF
 
 !IF "$(BUILD_TYPE)" == "DEBUG"
-BUILD_CFLAGS = /Zi
+BUILD_CFLAGS = /Zi /fsanitize=address
 BUILD_LINK = /DEBUG
 !ENDIF
 
@@ -77,15 +77,34 @@ test_wrapper : build_and_check_test_sample
 	rmdir /q /s tmp_bin
 	cd ..
 
-test_relocate: build_and_check_test_sample
+test_relocate_exe: build_and_check_test_sample
 	cd tmp\test
 	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
 	move calc.dll ..\calc.dll
-	relocate.exe tester.exe --deploy --full
-	relocate.exe tester.exe --export --full
+	relocate.exe --pe tester.exe --deploy --full
+	relocate.exe --pe tester.exe --export --full
 	tester.exe
+	move ..\calc.dll calc.dll
+	cd ../..
 
-test: test_wrapper test_relocate 
+test_relocate_dll: build_and_check_test_sample
+	cd tmp/test
+	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
+	cd ..
+	mkdir tmp_bin
+	mkdir tmp_lib
+	move test\calc.dll tmp_bin\calc.dll
+	move test\calc.lib tmp_lib\calc.lib
+	test\relocate.exe --pe tmp_bin\calc.dll --coff tmp_lib\calc.lib --export
+	cd test
+	del tester.exe
+	link main.obj ..\tmp_lib\calc.lib /out:tester.exe
+	.\tester.exe
+
+test_and_cleanup: test clean-test
+
+
+test: test_wrapper test_relocate_exe test_relocate_dll
 
 
 clean : clean-test clean-cl
