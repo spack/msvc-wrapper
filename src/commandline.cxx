@@ -58,26 +58,12 @@ std::map<std::string, std::string> ParseRelocate(const char ** args, int argc) {
             }
             opts.insert(std::pair<std::string, std::string>("pe", args[++i]));
         }
-        else if (endswith((std::string)args[i], ".dll")) {
-            if(redefinedArgCheck(opts, "pe", "pe")) {
+        else if (!strcmp(args[i], "--coff")) {
+            if(redefinedArgCheck(opts, "coff", "--coff")) {
                 opts.clear();
                 return opts;
             }
-            opts.insert(std::pair<std::string, std::string>("pe", args[i]));
-        }
-        else if (endswith((std::string)args[i], ".exe")) {
-            if(redefinedArgCheck(opts, "pe", "pe")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("pe", args[i]));
-        }
-        else if (endswith((std::string)args[i], ".lib")) {
-            if(redefinedArgCheck(opts, "pe", "pe")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("pe", args[i]));
+            opts.insert(std::pair<std::string, std::string>("coff", args[++i]));
         }
         else if (!strcmp(args[i], "--full")) {
             if(redefinedArgCheck(opts, "full", "--full")) {
@@ -112,14 +98,13 @@ std::map<std::string, std::string> ParseRelocate(const char ** args, int argc) {
         else if (!strcmp(args[i], "--verify")) {
             opts.insert(std::pair<std::string, std::string>("verify", "on"));
         }
+        else if (!strcmp(args[i], "--report")) {
+            opts.insert(std::pair<std::string, std::string>("report", "report"));
+        }
         else {
             // Unknown argument, warn the user it will not be used
             std::cerr << "Unknown argument: " << args[i] << " will be ignored\n";
         }
-    }
-    if(!checkArgumentPresence(opts, "pe")) {
-        opts.clear();
-        return opts;
     }
     return opts;
 }
@@ -183,21 +168,26 @@ bool print_help()
     std::cout << "     To preform relocation, invoke the 'relocate' symlink to this file:\n";
     std::cout << "\n";
     std::cout << "      Options:\n";
-    std::cout << "          [--pe] <path to pe file>                     = PE file to be relocated\n";
+    std::cout << "          --pe <path to pe file>                       = PE (dll/exe) file to be relocated\n";
+    std::cout << "          [--coff <path to coff file>]                 = COFF (import library) file to be relocated\n";
+    std::cout << "                                                         If relocating an exe, this is not required.\n";
     std::cout << "          --full                                       = Relocate dynamic references inside\n";
-    std::cout << "                                                          the dll in addition to re-generating\n";
+    std::cout << "                                                          the pe in addition to re-generating\n";
     std::cout << "                                                          the import library\n";
     std::cout << "                                                          Note: this is assumed to be true if\n";
     std::cout << "                                                           relocating an executable.\n";
     std::cout << "                                                          If an executable is relocated, no import\n";
     std::cout << "                                                          library operations are performed.\n";
+    std::cout << "                                                          When relocating a DLL, the import library for\n";
+    std::cout << "                                                          said library is regenerated and the old imp lib\n";
+    std::cout << "                                                          replaced.\n";
     std::cout << "          --export|--deploy                             = Mutually exclusive command modifier.\n";
     std::cout << "                                                           Instructs relocate to either prepare the\n";
     std::cout << "                                                           dynamic library for exporting to build cache\n";
     std::cout << "                                                           or for extraction from bc onto new host system\n";
     std::cout << "          --report                                      = Report information about the parsed PE/Coff files\n";
     std::cout << "          --debug|-d                                    = Debug relocate run\n";
-    std::cout << "          --verify                                      = Validates that a file is an import library\n";
+    std::cout << "          --verify                                      = Validates that the given file 'pe' is an import library\n";
     std::cout << "\n";
     std::cout << "     To report on PE/COFF files, invoke the 'reporter' symlink to this executable or use the --report flag when invoking 'relocate'";
     std::cout << "\n";

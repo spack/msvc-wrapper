@@ -87,7 +87,7 @@ void lower(std::string &str);
 // Given a string containing something terminated by a 
 // forward slash, get the length of the substr terminated
 // by /
-int get_slash_name_length(std::string &slash_name);
+int get_slash_name_length(char *slash_name);
 
 // Implementation of strstr but serch is bounded at size and
 // does not terminate on the first read nullptr

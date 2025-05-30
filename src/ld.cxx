@@ -64,8 +64,16 @@ int LdInvocation::InvokeToolchain()
             return -9;
         }
         debug("Renaming library from " + abs_out_imp_lib_name + " to " + imp_lib_name);
-        std::remove(imp_lib_name.c_str());
-        std::rename(abs_out_imp_lib_name.c_str(), imp_lib_name.c_str());
+        int remove_exitcode = std::remove(imp_lib_name.c_str());
+        if(remove_exitcode) {
+            debug("Failed to remove original import library with exit code: " + remove_exitcode);
+            return -10;
+        }
+        int rename_exitcode = std::rename(abs_out_imp_lib_name.c_str(), imp_lib_name.c_str());
+        if(rename_exitcode) {
+            debug("Failed to rename temporary import library with exit code: " + rename_exitcode);
+            return -11;
+        }
     }
     return ret_code;
 }

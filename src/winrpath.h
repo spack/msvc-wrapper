@@ -92,8 +92,10 @@ typedef struct coff_member {
     first_linker_member *first_link;
     second_linker_member *second_link;
     bool is_short;
+    bool is_longname;
     coff_member() {
         this->is_short = false;
+        this->is_longname = false;
         this->first_link = NULL;
         this->second_link = NULL;
         this->short_member = NULL;
@@ -185,9 +187,12 @@ private:
     void ParseSecondLinkerMember(coff_member *member);
     void ReportLongImportMember(long_import_member *li);
     void ReportShortImportMember(short_import_member *si);
+    void ReportLongName(char * data);
     void NormalizeLinkerMember(const std::string &name, const int &base_offset, const int &offset, const char * strings, const DWORD symbols);
     void NormalizeSectionNames(const std::string &name, char* section, const DWORD &section_data_start_offset, int data_size);
     bool ValidateLongName(coff_member *member, int size);
+    void writeRename(char *name, const int size, const int loc);
+    bool validateName(char *old_name, std::string new_name);
 public:
     CoffParser(CoffReaderWriter * cr);
     ~CoffParser() = default;
@@ -225,7 +230,8 @@ private:
 
 class LibRename {
 public:
-    LibRename(std::string pe, bool full, bool deploy, bool replace, bool report);
+    LibRename(std::string pe, std::string coff, bool full, bool deploy, bool replace);
+    LibRename(std::string pe, bool full, bool deploy, bool replace);
     bool ExecuteRename();
     bool ExecuteLibRename();
     bool ExecutePERename();
@@ -240,7 +246,7 @@ private:
     ExecuteCommand def_executor;
     ExecuteCommand lib_executor;
     std::string pe;
-    std::string name;
+    std::string coff;
     std::string new_lib;
     std::string def_file;
     std::string tmp_def_file;
@@ -248,7 +254,6 @@ private:
     bool deploy;
     bool replace;
     bool is_exe;
-    bool report;
 };
 
 

@@ -25,22 +25,59 @@ int main(int argc, const char* argv[]) {
         bool deploy = !(patch_args.find("cmd") == patch_args.end()) 
             && patch_args.at("cmd") == "deploy";
         bool report = !(patch_args.find("report") == patch_args.end());
-        bool is_exe = endswith(patch_args.at("pe"), ".exe");
+        bool has_pe = !(patch_args.find("pe") == patch_args.end());
+        bool is_exe = has_pe ? endswith(patch_args.at("pe"), ".exe") : false;
         bool debug = !(patch_args.find("debug") == patch_args.end());
         bool is_validate = !(patch_args.find("verify") == patch_args.end());
+        bool has_coff = !(patch_args.find("coff") == patch_args.end());
         // Without full with a DLL we re-produce the import lib from the
         // relocated DLL, but with an EXE there is nothing to do
+        if(!has_coff && !has_pe) {
+            std::cout << "No binaries to operate on... nothing to do\n";
+            return -1;
+        }
         if (is_exe && !full)
         {
             std::cout << "Executable file provided but --full not specified, nothing to do...\n";
-            return 0;
+            return -1;
+        }
+        if (!is_exe && !has_coff) {
+            std::cout << "Attempting to relocate DLL without coff file, please provide a coff file.\n";
+            return -1;
+        }
+        if (is_validate && !has_coff) {
+            std::cout << "Attempting to validate without a coff file, nothing to validate\n";
+            return -1;
+        }
+        if (report && !has_coff) {
+            std::cout << "Attempting to report without a binary, nothing to report...\n";
+            return -1;
+        }
+        if (!(is_validate || report) && !has_pe) {
+            std:: cout << "Attempting to perform relocation without a PE file, please provide one.\n";
+            return -1;
         }
         if (is_validate) {
-            return CoffParser::Validate(patch_args.at("pe"));
+            return CoffParser::Validate(patch_args.at("coff"));
+        }
+        if (report) {
+            CoffReaderWriter cr(patch_args.at("coff"));
+            CoffParser coff(&cr);
+            if(!reportCoff(coff)) {
+                return 1;
+            }
+            return 0;
         }
         DEBUG = debug;
-        LibRename rpath_lib(patch_args.at("pe"), full, deploy, true, report);
-        if(!rpath_lib.ExecuteRename()){
+        std::unique_ptr<LibRename> rpath_lib;
+        if (has_coff)
+        {
+            rpath_lib = std::make_unique<LibRename>(patch_args.at("pe"), patch_args.at("coff"), full, deploy, true);
+        }
+        else {
+            rpath_lib = std::make_unique<LibRename>(patch_args.at("pe"), full, deploy, true);
+        }
+        if(!rpath_lib->ExecuteRename()){
             std::cerr << "Library rename failed\n";
             return 9;
         }

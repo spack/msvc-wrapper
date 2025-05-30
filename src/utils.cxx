@@ -244,7 +244,7 @@ std::string basename(const std::string &file)
 {
     std:size_t last_path = file.find_last_of("\\")+1;
     if (last_path == std::string::npos) {
-        return std::string();
+        return file;
     }
     return file.substr(last_path);
 }
@@ -431,14 +431,17 @@ DWORD ToLittleEndian(DWORD val)
     return little_endian_val;
 }
 
-int get_slash_name_length(std::string &slash_name)
+int get_slash_name_length(char *slash_name)
 {
-    size_t pos = slash_name.find('/');
-    if (pos == std::string::npos) {
-        return (int)slash_name.length();
-    } else {
-        return (int)pos;
+    if(slash_name == nullptr) {
+        return 0;
     }
+    int len = 0;
+    // Maximum length for a given name in the PE/COFF format is 143 chars
+    while(slash_name[len] != '/' && len < 144) {
+        ++len;
+    }
+    return len;
 }
 
 char * findstr(char *search_str, const char * substr, int size)

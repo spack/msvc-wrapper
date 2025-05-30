@@ -522,7 +522,7 @@ void CoffParser::ParseSecondLinkerMember(coff_member *member)
 namespace {
     bool nameCheck(BYTE* name)
     {
-        int nameLen = get_slash_name_length(std::string((char*)name));
+        int nameLen = get_slash_name_length((char*)name);
         if(findstr((char*)name, ".obj", nameLen)) {
             return false;
         }
@@ -567,6 +567,7 @@ bool CoffParser::ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *mem
         if (!this->ValidateLongName(member, atoi((char*)header->Size))) {
             return false;
         }
+        member->is_longname = true;
     }
     else {
         if(!nameCheck(header->Name)) {
@@ -639,16 +640,24 @@ void CoffParser::NormalizeSectionNames(const std::string &name, char* section, c
             char * new_name = new char[name_len];
             strncpy(new_name, section_search_start, name_len);
             replace_special_characters(new_name, name_len);
-            this->coffStream->seek(0);
-            this->coffStream->seek(section_data_start_offset + offset);
-            // Reduce name len by one to prevent writing out the null terminator
-            // that is part of the new_name
-            this->coffStream->write(new_name, name_len);    
+            this->writeRename(new_name, name_len, section_data_start_offset + offset);
             delete new_name;
             section_search_start += name_len+1;
             offset = section_search_start - section;                
         }
     }
+}
+
+void CoffParser::writeRename(char* name, const int size, const int loc)
+{
+    this->coffStream->seek(0);
+    this->coffStream->seek(loc);
+    this->coffStream->write(name, size);
+}
+
+bool CoffParser::validateName(char* old_name, std::string new_name)
+{
+    return !strcmp(old_name, new_name.c_str());
 }
 
 /**
@@ -695,18 +704,12 @@ bool CoffParser::NormalizeName(std::string &name)
             // We know it exists at this point due to the success of the conditional above
             char* long_name = new char[long_name_len+1];
             strncpy(long_name, this->coff.members[2].member->data+longname_offset, long_name_len+1);
-            // Ensure Dll name is the one we're looking to perform the rename for
-            if (!strcmp(name.c_str(), long_name) && !long_name_renamed) {
+            if (this->validateName(long_name, name) && !long_name_renamed) {
                 // If so, unmangle it
                 replace_special_characters(long_name, long_name_len+1);
                 // offset of actual longname member
                 int offset = std::streamoff(this->coff.members[2].offset);
-                this->coffStream->seek(0);
-                // Seek to longname header
-                this->coffStream->seek(offset);
-                // Seek to offset within longname member for a given import name
-                this->coffStream->seek(sizeof(IMAGE_ARCHIVE_MEMBER_HEADER) + longname_offset, std::ios_base::cur);
-                this->coffStream->write(long_name, long_name_len+1);
+                this->writeRename(long_name, long_name_len+1, offset + sizeof(IMAGE_ARCHIVE_MEMBER_HEADER) + longname_offset);
                 long_name_renamed = true;
             }
             delete long_name;
@@ -722,7 +725,7 @@ bool CoffParser::NormalizeName(std::string &name)
                 strcpy(new_name, mem.member->short_member->short_dll);
                 replace_special_characters(new_name, name_len);
                 // ensure it's the name we're looking to rename
-                if(!strcmp(name.c_str(), mem.member->short_member->short_dll)) {
+                if(this->validateName(mem.member->short_member->short_dll, name)) {
                     // Member offset in file
                     int offset = std::streamoff(mem.offset);
                     // Member header offset
@@ -733,9 +736,7 @@ bool CoffParser::NormalizeName(std::string &name)
                     // Next is the symbol name, which is a null terminated string
                     // +1 to preserve the null terminator in the coff member
                     offset += strlen(mem.member->short_member->short_name) + 1;
-                    this->coffStream->seek(0);
-                    this->coffStream->seek(offset);
-                    this->coffStream->write(new_name, strlen(new_name));
+                    this->writeRename(new_name, strlen(new_name), offset);
                 }
                 delete new_name;
             }
@@ -775,9 +776,7 @@ bool CoffParser::NormalizeName(std::string &name)
                             char * new_no_ext_name = new char[name_len];
                             strncpy(new_no_ext_name, string_table_start, name_len);
                             replace_special_characters(new_no_ext_name, name_len);
-                            this->coffStream->seek(0);
-                            this->coffStream->seek(relative_string_table_start_offset + offset);
-                            this->coffStream->write(new_no_ext_name, name_len);
+                            this->writeRename(new_no_ext_name, name_len, relative_string_table_start_offset + offset);
                             delete new_no_ext_name;
                         }
                     }
@@ -836,15 +835,16 @@ void CoffParser::ReportShortImportMember(short_import_member *si)
 }
 
 
+void CoffParser::ReportLongName(char * data)
+{
+    std::cout << "DLL: " << data << "\n";
+}
+
 void CoffParser::Report()
 {
     for (auto mem: this->coff.members) {
-        reportArchiveHeader(mem.header);
-        if(mem.member->long_member) {
-            this->ReportLongImportMember(mem.member->long_member);
-        }
-        else if(mem.member->short_member) {
-            this->ReportShortImportMember(mem.member->short_member);
+        if(mem.member->is_longname) {
+            this->ReportLongName(mem.member->data);
         }
     }
 }
@@ -1071,13 +1071,17 @@ bool LibRename::FindDllAndRename(HANDLE &pe_in)
  * \param replace a flag indicating if we're replacing the renamed import lib or making a copy with absolute dll names
  * \param report a flag indicating if we should be reporting the contents of the PE/COFF file we're parsing to stdout
 */
-LibRename::LibRename(std::string pe, bool full, bool deploy, bool replace, bool report)
+LibRename::LibRename(std::string pe, bool full, bool deploy, bool replace)
 : replace(replace), full(full), pe(pe), deploy(deploy)
+{}
+
+LibRename::LibRename(std::string pe, std::string coff, bool full, bool deploy, bool replace)
+: replace(replace), full(full), pe(pe), deploy(deploy), coff(coff)
 {
-    this->name = stem(this->pe);
     this->is_exe = endswith(this->pe, ".exe");
-    this->tmp_def_file = this->name + "-tmp.def";
-    this->def_file = this->name + ".def";
+    std::string coff_path = stem(this->coff);
+    this->tmp_def_file = coff_path + "-tmp.def";
+    this->def_file = coff_path + ".def";
     this->def_executor = ExecuteCommand("dumpbin.exe", {this->ComputeDefLine()});
     this->lib_executor = ExecuteCommand("lib.exe", {this->ComputeRenameLink()});
 }
@@ -1086,11 +1090,11 @@ LibRename::LibRename(std::string pe, bool full, bool deploy, bool replace, bool 
  * Creates the line to be provided to dumpbin.exe to produce the exports of a given
  * dll in the case where we do not have access to the original link line
  * 
- * Produces something like `/EXPORTS <name of pe file`
+ * Produces something like `/EXPORTS <name of coff file>`
  */
 std::string LibRename::ComputeDefLine()
 {
-    return "/NOLOGO /EXPORTS " + this->pe;
+    return "/NOLOGO /EXPORTS " + this->coff;
 }
 
 /**
@@ -1128,7 +1132,7 @@ bool LibRename::ComputeDefFile()
     std::string line;
     // First 8 lines are templated output
     // skip them
-    for (int i = 0; i < 7; ++i) { // Adjust this number if the header changes across dumpbin versions
+    for (int i = 0; i < 8; ++i) { // Adjust this number if the header changes across dumpbin versions
         if (!std::getline(inputFile, line)) break;
     }
     while (std::getline(inputFile, line)) {
@@ -1173,7 +1177,9 @@ bool LibRename::ExecuteRename()
     // recompute the .def and .lib for dlls
     // exes do not typically have import libs so we don't handle
     // that case
-    if(!this->deploy && !this->is_exe){
+    // We do not bother with defs for things that don't have
+    // import libraries
+    if(!this->deploy && !this->coff.empty()){
         // Extract DLL 
         if(!this->ComputeDefFile()) {
             debug("Failed to compute def file");
@@ -1187,7 +1193,7 @@ bool LibRename::ExecuteRename()
     if (this->full) {
         if(!this->ExecutePERename()) {
             std::cerr << "Unable to execute rename of "
-                "referenced components in PE file: " << this->name << "\n";
+                "referenced components in PE file: " << this->pe << "\n";
             return false;
         }
     }
@@ -1207,23 +1213,24 @@ bool LibRename::ExecuteLibRename()
     this->lib_executor.Execute();
     int ret_code = this->lib_executor.Join();
     if(ret_code != 0) {
-        std::cerr << "Lib Rename failed: " << reportLastError() << "\n";
+        std::cerr << "Lib Rename failed with exit code: " << ret_code << "\n";
         return false;
     }
     // replace former .lib with renamed .lib
-    std::remove(this->pe.c_str());
-    std::rename(this->new_lib.c_str(), this->pe.c_str());
+    std::remove(this->coff.c_str());
+    std::rename(this->new_lib.c_str(), this->coff.c_str());
     // import library has been generated with
     // mangled abs path to dll -
     // unmangle it
-    CoffReaderWriter cr(this->new_lib);
+    CoffReaderWriter cr(this->coff);
     CoffParser coff(&cr);
     if (!coff.Parse()) {
         std::cerr << "Unable to parse generated import library {" << this->new_lib <<"}\n";
         return false;
     }
-    if(!coff.NormalizeName(mangle_name(this->pe) )) {
-        std::cerr << "Unable to normalize name\n";
+    std::string mangledName = mangle_name(this->pe);
+    if(!coff.NormalizeName(mangledName)) {
+        std::cerr << "Unable to normalize name: " << mangledName << "\n";
         return false;
     }
     return true;
@@ -1235,10 +1242,10 @@ bool LibRename::ExecuteLibRename()
  */
 bool LibRename::ExecutePERename()
 {
-    LPCWSTR lib_name = ConvertAnsiToWide(this->pe).c_str();
-    HANDLE pe_handle = CreateFileW(lib_name, (GENERIC_READ|GENERIC_WRITE), FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    LPCWSTR pe_path = ConvertAnsiToWide(this->pe).c_str();
+    HANDLE pe_handle = CreateFileW(pe_path, (GENERIC_READ|GENERIC_WRITE), FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (!pe_handle || pe_handle == INVALID_HANDLE_VALUE){
-        std::cerr << "Unable to acquire file handle to "<< lib_name << ": " << reportLastError() << "\n";
+        std::cerr << "Unable to acquire file handle to "<< pe_path << ": " << reportLastError() << "\n";
         return false;
     }
     return this->FindDllAndRename(pe_handle);
@@ -1272,14 +1279,14 @@ std::string LibRename::ComputeRenameLink()
     line += this->def_file + " ";
     line += "-name:";
     line += mangle_name(this->pe) + " ";
-    std::string name(stem(this->pe));
+    std::string name(stem(this->coff));
     if (!this->replace){
         this->new_lib = name + ".abs-name.lib";
     }
     else {
         // Name must be different
-        this->new_lib = this->name+"-tmp.lib";
+        this->new_lib = name+"-tmp.lib";
     }
-    line += "-out:\""+ this->new_lib + "\"" + " " + this->pe;
+    line += "-out:\""+ this->new_lib + "\"";
     return line;
 }
