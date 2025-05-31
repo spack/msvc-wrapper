@@ -33,13 +33,16 @@ int LdInvocation::InvokeToolchain()
     // We're creating a dll, we need to create an appropriate import lib
     if(!link_run.IsExeLink()) {
         std::string basename = link_run.get_name();
-        std::string imp_lib_name = strip(basename, ".dll") + ".lib";
+        std::string imp_lib_name = link_run.get_implib_name();
         std::string dll_name = link_run.get_mangled_out();
-        std::string abs_out_imp_lib_name = basename + ".dll-abs.lib";
+        std::string abs_out_imp_lib_name = imp_lib_name + ".dll-abs.lib";
+        std::string def_file = link_run.get_def_file();
+        std::string def_line = "-def";
+        def_line += !def_file.empty() ? ":" + def_file : "";
         // create command line to generate new import lib
         this->rpath_executor = ExecuteCommand("lib.exe", this->ComposeCommandLists(
             {
-                {"-def", "-name:" + dll_name, "-out:"+ abs_out_imp_lib_name},
+                {def_line, "-name:" + dll_name, "-out:"+ abs_out_imp_lib_name},
                 this->obj_args,
                 this->lib_args,
                 this->lib_dir_args,
@@ -52,13 +55,25 @@ int LdInvocation::InvokeToolchain()
         }
         CoffReaderWriter cr(abs_out_imp_lib_name);
         CoffParser coff(&cr);
-        coff.Parse();
-        if(!coff.NormalizeName(dll_name)){
+        if(!coff.Parse()) {
+            debug("Failed to parse COFF file: " + abs_out_imp_lib_name);
             return -9;
         }
-        std::remove(imp_lib_name.c_str());
-        std::rename(abs_out_imp_lib_name.c_str(), imp_lib_name.c_str());
-
+        if(!coff.NormalizeName(dll_name)){
+            debug("Failed to normalize name for COFF file: " + abs_out_imp_lib_name);
+            return -9;
+        }
+        debug("Renaming library from " + abs_out_imp_lib_name + " to " + imp_lib_name);
+        int remove_exitcode = std::remove(imp_lib_name.c_str());
+        if(remove_exitcode) {
+            debug("Failed to remove original import library with exit code: " + remove_exitcode);
+            return -10;
+        }
+        int rename_exitcode = std::rename(abs_out_imp_lib_name.c_str(), imp_lib_name.c_str());
+        if(rename_exitcode) {
+            debug("Failed to rename temporary import library with exit code: " + rename_exitcode);
+            return -11;
+        }
     }
     return ret_code;
 }

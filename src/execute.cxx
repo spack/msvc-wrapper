@@ -92,6 +92,7 @@ int ExecuteCommand::CreateChildPipes()
 bool ExecuteCommand::ExecuteToolChainChild()
 {
     LPVOID lpMsgBuf;
+    debug("Executing Command: " + this->ComposeCLI());
     const std::wstring c_commandLine = ConvertAnsiToWide(this->ComposeCLI());
     wchar_t * nc_commandLine = _wcsdup(c_commandLine.c_str());
     if(! CreateProcessW(
@@ -118,6 +119,8 @@ bool ExecuteCommand::ExecuteToolChainChild()
             (LPTSTR) &lpMsgBuf,
             0, NULL
         );
+        std::cerr << "Failed to initiate child process from: " << ConvertWideToANSI(nc_commandLine) << " ";
+        std::cerr << "With error: ";
         std::cerr << (char*)lpMsgBuf << "\n";
         free(nc_commandLine);
         this->cpw_initalization_failure = true;
@@ -230,7 +233,7 @@ bool ExecuteCommand::Execute(const std::string &filename)
                                     NULL
                                     );
     }
-    int ret_code = this->ExecuteToolChainChild();
+    bool ret_code = this->ExecuteToolChainChild();
     if (ret_code) {
         this->child_out_future = std::async(std::launch::async, &ExecuteCommand::PipeChildToStdout, this);
         this->exit_code_future = std::async(std::launch::async, &ExecuteCommand::ReportExitCode, this);

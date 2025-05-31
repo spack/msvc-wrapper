@@ -6,6 +6,8 @@
 #include "toolchain.h"
 
 #include <sstream>
+#include <typeinfo>
+
 
 ToolChainInvocation::ToolChainInvocation(std::string command, char const* const* cli) :
     command(command)
@@ -42,10 +44,12 @@ int ToolChainInvocation::InvokeToolchain() {
     this->executor = ExecuteCommand(  this->command,
                                       commandLine
                                     );
+    debug("Setting up executor for " + std::string(typeid(*this).name()) + "toolchain");
+    debug("Toolchain: " + this->command);
     // Run first pass of command as requested by caller
     int ret_code = this->executor.Execute();
     if(!ret_code) {
-        std::cerr << "Unable to launch process \n";
+        std::cerr << "Unable to launch toolchain process \n";
         return -9999;
     }
     return this->executor.Join();
@@ -67,7 +71,7 @@ void ToolChainInvocation::ParseCommandArgs(char const* const* cli) {
             else
                 this->include_args.push_back(std::string(*(++c)));
         }
-        else if( endswith(arg, ".lib") )
+        else if( endswith(arg, ".lib") && (arg.find("implib:") == std::string::npos))
             // Lib args are just libraries
             // provided like system32.lib on the
             // command line.

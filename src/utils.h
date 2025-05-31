@@ -59,6 +59,9 @@ StrList split(const std::string &s, const std::string &delim);
 //Strips substr off the RHS of the larger string
 std::string strip(const std::string& s, const std::string &substr);
 
+//Strips substr of LHS of the larger string
+std::string lstrip(const std::string& s, const std::string &substr);
+
 // Joins vector of strings by join character
 std::string join(const StrList &strs, const std::string &join_char = " ");
 
@@ -77,6 +80,14 @@ void StripExe(std::string &command);
 // Drives both StripPath and StripExe on the same path
 // resulting in a parentless, non exe extensioned path
 void StripPathAndExe(std::string &command);
+
+// Make str lowercase
+void lower(std::string &str);
+
+// Given a string containing something terminated by a 
+// forward slash, get the length of the substr terminated
+// by /
+int get_slash_name_length(char *slash_name);
 
 // Implementation of strstr but serch is bounded at size and
 // does not terminate on the first read nullptr
@@ -109,6 +120,12 @@ std::string reportLastError();
 // files in big endian format
 DWORD ToLittleEndian(DWORD val);
 
+// Operating Utils //
+
+void debug(std::string dbgStmt);
+
+void debug(char * dbgStmt, int len);
+
 /**
  * Library Searching utility class
  *  Collection of heuristics and logic surrounding library
@@ -132,3 +149,5 @@ public:
     std::string FindLibrary(const std::string &lib_name, const std::string &lib_path);
     void EvalSearchPaths();
 };
+
+static bool DEBUG = false;
