@@ -1234,7 +1234,7 @@ bool LibRename::ExecuteLibRename()
     CoffReaderWriter cr(this->coff);
     CoffParser coff(&cr);
     int coffParseValid = coff.Verify();
-    if (!coffParseValid) {
+    if (coffParseValid) {
         std::cerr << "Unable to parse generated import library {" << this->new_lib << "}: ";
         std::string err = coffParseValid > 1 ? "Error parsing library\n" : "Library is static, not import\n";
         std::cerr << err;
