@@ -41,7 +41,9 @@ int main(int argc, const char* argv[]) {
             std::cout << "Executable file provided but --full not specified, nothing to do...\n";
             return -1;
         }
-        if (!is_exe && !has_coff) {
+        // The only scenario its ok to have a dll/exe and no coff is when we're creating a cache
+        // entry
+        if (!is_exe && !has_coff && !deploy) {
             std::cout << "Attempting to relocate DLL without coff file, please provide a coff file.\n";
             return -1;
         }
