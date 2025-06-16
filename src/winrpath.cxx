@@ -1130,10 +1130,12 @@ bool LibRename::ComputeDefFile()
     outputFile << "EXPORTS\n";
 
     std::string line;
-    // First 8 lines are templated output
-    // skip them
-    for (int i = 0; i < 8; ++i) { // Adjust this number if the header changes across dumpbin versions
-        if (!std::getline(inputFile, line)) break;
+    // Read until the output column titles
+    while (std::getline(inputFile, line)) {
+        std::string res = regexSearch(line, R"(ordinal\s+name)");
+        if (!res.empty()) {
+            break;
+        }
     }
     while (std::getline(inputFile, line)) {
         if (line.empty()) {
@@ -1142,7 +1144,7 @@ bool LibRename::ComputeDefFile()
         else if(line.find("Summary") != std::string::npos) { // Skip header in export block if still present
             break;
         }
-        outputFile << "    " << lstrip(line, "            ") << std::endl;
+        outputFile << "    " << regexReplace(line, R"(\s+)", "") << std::endl;
     }
     inputFile.close();
     outputFile.close();
