@@ -183,6 +183,92 @@ void lower(std::string &str) {
 }
 
 
+std::regex_constants::syntax_option_type composeRegexOptions(const std::vector<std::regex_constants::syntax_option_type> &opts)
+{    
+    std::regex_constants::syntax_option_type composedOpt;
+    if(opts.empty()) {
+        // Default option
+        composedOpt = std::regex_constants::syntax_option_type::ECMAScript;
+    }
+    for (std::regex_constants::syntax_option_type opt: opts){
+        composedOpt |= opt;
+    }
+    return composedOpt;
+}
+
+
+std::regex_constants::match_flag_type composeMatchTypes(const std::vector<std::regex_constants::match_flag_type> &flags)
+{
+    std::regex_constants::match_flag_type composedFlag;
+    if(flags.empty()) {
+        // Default option
+        composedFlag = std::regex_constants::match_flag_type::match_default;
+    }
+    for (std::regex_constants::match_flag_type flag: flags){
+        composedFlag |= flag;
+    }
+    return composedFlag;
+}
+
+std::string regexSearch(
+    const std::string &searchDomain, 
+    const std::string &regex, 
+    const std::vector<std::regex_constants::syntax_option_type> &opts = {}, 
+    const std::vector<std::regex_constants::match_flag_type> &flags = {}
+)
+{
+    std::string resultStr;
+    std::regex_constants::syntax_option_type opt = composeRegexOptions(opts);
+    std::regex_constants::match_flag_type flag = composeMatchTypes(flags);
+    std::regex reg(regex, opt);
+    std::smatch match;
+    if(!std::regex_search(searchDomain, match, reg, flag)){
+        resultStr = std::string();
+    }
+    else {
+        resultStr = match.str();
+    }
+    return resultStr;
+}
+
+
+std::string regexMatch(
+    const std::string &searchDomain,
+    const std::string &regex, 
+    const std::vector<std::regex_constants::syntax_option_type> &opts = {},
+    const std::vector<std::regex_constants::match_flag_type> &flags = {}
+)
+{
+    std::string resultStr;
+    std::regex_constants::syntax_option_type opt = composeRegexOptions(opts);
+    std::regex_constants::match_flag_type flag = composeMatchTypes(flags);
+    std::regex reg(regex, opt);
+    std::smatch match;
+    if(!std::regex_match(searchDomain, match, reg, flag)){
+        resultStr = std::string();
+    }
+    else {
+        resultStr = match.str();
+    }
+    return resultStr;
+}
+
+
+std::string regexReplace(
+    const std::string &replaceDomain, 
+    const std::string &regex, 
+    const std::string &replacement, 
+    const std::vector<std::regex_constants::syntax_option_type> &opts = {},
+    const std::vector<std::regex_constants::match_flag_type> &flags = {}
+)
+{
+    std::regex_constants::syntax_option_type opt = composeRegexOptions(opts);
+    std::regex_constants::match_flag_type flag = composeMatchTypes(flags);
+    std::regex reg(regex, opt);
+    return std::regex_replace(replaceDomain, reg, replacement);   
+}
+
+
 /**
  * Given an environment variable name
  * return the corresponding environment variable value

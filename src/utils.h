@@ -15,6 +15,8 @@
 #include <stdio.h>
 #include <strsafe.h>
 #include <cctype> 
+#include <regex>
+
 
 #include "version.h"
 
@@ -92,6 +94,32 @@ int get_slash_name_length(char *slash_name);
 // Implementation of strstr but serch is bounded at size and
 // does not terminate on the first read nullptr
 char * findstr(char * search_str, const char * substr, int size);
+
+/// @brief Searches a sections of a string for a given regex using provided
+///     options to control search behavior
+/// @param searchDomain - string to be searched
+/// @param regex - regex used to search
+/// @param opts - optional argument, list of regex tuning options to adapt the search behavior
+/// @return Character sequence matching search regex
+std::string regexSearch(const std::string &searchDomain, const std::string &regex, const std::vector<std::regex_constants::syntax_option_type> &opts = {}, const std::vector<std::regex_constants::match_flag_type> &flags = {});
+
+/// @brief Tries to match an entire string to a given regex using provided
+///     options to control match behavior
+/// @param searchDomain - string to be matched
+/// @param regex - regex used to match
+/// @param opts - optional argument, list of regex tuning options to adapt the match behavior
+/// @return Character sequence matching regex
+std::string regexMatch(const std::string &searchDomain, const std::string &regex, const std::vector<std::regex_constants::syntax_option_type> &opts = {}, const std::vector<std::regex_constants::match_flag_type> &flags = {});
+
+/// @brief Searches a string for a given regex using provided
+///     options to control search behavior, and if found, replaces
+///     discovered string with given replacement string
+/// @param searchDomain - string to be searched
+/// @param regex - regex used to search
+/// @param replacement - string used to replace regex matched result
+/// @param opts - optional argument, list of regex tuning options to adapt the search behavior
+/// @return Character sequence matching search regex
+std::string regexReplace(const std::string &replaceDomain, const std::string &regex, const std::string &replacement, const std::vector<std::regex_constants::syntax_option_type> &opts = {}, const std::vector<std::regex_constants::match_flag_type> &flags = {});
 
 // FS/Path helpers //
 
