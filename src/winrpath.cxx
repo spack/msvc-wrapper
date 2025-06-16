@@ -342,6 +342,12 @@ CoffParser::CoffParser(CoffReaderWriter * cr)
  * and then reads in the file, member by member, and parses the archive header and
  * member utilizing the appropriate scheme (as determine by the COFF scheme) and stores
  * the parsed information in the coffparser object.
+ * 
+ * This method sets CoffParser's "verified" attribute, which indicates we've successfully
+ * identified the type of library. True if we were able to determine library type, false if not
+ * 
+ * \return True if the file we're parsing is a legitimate import library
+ * False if its anything else or we've encountered an error/unexpectedly structured data
  */
 bool CoffParser::Parse()
 {
@@ -542,6 +548,7 @@ namespace {
  * 
  * \param header A pointer to the archive member header corresponding to the member being parsed
  * \param member A pointer to the member data being parsed
+ * \return True if data indicates an import library, False if the archive is a static library
  */
 bool CoffParser::ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *member)
 {
@@ -1163,7 +1170,7 @@ bool LibRename::ComputeDefFile()
  * 
  * On standard deployment, we don't do anything
  * On standard extraction, we want to regenerate the import library
- *  from our dll or exe pointing to the new location of the dll/exe
+ *  from our import library pointing to the new location of the dll/exe
  *  post buildcache extraction
  * 
  * On a full deployment, we mark the spack based DLL names in the binary
@@ -1226,8 +1233,11 @@ bool LibRename::ExecuteLibRename()
     // unmangle it
     CoffReaderWriter cr(this->coff);
     CoffParser coff(&cr);
-    if (!coff.Parse()) {
-        std::cerr << "Unable to parse generated import library {" << this->new_lib << "}\n";
+    int coffParseValid = coff.Verify();
+    if (!coffParseValid) {
+        std::cerr << "Unable to parse generated import library {" << this->new_lib << "}: ";
+        std::string err = coffParseValid > 1 ? "Error parsing library\n" : "Library is static, not import\n";
+        std::cerr << err;
         return false;
     }
     std::string mangledName = mangle_name(this->pe);
