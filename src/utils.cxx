@@ -227,8 +227,8 @@ std::regex_constants::match_flag_type composeMatchTypes(const std::vector<std::r
 std::string regexSearch(
     const std::string &searchDomain, 
     const std::string &regex, 
-    const std::vector<std::regex_constants::syntax_option_type> &opts = {}, 
-    const std::vector<std::regex_constants::match_flag_type> &flags = {}
+    const std::vector<std::regex_constants::syntax_option_type> &opts, 
+    const std::vector<std::regex_constants::match_flag_type> &flags
 )
 {
     std::string resultStr;
@@ -249,8 +249,8 @@ std::string regexSearch(
 std::string regexMatch(
     const std::string &searchDomain,
     const std::string &regex, 
-    const std::vector<std::regex_constants::syntax_option_type> &opts = {},
-    const std::vector<std::regex_constants::match_flag_type> &flags = {}
+    const std::vector<std::regex_constants::syntax_option_type> &opts,
+    const std::vector<std::regex_constants::match_flag_type> &flags
 )
 {
     std::string resultStr;
@@ -272,8 +272,8 @@ std::string regexReplace(
     const std::string &replaceDomain, 
     const std::string &regex, 
     const std::string &replacement, 
-    const std::vector<std::regex_constants::syntax_option_type> &opts = {},
-    const std::vector<std::regex_constants::match_flag_type> &flags = {}
+    const std::vector<std::regex_constants::syntax_option_type> &opts,
+    const std::vector<std::regex_constants::match_flag_type> &flags
 )
 {
     std::regex_constants::syntax_option_type opt = composeRegexOptions(opts);
