@@ -1225,7 +1225,7 @@ bool LibRename::ExecuteLibRename()
     CoffReaderWriter cr(this->coff);
     CoffParser coff(&cr);
     if (!coff.Parse()) {
-        std::cerr << "Unable to parse generated import library {" << this->new_lib <<"}\n";
+        std::cerr << "Unable to parse generated import library {" << this->new_lib << "}\n";
         return false;
     }
     std::string mangledName = mangle_name(this->pe);
@@ -1242,10 +1242,10 @@ bool LibRename::ExecuteLibRename()
  */
 bool LibRename::ExecutePERename()
 {
-    LPCWSTR pe_path = ConvertAnsiToWide(this->pe).c_str();
-    HANDLE pe_handle = CreateFileW(pe_path, (GENERIC_READ|GENERIC_WRITE), FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    std::wstring pe_path = ConvertAnsiToWide(this->pe);
+    HANDLE pe_handle = CreateFileW(pe_path.c_str(), (GENERIC_READ|GENERIC_WRITE), FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (!pe_handle || pe_handle == INVALID_HANDLE_VALUE){
-        std::cerr << "Unable to acquire file handle to "<< pe_path << ": " << reportLastError() << "\n";
+        std::cerr << "Unable to acquire file handle to "<< pe_path.c_str() << ": " << reportLastError() << "\n";
         return false;
     }
     return this->FindDllAndRename(pe_handle);
