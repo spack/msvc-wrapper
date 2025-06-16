@@ -56,6 +56,7 @@ setup_test: cl.exe
 	-@ if NOT EXIST "link.exe" mklink link.exe cl.exe
 	cd ..\..
 
+# smoke test - can the wrapper compile anything
 build_and_check_test_sample : setup_test
 	cd tmp\test
 	cl /c /EHsc ..\..\test\calc.cxx /DCALC_EXPORTS /I ..\..\test\include
@@ -65,6 +66,8 @@ build_and_check_test_sample : setup_test
 	tester.exe
 	cd ..\..
 
+# Test basic wrapper behavior - did the absolute path to the DLL get injected
+# into the executable
 test_wrapper : build_and_check_test_sample
 	cd tmp
 	move test\tester.exe .\tester.exe
@@ -77,6 +80,7 @@ test_wrapper : build_and_check_test_sample
 	rmdir /q /s tmp_bin
 	cd ..
 
+# Test relocating an executable - re-write internal paths to dlls
 test_relocate_exe: build_and_check_test_sample
 	cd tmp\test
 	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
@@ -87,6 +91,7 @@ test_relocate_exe: build_and_check_test_sample
 	move ..\calc.dll calc.dll
 	cd ../..
 
+# Test relocating a dll - re-write import library
 test_relocate_dll: build_and_check_test_sample
 	cd tmp/test
 	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
