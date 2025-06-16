@@ -162,8 +162,7 @@ void StripPathAndExe(std::string &command) {
 
 void StripExe(std::string &command) {
     // Normalize command to lowercase to avoid parsing issues
-    std::transform(command.begin(), command.end(), command.begin(),
-        [](unsigned char c){ return std::tolower(c); });
+    lower(command);
     std::string::size_type loc = command.rfind(".exe");
     if ( std::string::npos != loc && loc + 4 == command.length() )
         command.erase(loc);
@@ -171,6 +170,116 @@ void StripExe(std::string &command) {
 
 void StripPath(std::string &command) {
     command.erase(0, command.find_last_of("\\/") + 1);
+}
+
+/**
+ * Converts a string to lowercase
+ * 
+ * \arg str - string to be made lowercase
+ */
+void lower(std::string &str) {
+    std::transform(str.begin(), str.end(), str.begin(),
+        [](unsigned char c){ return std::tolower(c); });
+}
+
+
+std::string quoteAsNeeded(std::string &str) {
+    if (str.find_first_of(" &<>|()") != std::string::npos) {
+        // There are spaces or special characters in string, quote it
+        return "\"" + str + "\"";
+    }
+    return str;
+}
+
+
+void quoteList(StrList &args) {
+    std::transform(args.begin(), args.end(), args.begin(), quoteAsNeeded);
+}
+
+
+std::regex_constants::syntax_option_type composeRegexOptions(const std::vector<std::regex_constants::syntax_option_type> &opts)
+{    
+    std::regex_constants::syntax_option_type composedOpt;
+    if(opts.empty()) {
+        // Default option
+        composedOpt = std::regex_constants::syntax_option_type::ECMAScript;
+    }
+    for (std::regex_constants::syntax_option_type opt: opts){
+        composedOpt |= opt;
+    }
+    return composedOpt;
+}
+
+
+std::regex_constants::match_flag_type composeMatchTypes(const std::vector<std::regex_constants::match_flag_type> &flags)
+{
+    std::regex_constants::match_flag_type composedFlag;
+    if(flags.empty()) {
+        // Default option
+        composedFlag = std::regex_constants::match_flag_type::match_default;
+    }
+    for (std::regex_constants::match_flag_type flag: flags){
+        composedFlag |= flag;
+    }
+    return composedFlag;
+}
+
+std::string regexSearch(
+    const std::string &searchDomain, 
+    const std::string &regex, 
+    const std::vector<std::regex_constants::syntax_option_type> &opts, 
+    const std::vector<std::regex_constants::match_flag_type> &flags
+)
+{
+    std::string resultStr;
+    std::regex_constants::syntax_option_type opt = composeRegexOptions(opts);
+    std::regex_constants::match_flag_type flag = composeMatchTypes(flags);
+    std::regex reg(regex, opt);
+    std::smatch match;
+    if(!std::regex_search(searchDomain, match, reg, flag)){
+        resultStr = std::string();
+    }
+    else {
+        resultStr = match.str();
+    }
+    return resultStr;
+}
+
+
+std::string regexMatch(
+    const std::string &searchDomain,
+    const std::string &regex, 
+    const std::vector<std::regex_constants::syntax_option_type> &opts,
+    const std::vector<std::regex_constants::match_flag_type> &flags
+)
+{
+    std::string resultStr;
+    std::regex_constants::syntax_option_type opt = composeRegexOptions(opts);
+    std::regex_constants::match_flag_type flag = composeMatchTypes(flags);
+    std::regex reg(regex, opt);
+    std::smatch match;
+    if(!std::regex_match(searchDomain, match, reg, flag)){
+        resultStr = std::string();
+    }
+    else {
+        resultStr = match.str();
+    }
+    return resultStr;
+}
+
+
+std::string regexReplace(
+    const std::string &replaceDomain, 
+    const std::string &regex, 
+    const std::string &replacement, 
+    const std::vector<std::regex_constants::syntax_option_type> &opts,
+    const std::vector<std::regex_constants::match_flag_type> &flags
+)
+{
+    std::regex_constants::syntax_option_type opt = composeRegexOptions(opts);
+    std::regex_constants::match_flag_type flag = composeMatchTypes(flags);
+    std::regex reg(regex, opt);
+    return std::regex_replace(replaceDomain, reg, replacement);   
 }
 
 
@@ -235,7 +344,7 @@ std::string basename(const std::string &file)
 {
     std:size_t last_path = file.find_last_of("\\")+1;
     if (last_path == std::string::npos) {
-        return std::string();
+        return file;
     }
     return file.substr(last_path);
 }
@@ -275,6 +384,16 @@ DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER &section_header, DWORD number_of_sec
     return 0;
 }
 
+
+void debug(std::string dbgStmt) {
+    if (DEBUG || getenv("SPACK_DEBUG_WRAPPER")) {
+        std::cout << "DEBUG: " << dbgStmt << "\n";
+    }
+}
+
+void debug(char * dbgStmt, int len) {
+    debug(std::string(dbgStmt, len));
+}
 
 std::string reportLastError()
 {
@@ -410,6 +529,19 @@ DWORD ToLittleEndian(DWORD val)
     ((val & 0x0000FF00) << 8) | 
     (val << 24);
     return little_endian_val;
+}
+
+int get_slash_name_length(char *slash_name)
+{
+    if(slash_name == nullptr) {
+        return 0;
+    }
+    int len = 0;
+    // Maximum length for a given name in the PE/COFF format is 143 chars
+    while(slash_name[len] != '/' && len < 144) {
+        ++len;
+    }
+    return len;
 }
 
 char * findstr(char *search_str, const char * substr, int size)

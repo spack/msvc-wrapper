@@ -92,8 +92,10 @@ typedef struct coff_member {
     first_linker_member *first_link;
     second_linker_member *second_link;
     bool is_short;
+    bool is_longname;
     coff_member() {
         this->is_short = false;
+        this->is_longname = false;
         this->first_link = NULL;
         this->second_link = NULL;
         this->short_member = NULL;
@@ -177,22 +179,28 @@ class CoffParser {
 private:
     CoffReaderWriter* coffStream;
     coff coff;
-    void ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *member);
+    bool verified = false;
+    bool ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *member);
     void ParseShortImport(coff_member *member);
     void ParseFullImport(coff_member *member);
     void ParseFirstLinkerMember(coff_member *member);
     void ParseSecondLinkerMember(coff_member *member);
     void ReportLongImportMember(long_import_member *li);
     void ReportShortImportMember(short_import_member *si);
+    void ReportLongName(char * data);
     void NormalizeLinkerMember(const std::string &name, const int &base_offset, const int &offset, const char * strings, const DWORD symbols);
     void NormalizeSectionNames(const std::string &name, char* section, const DWORD &section_data_start_offset, int data_size);
-
+    bool ValidateLongName(coff_member *member, int size);
+    void writeRename(char *name, const int size, const int loc);
+    bool matchesName(char *old_name, std::string new_name);
 public:
     CoffParser(CoffReaderWriter * cr);
     ~CoffParser() = default;
     bool Parse();
     bool NormalizeName(std::string &name);
     void Report();
+    int Verify();
+    static int Validate(std::string &coff);
 };
 
 class LinkerInvocation {
@@ -205,10 +213,14 @@ public:
     std::string get_name();
     std::string get_out();
     std::string get_mangled_out();
+    std::string get_implib_name();
+    std::string get_def_file();
 private:
     std::string line;
     StrList tokens;
     std::string name;
+    std::string implibname;
+    std::string def_file;
     std::string output;
     StrList libs;
     StrList objs;
@@ -218,11 +230,12 @@ private:
 
 class LibRename {
 public:
-    LibRename(std::string pe, bool full, bool deploy, bool replace, bool report);
+    LibRename(std::string pe, std::string coff, bool full, bool deploy, bool replace);
+    LibRename(std::string pe, bool full, bool deploy, bool replace);
     bool ExecuteRename();
     bool ExecuteLibRename();
     bool ExecutePERename();
-    int ComputeDefFile();
+    bool ComputeDefFile();
     std::string ComputeRenameLink();
     std::string ComputeDefLine();
 
@@ -233,14 +246,14 @@ private:
     ExecuteCommand def_executor;
     ExecuteCommand lib_executor;
     std::string pe;
-    std::string name;
+    std::string coff;
     std::string new_lib;
     std::string def_file;
+    std::string tmp_def_file;
     bool full;
     bool deploy;
     bool replace;
     bool is_exe;
-    bool report;
 };
 
 

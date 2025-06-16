@@ -15,6 +15,8 @@
 #include <stdio.h>
 #include <strsafe.h>
 #include <cctype> 
+#include <regex>
+
 
 #include "version.h"
 
@@ -59,6 +61,9 @@ StrList split(const std::string &s, const std::string &delim);
 //Strips substr off the RHS of the larger string
 std::string strip(const std::string& s, const std::string &substr);
 
+//Strips substr of LHS of the larger string
+std::string lstrip(const std::string& s, const std::string &substr);
+
 // Joins vector of strings by join character
 std::string join(const StrList &strs, const std::string &join_char = " ");
 
@@ -78,9 +83,49 @@ void StripExe(std::string &command);
 // resulting in a parentless, non exe extensioned path
 void StripPathAndExe(std::string &command);
 
+// Make str lowercase
+void lower(std::string &str);
+
+// Given a string containing something terminated by a 
+// forward slash, get the length of the substr terminated
+// by /
+int get_slash_name_length(char *slash_name);
+
 // Implementation of strstr but serch is bounded at size and
 // does not terminate on the first read nullptr
 char * findstr(char * search_str, const char * substr, int size);
+
+// Adds quote to relevent strings in a list of strings
+// Strings to be quoted contain: spaces, or any of &<>|()
+// These are all legal path characters than have additional
+// side effects on Windows
+void quoteList(StrList &args);
+
+/// @brief Searches a sections of a string for a given regex using provided
+///     options to control search behavior
+/// @param searchDomain - string to be searched
+/// @param regex - regex used to search
+/// @param opts - optional argument, list of regex tuning options to adapt the search behavior
+/// @return Character sequence matching search regex
+std::string regexSearch(const std::string &searchDomain, const std::string &regex, const std::vector<std::regex_constants::syntax_option_type> &opts = {}, const std::vector<std::regex_constants::match_flag_type> &flags = {});
+
+/// @brief Tries to match an entire string to a given regex using provided
+///     options to control match behavior
+/// @param searchDomain - string to be matched
+/// @param regex - regex used to match
+/// @param opts - optional argument, list of regex tuning options to adapt the match behavior
+/// @return Character sequence matching regex
+std::string regexMatch(const std::string &searchDomain, const std::string &regex, const std::vector<std::regex_constants::syntax_option_type> &opts = {}, const std::vector<std::regex_constants::match_flag_type> &flags = {});
+
+/// @brief Searches a string for a given regex using provided
+///     options to control search behavior, and if found, replaces
+///     discovered string with given replacement string
+/// @param searchDomain - string to be searched
+/// @param regex - regex used to search
+/// @param replacement - string used to replace regex matched result
+/// @param opts - optional argument, list of regex tuning options to adapt the search behavior
+/// @return Character sequence matching search regex
+std::string regexReplace(const std::string &replaceDomain, const std::string &regex, const std::string &replacement, const std::vector<std::regex_constants::syntax_option_type> &opts = {}, const std::vector<std::regex_constants::match_flag_type> &flags = {});
 
 // FS/Path helpers //
 
@@ -109,6 +154,12 @@ std::string reportLastError();
 // files in big endian format
 DWORD ToLittleEndian(DWORD val);
 
+// Operating Utils //
+
+void debug(std::string dbgStmt);
+
+void debug(char * dbgStmt, int len);
+
 /**
  * Library Searching utility class
  *  Collection of heuristics and logic surrounding library
@@ -132,3 +183,5 @@ public:
     std::string FindLibrary(const std::string &lib_name, const std::string &lib_path);
     void EvalSearchPaths();
 };
+
+static bool DEBUG = false;

@@ -37,6 +37,7 @@ private:
     void SetupExecute();
     bool ExecuteToolChainChild();
     int PipeChildToStdout();
+    int PipeChildToStdErr();
     int CreateChildPipes();
     int CleanupHandles();
     int ReportExitCode();
@@ -44,15 +45,21 @@ private:
     // pipe from child process stdout
     // to parent std out or file
     std::future<int> child_out_future;
+    // Holds the exit code of the pipe
+    // from child to parent stderr
+    std::future<int> child_err_future;
     // Holds the exit code of the 
     // command wrapped by this class
     std::future<int> exit_code_future;
     std::string ComposeCLI();
     HANDLE ChildStdOut_Rd;
     HANDLE ChildStdOut_Wd;
+    HANDLE ChildStdErr_Rd;
+    HANDLE ChildStdErr_Wd;
     PROCESS_INFORMATION procInfo;
     STARTUPINFOW startInfo;
     SECURITY_ATTRIBUTES saAttr;
+    SECURITY_ATTRIBUTES saAttrErr;
     HANDLE fileout = INVALID_HANDLE_VALUE;
     bool write_to_file;
     bool cpw_initalization_failure = false;
