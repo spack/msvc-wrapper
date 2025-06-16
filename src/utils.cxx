@@ -183,6 +183,20 @@ void lower(std::string &str) {
 }
 
 
+std::string quoteAsNeeded(std::string &str) {
+    if (str.find_first_of(" &<>|()") != std::string::npos) {
+        // There are spaces or special characters in string, quote it
+        return "\"" + str + "\"";
+    }
+    return str;
+}
+
+
+void quoteList(StrList &args) {
+    std::transform(args.begin(), args.end(), args.begin(), quoteAsNeeded);
+}
+
+
 std::regex_constants::syntax_option_type composeRegexOptions(const std::vector<std::regex_constants::syntax_option_type> &opts)
 {    
     std::regex_constants::syntax_option_type composedOpt;

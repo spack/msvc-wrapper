@@ -95,6 +95,12 @@ int get_slash_name_length(char *slash_name);
 // does not terminate on the first read nullptr
 char * findstr(char * search_str, const char * substr, int size);
 
+// Adds quote to relevent strings in a list of strings
+// Strings to be quoted contain: spaces, or any of &<>|()
+// These are all legal path characters than have additional
+// side effects on Windows
+void quoteList(StrList &args);
+
 /// @brief Searches a sections of a string for a given regex using provided
 ///     options to control search behavior
 /// @param searchDomain - string to be searched
