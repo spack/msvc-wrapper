@@ -192,7 +192,7 @@ private:
     void NormalizeSectionNames(const std::string &name, char* section, const DWORD &section_data_start_offset, int data_size);
     bool ValidateLongName(coff_member *member, int size);
     void writeRename(char *name, const int size, const int loc);
-    bool validateName(char *old_name, std::string new_name);
+    bool matchesName(char *old_name, std::string new_name);
 public:
     CoffParser(CoffReaderWriter * cr);
     ~CoffParser() = default;

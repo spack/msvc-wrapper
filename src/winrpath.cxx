@@ -655,7 +655,7 @@ void CoffParser::writeRename(char* name, const int size, const int loc)
     this->coffStream->write(name, size);
 }
 
-bool CoffParser::validateName(char* old_name, std::string new_name)
+bool CoffParser::matchesName(char* old_name, std::string new_name)
 {
     return !strcmp(old_name, new_name.c_str());
 }
@@ -704,7 +704,7 @@ bool CoffParser::NormalizeName(std::string &name)
             // We know it exists at this point due to the success of the conditional above
             char* long_name = new char[long_name_len+1];
             strncpy(long_name, this->coff.members[2].member->data+longname_offset, long_name_len+1);
-            if (this->validateName(long_name, name) && !long_name_renamed) {
+            if (this->matchesName(long_name, name) && !long_name_renamed) {
                 // If so, unmangle it
                 replace_special_characters(long_name, long_name_len+1);
                 // offset of actual longname member
@@ -725,7 +725,7 @@ bool CoffParser::NormalizeName(std::string &name)
                 strcpy(new_name, mem.member->short_member->short_dll);
                 replace_special_characters(new_name, name_len);
                 // ensure it's the name we're looking to rename
-                if(this->validateName(mem.member->short_member->short_dll, name)) {
+                if(this->matchesName(mem.member->short_member->short_dll, name)) {
                     // Member offset in file
                     int offset = std::streamoff(mem.offset);
                     // Member header offset
