@@ -72,6 +72,7 @@ void ExecuteCommand::SetupExecute()
  */
 int ExecuteCommand::CreateChildPipes()
 {
+    // Create stdout pipes
     SECURITY_ATTRIBUTES saAttr;
     // Set the bInheritHandle flag so pipe handles are inherited.
     saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
@@ -80,8 +81,21 @@ int ExecuteCommand::CreateChildPipes()
     this->saAttr = saAttr;
     if( !CreatePipe(&this->ChildStdOut_Rd, &this->ChildStdOut_Wd, &saAttr, 0) )
         return 0;
-    if ( !SetHandleInformation(ChildStdOut_Rd, HANDLE_FLAG_INHERIT, 0) )
+    if ( !SetHandleInformation(this->ChildStdOut_Rd, HANDLE_FLAG_INHERIT, 0) )
         return 0;
+
+    // create stderr pipes
+    SECURITY_ATTRIBUTES saAttrErr;
+    // Set the bInheritHandle flag so pipe handles are inherited.
+    saAttrErr.nLength = sizeof(SECURITY_ATTRIBUTES);
+    saAttrErr.bInheritHandle = TRUE;
+    saAttrErr.lpSecurityDescriptor = NULL;
+    this->saAttrErr = saAttrErr;
+    if( !CreatePipe(&this->ChildStdErr_Rd, &this->ChildStdErr_Wd, &saAttrErr, 0) )
+        return 0;
+    if ( !SetHandleInformation(this->ChildStdErr_Rd, HANDLE_FLAG_INHERIT, 0) )
+        return 0;
+
     return 1;
 }
 
@@ -134,6 +148,38 @@ bool ExecuteCommand::ExecuteToolChainChild()
     CloseHandle(this->ChildStdOut_Wd);
     return true;
 }
+
+
+/* 
+ * Reads for the member variable holding a pipe to the wrapped processes'
+ * STDERR and writes either to this processes' STDERR or a file, depending on
+ * how the process wrapper is configured
+ */
+int ExecuteCommand::PipeChildToStdErr()
+{
+    DWORD dwRead, dwWritten;
+    CHAR chBuf[BUFSIZE];
+    BOOL bSuccess = TRUE;
+    HANDLE hParentOut;
+    if (this->write_to_file) {
+        hParentOut = this->fileout;
+    }
+    else {
+        hParentOut = GetStdHandle(STD_ERROR_HANDLE);
+    }
+
+    for (;;)
+    {
+        bSuccess = ReadFile( this->ChildStdErr_Rd, chBuf, BUFSIZE, &dwRead, NULL);
+        if( ! bSuccess || dwRead == 0 ) break;
+
+        bSuccess = WriteFile(hParentOut, chBuf,
+                            dwRead, &dwWritten, NULL);
+        if (! bSuccess ) break;
+    }
+    return !bSuccess;
+}
+
 
 /* 
  * Reads for the member variable holding a pipe to the wrapped processes'
@@ -236,6 +282,7 @@ bool ExecuteCommand::Execute(const std::string &filename)
     bool ret_code = this->ExecuteToolChainChild();
     if (ret_code) {
         this->child_out_future = std::async(std::launch::async, &ExecuteCommand::PipeChildToStdout, this);
+        this->child_err_future = std::async(std::launch::async, &ExecuteCommand::PipeChildToStdErr, this);
         this->exit_code_future = std::async(std::launch::async, &ExecuteCommand::ReportExitCode, this);
     }
     return ret_code;
@@ -248,6 +295,8 @@ bool ExecuteCommand::Execute(const std::string &filename)
 int ExecuteCommand::Join()
 {
     if(!this->child_out_future.get())
+        return -999;
+    if(!this->child_err_future.get())
         return -999;
     return this->exit_code_future.get();
 }
