@@ -188,6 +188,13 @@ std::string quoteAsNeeded(std::string &str) {
         // There are spaces or special characters in string, quote it
         return "\"" + str + "\"";
     }
+    if (str.find_first_of("\"") != std::string::npos) {
+        // If there are escaped quotes in input
+        // We need to escape them as well as we're adding another
+        // layer of indirection between builder and compiler
+        std::regex pattern("\"");
+        return std::regex_replace(str, pattern, "\\\"");
+    }
     return str;
 }
 

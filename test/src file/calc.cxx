@@ -3,7 +3,12 @@
  *
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
+
+#if defined(CALC_HEADER)
+#include CALC_HEADER /* "calc.h" */
+#else
 #include "calc.h"
+#endif
 
 extern "C" int add(int a, int b)
 {
