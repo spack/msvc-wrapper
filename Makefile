@@ -59,7 +59,7 @@ setup_test: cl.exe
 # smoke test - can the wrapper compile anything
 build_and_check_test_sample : setup_test
 	cd tmp\test
-	cl /c /EHsc ..\..\test\calc.cxx /DCALC_EXPORTS /I ..\..\test\include
+	cl /c /EHsc "..\..\test\src file\calc.cxx" /DCALC_EXPORTS /I ..\..\test\include
 	cl /c /EHsc ..\..\test\main.cxx /I ..\..\test\include
 	link $(LFLAGS) calc.obj /out:calc.dll /DLL
 	link $(LFLAGS) main.obj calc.lib /out:tester.exe
