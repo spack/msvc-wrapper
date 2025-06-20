@@ -22,7 +22,7 @@ PREFIX="$(MAKEDIR)\install\"
 !ENDIF
 
 !IF "$(BUILD_TYPE)" == "DEBUG"
-BUILD_CFLAGS = /Zi /fsanitize=address
+BUILD_CFLAGS = /Zi
 BUILD_LINK = /DEBUG
 !ENDIF
 
