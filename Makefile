@@ -22,7 +22,7 @@ PREFIX="$(MAKEDIR)\install\"
 !ENDIF
 
 !IF "$(BUILD_TYPE)" == "DEBUG"
-BUILD_CFLAGS = /Zi /fsanitize=address
+BUILD_CFLAGS = /Zi
 BUILD_LINK = /DEBUG
 !ENDIF
 
@@ -57,9 +57,12 @@ setup_test: cl.exe
 	cd ..\..
 
 # smoke test - can the wrapper compile anything
+# tests:
+# * space in a path - preserved by quoted arguments
+# * escaped quoted arguments
 build_and_check_test_sample : setup_test
 	cd tmp\test
-	cl /c /EHsc ..\..\test\calc.cxx /DCALC_EXPORTS /I ..\..\test\include
+	cl /c /EHsc "..\..\test\src file\calc.cxx" /DCALC_EXPORTS /DCALC_HEADER=\"calc.h\" /I ..\..\test\include
 	cl /c /EHsc ..\..\test\main.cxx /I ..\..\test\include
 	link $(LFLAGS) calc.obj /out:calc.dll /DLL
 	link $(LFLAGS) main.obj calc.lib /out:tester.exe
