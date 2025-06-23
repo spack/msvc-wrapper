@@ -57,8 +57,9 @@ setup_test: cl.exe
 	cd ..\..
 
 # smoke test - can the wrapper compile anything
-# tests a space in a path, quoted arguments, and escaped quoted arguments to ensure
-# all can be processed correctly
+# tests:
+# * space in a path - preserved by quoted arguments
+# * escaped quoted arguments
 build_and_check_test_sample : setup_test
 	cd tmp\test
 	cl /c /EHsc "..\..\test\src file\calc.cxx" /DCALC_EXPORTS /DCALC_HEADER=\"calc.h\" /I ..\..\test\include
