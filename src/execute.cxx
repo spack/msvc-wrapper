@@ -161,7 +161,7 @@ int ExecuteCommand::PipeChildToStdErr()
     CHAR chBuf[BUFSIZE];
     BOOL bSuccess = TRUE;
     HANDLE hParentOut;
-    if (this->write_to_file) {
+    if (this->write_to_file && this->fileout != INVALID_HANDLE_VALUE) {
         hParentOut = this->fileout;
     }
     else {
@@ -171,10 +171,11 @@ int ExecuteCommand::PipeChildToStdErr()
     for (;;)
     {
         bSuccess = ReadFile( this->ChildStdErr_Rd, chBuf, BUFSIZE, &dwRead, NULL);
-        if( ! bSuccess || dwRead == 0 ) break;
-
-        bSuccess = WriteFile(hParentOut, chBuf,
-                            dwRead, &dwWritten, NULL);
+        if( ! bSuccess || (dwRead == 0 && this->terminated) ) break;
+        if(dwRead != 0) {
+            bSuccess = WriteFile(hParentOut, chBuf,
+                dwRead, &dwWritten, NULL);
+        }
         if (! bSuccess ) break;
     }
     return !bSuccess;
@@ -192,7 +193,7 @@ int ExecuteCommand::PipeChildToStdout()
     CHAR chBuf[BUFSIZE];
     BOOL bSuccess = TRUE;
     HANDLE hParentOut;
-    if (this->write_to_file) {
+    if (this->write_to_file && this->fileout != INVALID_HANDLE_VALUE) {
         hParentOut = this->fileout;
     }
     else {
@@ -202,10 +203,11 @@ int ExecuteCommand::PipeChildToStdout()
     for (;;)
     {
         bSuccess = ReadFile( this->ChildStdOut_Rd, chBuf, BUFSIZE, &dwRead, NULL);
-        if( ! bSuccess || dwRead == 0 ) break;
-
-        bSuccess = WriteFile(hParentOut, chBuf,
-                            dwRead, &dwWritten, NULL);
+        if( ! bSuccess || (dwRead == 0 && this->terminated) ) break;
+        if(dwRead != 0){
+            bSuccess = WriteFile(hParentOut, chBuf,
+                                dwRead, &dwWritten, NULL);
+        }
         if (! bSuccess ) break;
     }
     return !bSuccess;
@@ -242,6 +244,7 @@ int ExecuteCommand::ReportExitCode()
         if(exit_code != STILL_ACTIVE)
             break;
     }
+    this->terminated = true;
     CloseHandle(this->procInfo.hProcess);
     return exit_code;
 }
@@ -294,9 +297,14 @@ bool ExecuteCommand::Execute(const std::string &filename)
  */
 int ExecuteCommand::Join()
 {
+    // Allow primary command to conclude
+    // ensures stdout and stderr readers
+    // exit only once primary command process
+    // has concluded
+    int commandError = this->exit_code_future.get();
     if(!this->child_out_future.get())
         return -999;
     if(!this->child_err_future.get())
         return -999;
-    return this->exit_code_future.get();
+    return commandError;
 }
