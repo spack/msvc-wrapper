@@ -12,6 +12,7 @@
 #include <cwchar>
 #include <fstream>
 #include "shlwapi.h"
+#include <regex>
 
 //////////////////////////////////////////////////////////
 // String helper methods adding cxx20 features to cxx14 //
