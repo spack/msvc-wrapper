@@ -108,11 +108,19 @@ test_relocate_dll: build_and_check_test_sample
 	del tester.exe
 	link main.obj ..\tmp_lib\calc.lib /out:tester.exe
 	.\tester.exe
+	cd ../..
+
+test_pipe_overflow: build_and_check_test_sample
+	set SPACK_CC_TMP=%SPACK_CC%
+	set SPACK_CC=$(MAKEDIR)\test\lots-of-output.bat
+	cl /c /EHsc "test\src file\calc.cxx"
+
+
 
 test_and_cleanup: test clean-test
 
 
-test: test_wrapper test_relocate_exe test_relocate_dll
+test: test_wrapper test_relocate_exe test_relocate_dll test_pipe_overflow
 
 
 clean : clean-test clean-cl
@@ -128,4 +136,5 @@ clean-cl :
 	del cl.exe
 
 clean-test:
-	rmdir /q /s tmp
+	-@ if EXIST "tmp" rmdir /q /s "tmp"
+	
