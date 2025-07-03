@@ -114,8 +114,17 @@ test_pipe_overflow: build_and_check_test_sample
 	set SPACK_CC_TMP=%SPACK_CC%
 	set SPACK_CC=$(MAKEDIR)\test\lots-of-output.bat
 	cl /c /EHsc "test\src file\calc.cxx"
+	set SPACK_CC=%SPACK_CC_TMP%
+
+build_zerowrite_test: test\writezero.obj
+	link $(LFLAGS) $** Shlwapi.lib /out:writezero.exe
 
 
+test_zerowrite: build_zerowrite_test
+	set SPACK_CC_TMP=%SPACK_CC%
+	set SPACK_CC=$(MAKEDIR)\writezero.exe
+	cl /c EHsc "test\src file\calc.cxx"
+	set SPACK_CC=%SPACK_CC_TMP%
 
 test_and_cleanup: test clean-test
 
