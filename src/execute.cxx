@@ -191,6 +191,7 @@ int ExecuteCommand::PipeChildToStdErr()
                     }
                     bSuccess = WriteFile(hParentOut, partialBuf,
                                         dwRead, &dwWritten, NULL);
+                    delete partialBuf;
                     if (! bSuccess) break;
                     currentPos += dwWritten;
                 }
@@ -252,6 +253,7 @@ int ExecuteCommand::PipeChildToStdout()
                     }
                     bSuccess = WriteFile(hParentOut, partialBuf,
                                         dwRead, &dwWritten, NULL);
+                    delete partialBuf;
                     if (! bSuccess) break;
                     currentPos += dwWritten;
                 }
