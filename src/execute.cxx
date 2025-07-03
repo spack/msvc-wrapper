@@ -224,6 +224,14 @@ int ExecuteCommand::PipeChildToStdout()
     for (;;)
     {
         bSuccess = ReadFile( this->ChildStdOut_Rd, chBuf, BUFSIZE, &dwRead, NULL);
+        // Typically dwRead == 0 indicates the writer end of the pipe has ceased writing
+        // however if the writer were to invoke WriteFile with a size of 0, dwRead would
+        // be 0 but the writer would not have terminated. 
+        // As such we need an explicit indication the writer process has termianted.
+        // From the MSVC docs:
+        // If the lpNumberOfBytesRead parameter is zero when ReadFile returns TRUE on a pipe,
+        // the other end of the pipe called the WriteFile function with nNumberOfBytesToWrite 
+        // set to zero.
         if( ! bSuccess || (dwRead == 0 && this->terminated) ) break;
         if(dwRead != 0){
             bSuccess = WriteFile(hParentOut, chBuf,
