@@ -353,6 +353,9 @@ int ExecuteCommand::Join()
     // ensures stdout and stderr readers
     // exit only once primary command process
     // has concluded
+    // The child and std err pipe readers
+    // will not terminate under normal conditions
+    // unless this process concludes and sets the terminate flag
     int commandError = this->exit_code_future.get();
     if(!this->child_out_future.get())
         return -999;
