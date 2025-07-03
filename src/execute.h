@@ -61,8 +61,9 @@ private:
     SECURITY_ATTRIBUTES saAttr;
     SECURITY_ATTRIBUTES saAttrErr;
     HANDLE fileout = INVALID_HANDLE_VALUE;
-    bool write_to_file;
+    bool write_to_file = false;
     bool cpw_initalization_failure = false;
+    bool terminated = false;
     std::string base_command;
     StrList command_args;
 };
