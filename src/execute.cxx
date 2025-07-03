@@ -250,6 +250,7 @@ int ExecuteCommand::PipeChildToStdout()
                 break;
             }
         }
+        if (! bSuccess ) break;
     }
     return !bSuccess;
 }
