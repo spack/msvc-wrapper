@@ -171,6 +171,8 @@ int ExecuteCommand::PipeChildToStdErr()
     for (;;)
     {
         bSuccess = ReadFile( this->ChildStdErr_Rd, chBuf, BUFSIZE, &dwRead, NULL);
+        // For an explanation behind the use of termianted here
+        // see the docstring on pipechildtostdout
         if( ! bSuccess || (dwRead == 0 && this->terminated) ) break;
         if(dwRead != 0) {
             bSuccess = WriteFile(hParentOut, chBuf,
