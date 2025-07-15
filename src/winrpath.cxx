@@ -190,6 +190,13 @@ void LinkerInvocation::Parse()
             StrList defLine = split(*token, ":");
             this->def_file = defLine[1];
         }
+        else if (startswith(normalToken, "@") && endswith(normalToken, ".rsp")) {
+            // RSP files are used to describe object files, libraries, other CLI
+            // Switches relevant to the tool the rsp file is being passed to
+            // Primarily utilized by CMake and MSBuild projects to bypass
+            // Command line length limits
+            this->rsp_file = *token;
+        }
     }
     std::string ext = this->is_exe ? ".exe" : ".dll";
     if (this->output.empty()){
@@ -214,6 +221,11 @@ std::string LinkerInvocation::get_implib_name()
 std::string LinkerInvocation::get_def_file()
 {
     return this->def_file;
+}
+
+std::string LinkerInvocation::get_rsp_file()
+{
+    return this->rsp_file;
 }
 
 std::string LinkerInvocation::get_out()

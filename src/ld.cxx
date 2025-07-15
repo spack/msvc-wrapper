@@ -43,6 +43,7 @@ int LdInvocation::InvokeToolchain()
         this->rpath_executor = ExecuteCommand("lib.exe", this->ComposeCommandLists(
             {
                 {def_line, "-name:" + dll_name, "-out:"+ abs_out_imp_lib_name},
+                {link_run.get_rsp_file()},
                 this->obj_args,
                 this->lib_args,
                 this->lib_dir_args,
