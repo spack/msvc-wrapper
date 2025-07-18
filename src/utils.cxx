@@ -541,7 +541,6 @@ std::string mangle_name(const std::string& name) {
  *  \param name string to check for path characters
  */
 bool hasPathCharacters(const std::string& name) {
-    using PathCharMap = std::map<char, char>::const_iterator;
     for (auto it = path_to_special_characters.begin();
          it != path_to_special_characters.end(); ++it) {
         if (!(name.find(it->first) == std::string::npos)) {
@@ -549,6 +548,17 @@ bool hasPathCharacters(const std::string& name) {
         }
     }
     return false;
+}
+
+bool SpackInstalledLib(const std::string& lib) {
+    const std::string prefix = GetSpackEnv("SPACK_INSTALL_PREFIX");
+    if (prefix.empty()) {
+        debug(
+            "Unable to determine Spack install prefix, SPACK_INSTALL_PREFIX "
+            "unset");
+        return false;
+    }
+    return startswith(lib, prefix);
 }
 
 LibraryFinder::LibraryFinder() : search_vars{"SPACK_RELOCATE_PATH"} {}
