@@ -135,6 +135,18 @@ std::string GetCWD();
 // Returns boolean indication whether pth is absolute
 bool IsPathAbsolute(const std::string &pth);
 
+bool hasPathCharacters(const std::string &name);
+
+std::string mangle_name(const std::string &name);
+
+int get_padding_length(const std::string &name);
+
+char * pad_path(const char *pth, DWORD str_size, DWORD bsize = MAX_NAME_LEN);
+
+void replace_path_characters(char in[], int len);
+
+void replace_special_characters(char in[], int len);
+
 // File and File handle helpers //
 
 // Returns File offset given RVA
@@ -187,5 +199,17 @@ public:
     std::string FindLibrary(const std::string &lib_name, const std::string &lib_path);
     void EvalSearchPaths();
 };
+
+const std::map<char, char> special_character_to_path{
+    {'|', '\\'},
+    {';', ':'}
+};
+
+const std::map<char, char> path_to_special_characters{
+    {'\\', '|'},
+    {'/', '|'},
+    {':', ';'}
+};
+
 
 static bool DEBUG = false;
