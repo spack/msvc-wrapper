@@ -555,6 +555,14 @@ bool hasPathCharacters(const std::string &name) {
     return false;
 }
 
+bool SpackInstalledLib(const std::string &lib) {
+    const std::string prefix = GetSpackEnv("SPACK_INSTALL_PREFIX");
+    if (prefix.empty()) {
+        debug("Unable to determine Spack install prefix, SPACK_INSTALL_PREFIX unset");
+        return false;
+    }
+    return startswith(lib, prefix);
+}
 
 LibraryFinder::LibraryFinder() : search_vars{"SPACK_RELOCATE_PATH"} {}
 
