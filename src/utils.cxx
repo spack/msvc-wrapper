@@ -508,6 +508,20 @@ int get_padding_length(const std::string& name) {
     return count;
 }
 
+std::string strip_padding(const std::string &lib)
+{
+    // One of the padding characters is a legitimate
+    // path separator
+    int pad_len = get_padding_length(lib)-1;
+    // Capture the drive and drive separator
+    std::string::const_iterator p = lib.cbegin();
+    std::string::const_iterator e = lib.cbegin()+2;
+    std::string stripped_drive(p, e);
+    e = e + pad_len;
+    std::string path_remainder(e, lib.end());
+    return stripped_drive + path_remainder;
+}
+
 /**
  * Mangles a string representing a path to have no path characters
  *  instead path characters (i.e. \\, :, etc) are replaced with
@@ -558,7 +572,8 @@ bool SpackInstalledLib(const std::string& lib) {
             "unset");
         return false;
     }
-    return startswith(lib, prefix);
+    std::string stripped_lib = strip_padding(lib);
+    startswith(stripped_lib, prefix);
 }
 
 LibraryFinder::LibraryFinder() : search_vars{"SPACK_RELOCATE_PATH"} {}
