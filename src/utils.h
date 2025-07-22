@@ -147,6 +147,8 @@ void replace_path_characters(char in[], int len);
 
 void replace_special_characters(char in[], int len);
 
+bool SpackInstalledLib(const std::string &lib);
+
 // File and File handle helpers //
 
 // Returns File offset given RVA

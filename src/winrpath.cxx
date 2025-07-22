@@ -829,6 +829,9 @@ bool LibRename::RenameDll(char* name_loc, const std::string &dll_path)
         }
     }
     else {
+        if(SpackInstalledLib(dll_path)) {
+            return true;
+        }
         std::string file_name = basename(dll_path);
         if(file_name.empty()) {
             std::cerr << "Unable to extract filename from dll for relocation" << "\n";
