@@ -472,7 +472,7 @@ void replace_path_characters(char in[], int len)
  *                  null terminators.
  * \param bsize the lengh of the padding to add
  */
-char * pad_path(const char *pth, DWORD str_size, DWORD bsize = MAX_NAME_LEN)
+char * pad_path(const char *pth, DWORD str_size, DWORD bsize)
 {
     size_t extended_buf = bsize - str_size + 2;
     char * padded_path = new char[bsize+1];
@@ -545,7 +545,9 @@ std::string mangle_name(const std::string &name)
  *  \param name string to check for path characters
  */
 bool hasPathCharacters(const std::string &name) {
-    for(std::map<char, char>::const_iterator it = path_to_special_characters.begin(); it != path_to_special_characters.end(); ++it){
+    typedef std::map<char, char>::const_iterator PathCharMap;
+    for(PathCharMap it = path_to_special_characters.begin();
+                it != path_to_special_characters.end(); ++it){
         if(!(name.find(it->first) == std::string::npos)){
             return true;
         }
