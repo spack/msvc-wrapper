@@ -56,8 +56,10 @@ void ToolChainInvocation::ParseCommandArgs(char const* const* cli) {
     // Collect include args as we need to ensure Spack
     // Includes come first
     for (char const* const* co = cli; *co; co++) {
-        std::string const arg = std::string(*co);
-        if (startswith(arg, "/I") || startswith(arg, "-I")) {
+        std::string norm_arg = std::string(*co);
+        const std::string arg = std::string(*co);
+        lower(norm_arg);
+        if (isCommandArg(norm_arg, "i")) {
             // We have an include arg
             // can have an optional space
             // check if there are characters after
@@ -69,8 +71,8 @@ void ToolChainInvocation::ParseCommandArgs(char const* const* cli) {
                 this->include_args.push_back(arg);
                 this->include_args.emplace_back(*(++co));
             }
-        } else if (endswith(arg, ".lib") &&
-                   (arg.find("implib:") == std::string::npos))
+        } else if (endswith(norm_arg, ".lib") &&
+                   (norm_arg.find("implib:") == std::string::npos))
             // Lib args are just libraries
             // provided like system32.lib on the
             // command line.
@@ -78,10 +80,11 @@ void ToolChainInvocation::ParseCommandArgs(char const* const* cli) {
             // on MSVC but this is useful for filtering system libs
             // and adding all libs
             this->lib_args.push_back(arg);
-        else if (endswith(arg, ".obj"))
+        else if (endswith(norm_arg, ".obj"))
             this->obj_args.push_back(arg);
-        else
+        else {
             this->command_args.push_back(arg);
+        }
     }
 }
 
