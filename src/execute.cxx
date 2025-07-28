@@ -161,7 +161,7 @@ int ExecuteCommand::PipeChildToStdErr()
     CHAR chBuf[BUFSIZE];
     BOOL bSuccess = TRUE;
     HANDLE hParentOut;
-    if (this->write_to_file) {
+    if (this->write_to_file && this->fileout != INVALID_HANDLE_VALUE) {
         hParentOut = this->fileout;
     }
     else {
@@ -171,10 +171,35 @@ int ExecuteCommand::PipeChildToStdErr()
     for (;;)
     {
         bSuccess = ReadFile( this->ChildStdErr_Rd, chBuf, BUFSIZE, &dwRead, NULL);
-        if( ! bSuccess || dwRead == 0 ) break;
-
-        bSuccess = WriteFile(hParentOut, chBuf,
-                            dwRead, &dwWritten, NULL);
+        // For an explanation behind the use of termianted here
+        // see the docstring on pipechildtostdout
+        if( ! bSuccess || (dwRead == 0 && this->terminated) ) break;
+        if(dwRead != 0) {
+            bSuccess = WriteFile(hParentOut, chBuf,
+                                dwRead, &dwWritten, NULL);
+            if (dwWritten < dwRead && bSuccess){
+                // incomplete write but not a failure
+                // since bSuccess is true
+                // So lets write until bSuccess is false or
+                // until all bytes are written
+                int currentPos = dwWritten;
+                while((dwWritten < dwRead) || dwWritten == 0) {
+                    dwRead = dwRead - dwWritten;
+                    CHAR * partialBuf = new CHAR[dwRead];
+                    for(int i = 0; i < dwRead; ++i) {
+                        partialBuf[i] = chBuf[currentPos + i];
+                    }
+                    bSuccess = WriteFile(hParentOut, partialBuf,
+                                        dwRead, &dwWritten, NULL);
+                    delete partialBuf;
+                    if (! bSuccess) break;
+                    currentPos += dwWritten;
+                }
+            }
+            if (! bSuccess ) {
+                break;
+            }
+        }
         if (! bSuccess ) break;
     }
     return !bSuccess;
@@ -192,7 +217,7 @@ int ExecuteCommand::PipeChildToStdout()
     CHAR chBuf[BUFSIZE];
     BOOL bSuccess = TRUE;
     HANDLE hParentOut;
-    if (this->write_to_file) {
+    if (this->write_to_file && this->fileout != INVALID_HANDLE_VALUE) {
         hParentOut = this->fileout;
     }
     else {
@@ -202,10 +227,41 @@ int ExecuteCommand::PipeChildToStdout()
     for (;;)
     {
         bSuccess = ReadFile( this->ChildStdOut_Rd, chBuf, BUFSIZE, &dwRead, NULL);
-        if( ! bSuccess || dwRead == 0 ) break;
-
-        bSuccess = WriteFile(hParentOut, chBuf,
-                            dwRead, &dwWritten, NULL);
+        // Typically dwRead == 0 indicates the writer end of the pipe has ceased writing
+        // however if the writer were to invoke WriteFile with a size of 0, dwRead would
+        // be 0 but the writer would not have terminated. 
+        // As such we need an explicit indication the writer process has termianted.
+        // From the MSVC docs:
+        // If the lpNumberOfBytesRead parameter is zero when ReadFile returns TRUE on a pipe,
+        // the other end of the pipe called the WriteFile function with nNumberOfBytesToWrite 
+        // set to zero.
+        if( ! bSuccess || (dwRead == 0 && this->terminated) ) break;
+        if(dwRead != 0){
+            bSuccess = WriteFile(hParentOut, chBuf,
+                                dwRead, &dwWritten, NULL);
+            if (dwWritten < dwRead && bSuccess){
+                // incomplete write but not a failure
+                // since bSuccess is true
+                // So lets write until bSuccess is false or
+                // until all bytes are written
+                int currentPos = dwWritten;
+                while((dwWritten < dwRead) || dwWritten == 0) {
+                    dwRead = dwRead - dwWritten;
+                    CHAR * partialBuf = new CHAR[dwRead];
+                    for(int i = 0; i < dwRead; ++i) {
+                        partialBuf[i] = chBuf[currentPos + i];
+                    }
+                    bSuccess = WriteFile(hParentOut, partialBuf,
+                                        dwRead, &dwWritten, NULL);
+                    delete partialBuf;
+                    if (! bSuccess) break;
+                    currentPos += dwWritten;
+                }
+            }
+            if (! bSuccess ) {
+                break;
+            }
+        }
         if (! bSuccess ) break;
     }
     return !bSuccess;
@@ -242,6 +298,7 @@ int ExecuteCommand::ReportExitCode()
         if(exit_code != STILL_ACTIVE)
             break;
     }
+    this->terminated = true;
     CloseHandle(this->procInfo.hProcess);
     return exit_code;
 }
@@ -294,9 +351,16 @@ bool ExecuteCommand::Execute(const std::string &filename)
  */
 int ExecuteCommand::Join()
 {
+    // Join primary thread first
+    // This process sets the termianted flag
+    // without which the reader threads will not
+    // terminate, so the primary thread must be
+    // joined first so we have a guaruntee that the
+    // reader processes can exit
+    int commandError = this->exit_code_future.get();
     if(!this->child_out_future.get())
         return -999;
     if(!this->child_err_future.get())
         return -999;
-    return this->exit_code_future.get();
+    return commandError;
 }
