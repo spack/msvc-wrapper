@@ -351,13 +351,12 @@ bool ExecuteCommand::Execute(const std::string &filename)
  */
 int ExecuteCommand::Join()
 {
-    // Allow primary command to conclude
-    // ensures stdout and stderr readers
-    // exit only once primary command process
-    // has concluded
-    // The child and std err pipe readers
-    // will not terminate under normal conditions
-    // unless this process concludes and sets the terminate flag
+    // Join primary thread first
+    // This process sets the termianted flag
+    // without which the reader threads will not
+    // terminate, so the primary thread must be
+    // joined first so we have a guaruntee that the
+    // reader processes can exit
     int commandError = this->exit_code_future.get();
     if(!this->child_out_future.get())
         return -999;
