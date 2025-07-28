@@ -161,7 +161,7 @@ void LinkerInvocation::Parse()
 {
     for (auto token = this->tokens.begin(); token != this->tokens.end(); ++token) {
         std::string normalToken = *token;
-        lower(normalToken);
+        normalArg(normalToken);
         // implib specifies the eventuall import libraries name
         // and thus will contain a ".lib" extension, which
         // the next check will process as a library argument
@@ -186,16 +186,16 @@ void LinkerInvocation::Parse()
         else if (endswith(normalToken, ".obj")) {
             this->objs.push_back(*token);
         }
-        else if (normalToken.find("def:") != std::string::npos) {
-            StrList defLine = split(*token, ":");
-            this->def_file = defLine[1];
-        }
         else if (startswith(normalToken, "@") && endswith(normalToken, ".rsp")) {
             // RSP files are used to describe object files, libraries, other CLI
             // Switches relevant to the tool the rsp file is being passed to
             // Primarily utilized by CMake and MSBuild projects to bypass
             // Command line length limits
             this->rsp_file = *token;
+        }
+        // handle arguments we need to pipe through to the lib tool
+        else if (this->pipedArgs.find(normalToken) != this->pipedArgs.end()) {
+            this->pipedArgs.at(normalToken).emplace_back(normalToken);
         }
     }
     std::string ext = this->is_exe ? ".exe" : ".dll";
@@ -218,10 +218,23 @@ std::string LinkerInvocation::get_implib_name()
     return this->implibname;
 }
 
-std::string LinkerInvocation::get_def_file()
+std::string LinkerInvocation::get_lib_link_args()
 {
-    return this->def_file;
+    std::string lib_link_line;
+    for (const auto& var_args : this->pipedArgs) {
+        // Most of these should be single arguments
+        // however some can be defined multiple times
+        // namely libpath and include
+        // this allows for all arguments to be processed
+        // correctly
+        auto vars = var_args.second;
+        if(!vars.empty()) {
+            lib_link_line += join(var_args.second);
+        }
+    }
+    return lib_link_line;
 }
+
 
 std::string LinkerInvocation::get_rsp_file()
 {

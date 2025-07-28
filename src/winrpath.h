@@ -214,9 +214,8 @@ public:
     std::string get_out();
     std::string get_mangled_out();
     std::string get_implib_name();
-    std::string get_def_file();
     std::string get_rsp_file();
-
+    std::string get_lib_link_args();
 private:
     std::string line;
     StrList tokens;
@@ -228,6 +227,18 @@ private:
     StrList libs;
     StrList objs;
     bool is_exe;
+    std::map<std::string, StrList> pipedArgs = {
+        {"def", {}},
+        {"export", {}},
+        {"include", {}},
+        {"libpath", {}},
+        {"ltcg", {}},
+        {"machine", {}},
+        {"nodefaultlib", {}},
+        {"subsystem", {}},
+        {"verbose", {}},
+        {"wx", {}},
+    };
 };
 
 
