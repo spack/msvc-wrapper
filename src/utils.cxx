@@ -141,8 +141,12 @@ std::string join(const StrList &args, const std::string &join_char)
     for(std::string arg : args) {
        joined_path += arg + join_char;
     }
-    // Remove trailing space
-    joined_path.pop_back();
+    // Remove trailing token
+    const size_t last_token_pos = joined_path.rfind(join_char);
+    if(last_token_pos != std::string::npos)
+    {
+        joined_path.erase(last_token_pos, joined_path.length());
+    }
     return joined_path;
 }
 
