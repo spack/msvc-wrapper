@@ -160,6 +160,10 @@ void debug(std::string dbgStmt);
 
 void debug(char * dbgStmt, int len);
 
+bool isCommandArg(const std::string &arg, const std::string &opt);
+
+void normalArg(std::string &arg);
+
 /**
  * Library Searching utility class
  *  Collection of heuristics and logic surrounding library

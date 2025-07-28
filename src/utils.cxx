@@ -403,6 +403,22 @@ void debug(char * dbgStmt, int len) {
     debug(std::string(dbgStmt, len));
 }
 
+bool isCommandArg(const std::string &arg, const std::string &command)
+{
+    const std::string slash_opt = "/"+command;
+    const std::string dash_opt = "-"+command;
+    return startswith(arg, slash_opt) || startswith(arg, dash_opt);
+}
+
+void normalArg(std::string &arg)
+{
+    // first normalize capitalization
+    lower(arg);
+    // strip leading / and -
+    arg = strip(strip(arg, "-"), "/");
+}
+
+
 std::string reportLastError()
 {
     DWORD error = GetLastError();
