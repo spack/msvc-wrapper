@@ -22,6 +22,7 @@ class LinkerInvocation {
     std::string get_implib_name();
     std::string get_def_file();
     std::string get_rsp_file();
+    std::string get_lib_link_args();
 
    private:
     std::string line_;
@@ -34,4 +35,10 @@ class LinkerInvocation {
     StrList libs_;
     StrList objs_;
     bool is_exe_;
+    std::map<std::string, StrList> piped_args_ = {
+        {"def", {}},          {"export", {}},    {"include", {}},
+        {"libpath", {}},      {"ltcg", {}},      {"machine", {}},
+        {"nodefaultlib", {}}, {"subsystem", {}}, {"verbose", {}},
+        {"wx", {}},
+    };
 };
