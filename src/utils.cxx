@@ -141,8 +141,12 @@ std::string join(const StrList &args, const std::string &join_char)
     for(std::string arg : args) {
        joined_path += arg + join_char;
     }
-    // Remove trailing space
-    joined_path.pop_back();
+    // Remove trailing token
+    const size_t last_token_pos = joined_path.rfind(join_char);
+    if(last_token_pos != std::string::npos)
+    {
+        joined_path.erase(last_token_pos, joined_path.length());
+    }
     return joined_path;
 }
 
@@ -402,6 +406,22 @@ void debug(std::string dbgStmt) {
 void debug(char * dbgStmt, int len) {
     debug(std::string(dbgStmt, len));
 }
+
+bool isCommandArg(const std::string &arg, const std::string &command)
+{
+    const std::string slash_opt = "/"+command;
+    const std::string dash_opt = "-"+command;
+    return startswith(arg, slash_opt) || startswith(arg, dash_opt);
+}
+
+void normalArg(std::string &arg)
+{
+    // first normalize capitalization
+    lower(arg);
+    // strip leading / and -
+    arg = strip(strip(arg, "-"), "/");
+}
+
 
 std::string reportLastError()
 {
