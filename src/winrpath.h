@@ -215,12 +215,15 @@ public:
     std::string get_mangled_out();
     std::string get_implib_name();
     std::string get_def_file();
+    std::string get_rsp_file();
+
 private:
     std::string line;
     StrList tokens;
     std::string name;
     std::string implibname;
     std::string def_file;
+    std::string rsp_file;
     std::string output;
     StrList libs;
     StrList objs;
