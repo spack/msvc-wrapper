@@ -36,8 +36,7 @@ public:
 private:
     void SetupExecute();
     bool ExecuteToolChainChild();
-    int PipeChildToStdout();
-    int PipeChildToStdErr();
+    int PipeChildToStdStream(DWORD STD_HANDLE, HANDLE reader_handle);
     int CreateChildPipes();
     int CleanupHandles();
     int ReportExitCode();
