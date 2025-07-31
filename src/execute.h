@@ -29,7 +29,7 @@ class ExecuteCommand {
     ExecuteCommand(std::string command);
     ExecuteCommand(std::string arg, const StrList& args);
     ExecuteCommand() = default;
-    ExecuteCommand& operator=(ExecuteCommand&& ec);
+    ExecuteCommand& operator=(ExecuteCommand&& ec) noexcept;
     ~ExecuteCommand();
     bool Execute(const std::string& filename = empty);
     int Join();
@@ -40,7 +40,7 @@ class ExecuteCommand {
     int PipeChildToStdStream(DWORD STD_HANDLE, HANDLE reader_handle);
     int CreateChildPipes();
     int CleanupHandles();
-    int ReportExitCode() const;
+    int ReportExitCode();
     // Holds the exit code of the
     // pipe from child process stdout
     // to parent std out or file

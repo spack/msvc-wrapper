@@ -221,7 +221,7 @@ int ExecuteCommand::CleanupHandles() {
  * Reports the exit code of a given process, used as a callback to report
  * on the status of wrapped process which is performed asynchronously
  */
-int ExecuteCommand::ReportExitCode() const {
+int ExecuteCommand::ReportExitCode() {
     DWORD exit_code;
     while (GetExitCodeProcess(this->procInfo.hProcess, &exit_code)) {
         if (exit_code != STILL_ACTIVE)

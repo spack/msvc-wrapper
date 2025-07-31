@@ -4,16 +4,16 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include "utils.h"
-#include <stringapiset.h>
-#include <winnls.h>
+#include <errhandlingapi.h>
+#include <fileapi.h>
+#include <handleapi.h>
+#include <minwinbase.h>
 #include <minwindef.h>
 #include <processenv.h>
-#include <winnt.h>
-#include <errhandlingapi.h>
-#include <minwinbase.h>
-#include <fileapi.h>
+#include <stringapiset.h>
 #include <winerror.h>
-#include <handleapi.h>
+#include <winnls.h>
+#include <winnt.h>
 
 #include <algorithm>
 #include <cctype>
@@ -24,8 +24,8 @@
 #include <map>
 #include <regex>
 #include <string>
-#include <vector>
 #include <system_error>
+#include <vector>
 #include "shlwapi.h"
 
 //////////////////////////////////////////////////////////
@@ -71,10 +71,10 @@ bool endswith(const std::string& arg, char const* match) {
  * Converts wstring to string
  */
 std::string ConvertWideToANSI(const std::wstring& wstr) {
-    int const count = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), wstr.length(),
-                                    nullptr, 0, nullptr, nullptr);
+    int const count = WideCharToMultiByte(
+        CP_ACP, 0, wstr.c_str(), wstr.length(), nullptr, 0, nullptr, nullptr);
     std::string str(count, 0);
-    WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), -1, str.data(), count, nullptr,
+    WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), -1, &str[0], count, nullptr,
                         nullptr);
     return str;
 }
@@ -86,9 +86,9 @@ std::string ConvertWideToANSI(const std::wstring& wstr) {
  */
 std::wstring ConvertAnsiToWide(const std::string& str) {
     int const count =
-        MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), nullptr, 0);
+        MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), NULL, 0);
     std::wstring wstr(count, 0);
-    MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), wstr.data(), count);
+    MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), &wstr[0], count);
     return wstr;
 }
 
@@ -156,7 +156,8 @@ std::string join(const StrList& args, const std::string& join_char) {
     return joined_path;
 }
 
-static std::string getCmdOption(char** begin, char** end, const std::string& option) {
+static std::string getCmdOption(char** begin, char** end,
+                                const std::string& option) {
     char** itr = std::find(begin, end, option);
     if (itr != end && ++itr != end) {
         return std::string(*itr);
@@ -241,7 +242,8 @@ std::string regexSearch(
     const std::vector<std::regex_constants::syntax_option_type>& opts,
     const std::vector<std::regex_constants::match_flag_type>& flags) {
     std::string result_str;
-    std::regex_constants::syntax_option_type const opt = composeRegexOptions(opts);
+    std::regex_constants::syntax_option_type const opt =
+        composeRegexOptions(opts);
     std::regex_constants::match_flag_type const flag = composeMatchTypes(flags);
     std::regex const reg(regex, opt);
     std::smatch match;
@@ -258,7 +260,8 @@ std::string regexMatch(
     const std::vector<std::regex_constants::syntax_option_type>& opts,
     const std::vector<std::regex_constants::match_flag_type>& flags) {
     std::string result_str;
-    std::regex_constants::syntax_option_type const opt = composeRegexOptions(opts);
+    std::regex_constants::syntax_option_type const opt =
+        composeRegexOptions(opts);
     std::regex_constants::match_flag_type const flag = composeMatchTypes(flags);
     std::regex const reg(regex, opt);
     std::smatch match;
@@ -275,7 +278,8 @@ std::string regexReplace(
     const std::string& replacement,
     const std::vector<std::regex_constants::syntax_option_type>& opts,
     const std::vector<std::regex_constants::match_flag_type>& flags) {
-    std::regex_constants::syntax_option_type const opt = composeRegexOptions(opts);
+    std::regex_constants::syntax_option_type const opt =
+        composeRegexOptions(opts);
     std::regex_constants::match_flag_type const flag = composeMatchTypes(flags);
     std::regex const reg(regex, opt);
     return std::regex_replace(replaceDomain, reg, replacement);
@@ -308,8 +312,8 @@ StrList GetEnvList(const std::string& envVar, const std::string& delim) {
     std::string const env_value = GetSpackEnv(envVar);
     if (!env_value.empty())
         return split(env_value, delim);
-    
-        return StrList();
+
+    return StrList();
 }
 
 bool ValidateSpackEnv() {
@@ -367,7 +371,8 @@ DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER& section_header,
 
     for (int i = 0; i < number_of_sections; ++i, ++section_header) {
         DWORD const section_start_rva = section_header->VirtualAddress;
-        DWORD const section_end_rva = section_start_rva + section_header->SizeOfRawData;
+        DWORD const section_end_rva =
+            section_start_rva + section_header->SizeOfRawData;
         // check section bounds for RVA
         if (rva >= section_start_rva && rva < section_end_rva) {
             DWORD const file_offset =
@@ -595,7 +600,7 @@ std::string LibraryFinder::Finder(const std::string& pth,
 
     do {
         if (wcscmp(find_file_data.cFileName,
-                    ConvertAnsiToWide(lib_name).c_str()) == 0) {
+                   ConvertAnsiToWide(lib_name).c_str()) == 0) {
             return pth + "\\" + ConvertWideToANSI(find_file_data.cFileName);
         }
     } while (FindNextFileW(h_find, &find_file_data));
@@ -634,7 +639,7 @@ int SafeHandleCleanup(HANDLE& handle) {
 
 DWORD ToLittleEndian(DWORD val) {
     DWORD const little_endian_val = (val >> 24) | ((val & 0x00FF0000) >> 8) |
-                              ((val & 0x0000FF00) << 8) | (val << 24);
+                                    ((val & 0x0000FF00) << 8) | (val << 24);
     return little_endian_val;
 }
 
