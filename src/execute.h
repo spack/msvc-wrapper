@@ -27,7 +27,7 @@ class ExecuteCommand {
    public:
     // constructor for single executable/arguments + command in one string
     ExecuteCommand(std::string command);
-    ExecuteCommand(std::string arg, StrList args);
+    ExecuteCommand(std::string arg, const StrList& args);
     ExecuteCommand() = default;
     ExecuteCommand& operator=(ExecuteCommand&& ec);
     ~ExecuteCommand();
@@ -40,7 +40,7 @@ class ExecuteCommand {
     int PipeChildToStdStream(DWORD STD_HANDLE, HANDLE reader_handle);
     int CreateChildPipes();
     int CleanupHandles();
-    int ReportExitCode();
+    int ReportExitCode() const;
     // Holds the exit code of the
     // pipe from child process stdout
     // to parent std out or file

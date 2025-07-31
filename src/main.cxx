@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 
+#include <iostream>
+#include <map>
+#include <memory>
+#include <string>
 #include "commandline.h"
+#include "spack_env.h"
+#include "toolchain.h"
 #include "toolchain_factory.h"
 #include "utils.h"
 #include "winrpath.h"
@@ -23,15 +29,17 @@ int main(int argc, const char* argv[]) {
                          "line arguments\n";
             return -1;
         }
-        bool full = !(patch_args.find("full") == patch_args.end());
-        bool deploy = !(patch_args.find("cmd") == patch_args.end()) &&
-                      patch_args.at("cmd") == "deploy";
-        bool report = !(patch_args.find("report") == patch_args.end());
-        bool has_pe = !(patch_args.find("pe") == patch_args.end());
-        bool is_exe = has_pe ? endswith(patch_args.at("pe"), ".exe") : false;
-        bool debug = !(patch_args.find("debug") == patch_args.end());
-        bool is_validate = !(patch_args.find("verify") == patch_args.end());
-        bool has_coff = !(patch_args.find("coff") == patch_args.end());
+        bool const full = !(patch_args.find("full") == patch_args.end());
+        bool const deploy = !(patch_args.find("cmd") == patch_args.end()) &&
+                            patch_args.at("cmd") == "deploy";
+        bool const report = !(patch_args.find("report") == patch_args.end());
+        bool const has_pe = !(patch_args.find("pe") == patch_args.end());
+        bool const is_exe =
+            has_pe ? endswith(patch_args.at("pe"), ".exe") : false;
+        bool const debug = !(patch_args.find("debug") == patch_args.end());
+        bool const is_validate =
+            !(patch_args.find("verify") == patch_args.end());
+        bool const has_coff = !(patch_args.find("coff") == patch_args.end());
         // Without full with a DLL we re-produce the import lib from the
         // relocated DLL, but with an EXE there is nothing to do
         if (!has_coff && !has_pe) {
@@ -104,7 +112,7 @@ int main(int argc, const char* argv[]) {
         } else {
             CoffReaderWriter cr(report_args.at("coff"));
             CoffParser coff(&cr);
-            return reportCoff(coff);
+            return static_cast<int>(reportCoff(coff));
         }
     } else {
         // Ensure required variables are set
@@ -112,7 +120,7 @@ int main(int argc, const char* argv[]) {
             return -99;
         }
         // Determine which tool we're trying to run
-        std::unique_ptr<ToolChainInvocation> tchain(
+        std::unique_ptr<ToolChainInvocation> const tchain(
             ToolChainFactory::ParseToolChain(argv));
         if (!tchain) {
             return -3;

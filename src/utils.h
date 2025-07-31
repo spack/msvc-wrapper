@@ -88,7 +88,7 @@ void lower(std::string& str);
 // Given a string containing something terminated by a
 // forward slash, get the length of the substr terminated
 // by /
-int get_slash_name_length(char* slash_name);
+int get_slash_name_length(const char* slash_name);
 
 // Implementation of strstr but serch is bounded at size and
 // does not terminate on the first read nullptr
@@ -178,7 +178,7 @@ DWORD ToLittleEndian(DWORD val);
 
 // Operating Utils //
 
-void debug(std::string dbgStmt);
+void debug(const std::string& dbgStmt);
 
 void debug(char* dbgStmt, int len);
 
@@ -202,8 +202,8 @@ class LibraryFinder {
     std::map<std::string, std::string> found_libs;
     std::vector<std::string> search_vars;
     std::map<std::string, std::vector<std::string>> evald_search_paths;
-    std::string Finder(const std::string& pth, const std::string& lib_name);
-    bool IsSystem(const std::string& pth);
+    static std::string Finder(const std::string& pth, const std::string& lib_name);
+    static bool IsSystem(const std::string& pth);
 
    public:
     LibraryFinder();

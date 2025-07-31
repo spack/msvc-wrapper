@@ -5,20 +5,25 @@
  */
 #include "toolchain.h"
 
-#include <sstream>
-#include <typeinfo>
+#include <iostream>
+#include <string>
+#include <utility>
+#include <utility>
+#include "spack_env.h"
+#include "utils.h"
+#include <vector>
 
 ToolChainInvocation::ToolChainInvocation(std::string command,
                                          char const* const* cli)
-    : command(command) {
+    : command(std::move(std::move(command))) {
     this->ParseCommandArgs(cli);
 }
 
 void ToolChainInvocation::InterpolateSpackEnv(SpackEnvState& spackenv) {
     // inject Spack includes before the default includes
     for (auto& include : spackenv.SpackIncludeDirs) {
-        auto incArg = this->ComposeIncludeArg(include);
-        this->include_args.insert(this->include_args.begin(), incArg);
+        auto inc_arg = this->ComposeIncludeArg(include);
+        this->include_args.insert(this->include_args.begin(), inc_arg);
     }
     for (auto& lib : spackenv.SpackLdLibs) {
         this->lib_args.push_back(lib);
@@ -31,15 +36,15 @@ void ToolChainInvocation::InterpolateSpackEnv(SpackEnvState& spackenv) {
 }
 
 int ToolChainInvocation::InvokeToolchain() {
-    StrList commandLine(this->ComposeCommandLists(
+    StrList const command_line(this->ComposeCommandLists(
         {this->command_args, this->include_args, this->lib_args,
          this->lib_dir_args, this->obj_args}));
-    this->executor = ExecuteCommand(this->command, commandLine);
+    this->executor = ExecuteCommand(this->command, command_line);
     debug("Setting up executor for " + std::string(typeid(*this).name()) +
           "toolchain");
     debug("Toolchain: " + this->command);
     // Run first pass of command as requested by caller
-    int ret_code = this->executor.Execute();
+    int const ret_code = static_cast<int>(this->executor.Execute());
     if (!ret_code) {
         std::cerr << "Unable to launch toolchain process \n";
         return -9999;
@@ -51,7 +56,7 @@ void ToolChainInvocation::ParseCommandArgs(char const* const* cli) {
     // Collect include args as we need to ensure Spack
     // Includes come first
     for (char const* const* c = cli; *c; c++) {
-        std::string arg = std::string(*c);
+        std::string const arg = std::string(*c);
         if (startswith(arg, "/I") || startswith(arg, "-I")) {
             // We have an include arg
             // can have an optional space
@@ -62,7 +67,7 @@ void ToolChainInvocation::ParseCommandArgs(char const* const* cli) {
                 this->include_args.push_back(arg);
             else {
                 this->include_args.push_back(arg);
-                this->include_args.push_back(std::string(*(++c)));
+                this->include_args.emplace_back(*(++c));
             }
         } else if (endswith(arg, ".lib") &&
                    (arg.find("implib:") == std::string::npos))
@@ -89,18 +94,18 @@ std::string ToolChainInvocation::ComposeLibPathArg(std::string& libPath) {
 }
 
 void ToolChainInvocation::AddExtraLibPaths(StrList paths) {
-    for (auto& libDir : paths) {
-        this->lib_dir_args.push_back(this->ComposeLibPathArg(libDir));
+    for (auto& lib_dir : paths) {
+        this->lib_dir_args.push_back(this->ComposeLibPathArg(lib_dir));
     }
 }
 
 StrList ToolChainInvocation::ComposeCommandLists(
-    std::vector<StrList> command_args) {
-    StrList commandLine;
+    const std::vector<StrList>& command_args) {
+    StrList command_line;
     for (auto arg_list : command_args) {
         // Ensure arguments are appropriately quoted
         quoteList(arg_list);
-        commandLine.insert(commandLine.end(), arg_list.begin(), arg_list.end());
+        command_line.insert(command_line.end(), arg_list.begin(), arg_list.end());
     }
-    return commandLine;
+    return command_line;
 }

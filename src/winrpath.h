@@ -180,22 +180,22 @@ class CoffParser {
     coff coff;
     bool verified = false;
     bool ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member* member);
-    void ParseShortImport(coff_member* member);
-    void ParseFullImport(coff_member* member);
-    void ParseFirstLinkerMember(coff_member* member);
-    void ParseSecondLinkerMember(coff_member* member);
-    void ReportLongImportMember(long_import_member* li);
-    void ReportShortImportMember(short_import_member* si);
-    void ReportLongName(char* data);
+    static void ParseShortImport(coff_member* member);
+    static void ParseFullImport(coff_member* member);
+    static void ParseFirstLinkerMember(coff_member* member);
+    static void ParseSecondLinkerMember(coff_member* member);
+    static void ReportLongImportMember(long_import_member* li);
+    static void ReportShortImportMember(short_import_member* si);
+    static void ReportLongName(char* data);
     void NormalizeLinkerMember(const std::string& name, const int& base_offset,
                                const int& offset, const char* strings,
                                const DWORD symbols);
     void NormalizeSectionNames(const std::string& name, char* section,
                                const DWORD& section_data_start_offset,
                                int data_size);
-    bool ValidateLongName(coff_member* member, int size);
+    static bool ValidateLongName(coff_member* member, int size);
     void writeRename(char* name, const int size, const int loc);
-    bool matchesName(char* old_name, std::string new_name);
+    static bool matchesName(char* old_name, const std::string& new_name);
 
    public:
     CoffParser(CoffReaderWriter* cr);
@@ -209,7 +209,7 @@ class CoffParser {
 
 class LinkerInvocation {
    public:
-    LinkerInvocation(const std::string& linkLine);
+    LinkerInvocation(std::string  linkLine);
     LinkerInvocation(const StrList& linkline);
     ~LinkerInvocation() = default;
     void Parse();
@@ -248,8 +248,8 @@ class LibRename {
 
    private:
     bool FindDllAndRename(HANDLE& pe_in);
-    bool SpackCheckForDll(const std::string& dll_path);
-    bool RenameDll(char* pos, const std::string& dll_path);
+    bool SpackCheckForDll(const std::string& dll_path) const;
+    bool RenameDll(char* pos, const std::string& dll_path) const;
     ExecuteCommand def_executor;
     ExecuteCommand lib_executor;
     std::string pe;

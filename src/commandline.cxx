@@ -1,6 +1,13 @@
 #include "commandline.h"
+#include <string>
+#include "utils.h"
+#include <cstring>
+#include <map>
+#include <iostream>
+#include <utility>
+#include "version.h"
 
-bool CLICheck(const char* arg, const char* check) {
+static bool CLICheck(const char* arg, const char* check) {
     std::string normalized_arg(arg);
     StripPathAndExe(normalized_arg);
     return strcmp(normalized_arg.c_str(), check) == 0;
@@ -17,7 +24,7 @@ bool IsReport(const char* arg) {
 /**
  * Checks if an argument has already been defined on the command line
  */
-int redefinedArgCheck(const std::map<std::string, std::string>& args,
+static int redefinedArgCheck(const std::map<std::string, std::string>& args,
                       const char* arg, const char* cli_name) {
     if (args.find(arg) != args.end()) {
         std::cerr << "Invalid command line, too many values for argument: "
@@ -30,7 +37,7 @@ int redefinedArgCheck(const std::map<std::string, std::string>& args,
 /**
  * Check for the presense of an argument in the argument map
  */
-int checkArgumentPresence(const std::map<std::string, std::string>& args,
+static int checkArgumentPresence(const std::map<std::string, std::string>& args,
                           const char* val, bool required = true) {
     if (args.find(val) == args.end()) {
         std::cerr << "Warning! Argument (" << val << ") not present\n";
@@ -102,19 +109,19 @@ std::map<std::string, std::string> ParseRelocate(const char** args, int argc) {
 std::map<std::string, std::string> ParseReport(int argc, const char** args) {
     std::map<std::string, std::string> opts;
     for (int i = 0; i < argc; ++i) {
-        if (endswith((std::string)args[i], ".dll")) {
+        if (endswith(std::string(args[i]), ".dll")) {
             if (redefinedArgCheck(opts, "pe", "pe")) {
                 opts.clear();
                 return opts;
             }
             opts.insert(std::pair<std::string, std::string>("pe", args[i]));
-        } else if (endswith((std::string)args[i], ".exe")) {
+        } else if (endswith(std::string(args[i]), ".exe")) {
             if (redefinedArgCheck(opts, "pe", "pe")) {
                 opts.clear();
                 return opts;
             }
             opts.insert(std::pair<std::string, std::string>("pe", args[i]));
-        } else if (endswith((std::string)args[i], ".lib")) {
+        } else if (endswith(std::string(args[i]), ".lib")) {
             if (redefinedArgCheck(opts, "coff", "coff")) {
                 opts.clear();
                 return opts;
@@ -125,7 +132,7 @@ std::map<std::string, std::string> ParseReport(int argc, const char** args) {
     return opts;
 }
 
-bool print_help() {
+static bool print_help() {
     std::cout << "Spack's Windows compiler wrapper\n";
     std::cout << "Version: " << STRING(MSVC_WRAPPER_VERSION) << "\n";
     std::cout << "\n";
@@ -223,7 +230,7 @@ bool print_help() {
 bool CheckAndPrintHelp(const char** arg, int argc) {
     if (argc < 2) {
         return print_help();
-    } else if (strcmp(arg[1], "--help") == 0 || strcmp(arg[1], "-h") == 0) {
+    } if (strcmp(arg[1], "--help") == 0 || strcmp(arg[1], "-h") == 0) {
         return print_help();
     }
     return false;

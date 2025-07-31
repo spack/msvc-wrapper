@@ -4,25 +4,45 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include "execute.h"
+#include <corecrt_wstring.h>
+#include <errhandlingapi.h>
+#include <fileapi.h>
+#include <handleapi.h>
+#include <minwinbase.h>
+#include <minwindef.h>
+#include <namedpipeapi.h>
+#include <processenv.h>
+#include <processthreadsapi.h>
+#include <winbase.h>
+#include <winnt.h>
 
-#include <sstream>
+#include <cstdlib>
+#include <future>
+#include <iostream>
+#include <string>
+#include <utility>
+#include "utils.h"
 
 ExecuteCommand::ExecuteCommand(std::string command)
-    : ChildStdOut_Rd(NULL), ChildStdOut_Wd(NULL), base_command(command) {
+    : ChildStdOut_Rd(nullptr),
+      ChildStdOut_Wd(nullptr),
+      base_command(std::move(std::move(command))) {
     this->CreateChildPipes();
     this->SetupExecute();
 }
 
-ExecuteCommand::ExecuteCommand(std::string arg, StrList args)
-    : ChildStdOut_Rd(NULL), ChildStdOut_Wd(NULL), base_command(arg) {
-    for (const auto a : args) {
+ExecuteCommand::ExecuteCommand(std::string arg, const StrList& args)
+    : ChildStdOut_Rd(nullptr),
+      ChildStdOut_Wd(nullptr),
+      base_command(std::move(std::move(arg))) {
+    for (const auto& a : args) {
         this->command_args.push_back(a);
     }
     this->CreateChildPipes();
     this->SetupExecute();
 }
 
-ExecuteCommand& ExecuteCommand::operator=(ExecuteCommand&& ec) {
+ExecuteCommand& ExecuteCommand::operator=(ExecuteCommand&& ec) noexcept {
     this->ChildStdOut_Rd = std::move(ec.ChildStdOut_Rd);
     this->ChildStdOut_Wd = std::move(ec.ChildStdOut_Wd);
     this->procInfo = std::move(ec.procInfo);
@@ -42,19 +62,19 @@ ExecuteCommand::~ExecuteCommand() {
 }
 
 void ExecuteCommand::SetupExecute() {
-    PROCESS_INFORMATION piProcInfo;
-    STARTUPINFOW siStartInfo;
-    ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
+    PROCESS_INFORMATION pi_proc_info;
+    STARTUPINFOW si_start_info;
+    ZeroMemory(&pi_proc_info, sizeof(PROCESS_INFORMATION));
 
     // Set up members of the STARTUPINFO structure.
     // This structure specifies the STDIN and STDOUT handles for redirection.
-    ZeroMemory(&siStartInfo, sizeof(STARTUPINFOW));
-    siStartInfo.cb = sizeof(STARTUPINFOW);
-    siStartInfo.hStdError = this->ChildStdOut_Wd;
-    siStartInfo.hStdOutput = this->ChildStdOut_Wd;
-    siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
-    this->procInfo = piProcInfo;
-    this->startInfo = siStartInfo;
+    ZeroMemory(&si_start_info, sizeof(STARTUPINFOW));
+    si_start_info.cb = sizeof(STARTUPINFOW);
+    si_start_info.hStdError = this->ChildStdOut_Wd;
+    si_start_info.hStdOutput = this->ChildStdOut_Wd;
+    si_start_info.dwFlags |= STARTF_USESTDHANDLES;
+    this->procInfo = pi_proc_info;
+    this->startInfo = si_start_info;
 }
 
 /*
@@ -63,25 +83,25 @@ void ExecuteCommand::SetupExecute() {
  */
 int ExecuteCommand::CreateChildPipes() {
     // Create stdout pipes
-    SECURITY_ATTRIBUTES saAttr;
+    SECURITY_ATTRIBUTES sa_attr;
     // Set the bInheritHandle flag so pipe handles are inherited.
-    saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
-    saAttr.bInheritHandle = TRUE;
-    saAttr.lpSecurityDescriptor = NULL;
-    this->saAttr = saAttr;
-    if (!CreatePipe(&this->ChildStdOut_Rd, &this->ChildStdOut_Wd, &saAttr, 0))
+    sa_attr.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa_attr.bInheritHandle = TRUE;
+    sa_attr.lpSecurityDescriptor = nullptr;
+    this->saAttr = sa_attr;
+    if (!CreatePipe(&this->ChildStdOut_Rd, &this->ChildStdOut_Wd, &sa_attr, 0))
         return 0;
     if (!SetHandleInformation(this->ChildStdOut_Rd, HANDLE_FLAG_INHERIT, 0))
         return 0;
 
     // create stderr pipes
-    SECURITY_ATTRIBUTES saAttrErr;
+    SECURITY_ATTRIBUTES sa_attr_err;
     // Set the bInheritHandle flag so pipe handles are inherited.
-    saAttrErr.nLength = sizeof(SECURITY_ATTRIBUTES);
-    saAttrErr.bInheritHandle = TRUE;
-    saAttrErr.lpSecurityDescriptor = NULL;
-    this->saAttrErr = saAttrErr;
-    if (!CreatePipe(&this->ChildStdErr_Rd, &this->ChildStdErr_Wd, &saAttrErr,
+    sa_attr_err.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa_attr_err.bInheritHandle = TRUE;
+    sa_attr_err.lpSecurityDescriptor = nullptr;
+    this->saAttrErr = sa_attr_err;
+    if (!CreatePipe(&this->ChildStdErr_Rd, &this->ChildStdErr_Wd, &sa_attr_err,
                     0))
         return 0;
     if (!SetHandleInformation(this->ChildStdErr_Rd, HANDLE_FLAG_INHERIT, 0))
@@ -95,23 +115,23 @@ int ExecuteCommand::CreateChildPipes() {
  * whether the subprocess was created successfully
  */
 bool ExecuteCommand::ExecuteToolChainChild() {
-    LPVOID lpMsgBuf;
+    LPVOID lp_msg_buf;
     debug("Executing Command: " + this->ComposeCLI());
-    const std::wstring c_commandLine = ConvertAnsiToWide(this->ComposeCLI());
-    wchar_t* nc_commandLine = _wcsdup(c_commandLine.c_str());
-    if (!CreateProcessW(NULL, nc_commandLine, NULL, NULL, TRUE, 0, NULL, NULL,
-                        &this->startInfo, &this->procInfo)) {
+    const std::wstring c_command_line = ConvertAnsiToWide(this->ComposeCLI());
+    wchar_t* nc_command_line = _wcsdup(c_command_line.c_str());
+    if (!CreateProcessW(nullptr, nc_command_line, nullptr, nullptr, TRUE, 0,
+                        nullptr, nullptr, &this->startInfo, &this->procInfo)) {
         // Handle errors coming from creation of child proc
         FormatMessage(
             FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
                 FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            (LPTSTR)&lpMsgBuf, 0, NULL);
+            nullptr, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            reinterpret_cast<LPTSTR>(&lp_msg_buf), 0, nullptr);
         std::cerr << "Failed to initiate child process from: "
-                  << ConvertWideToANSI(nc_commandLine) << " ";
+                  << ConvertWideToANSI(nc_command_line) << " ";
         std::cerr << "With error: ";
-        std::cerr << (char*)lpMsgBuf << "\n";
-        free(nc_commandLine);
+        std::cerr << static_cast<char*>(lp_msg_buf) << "\n";
+        free(nc_command_line);
         this->cpw_initalization_failure = true;
         return false;
     }
@@ -119,7 +139,7 @@ bool ExecuteCommand::ExecuteToolChainChild() {
     // Explicitly close write handle to child proc stdout
     // as it is no longer needed and if we do not then cannot
     // determine when child proc is done
-    free(nc_commandLine);
+    free(nc_command_line);
     CloseHandle(this->ChildStdOut_Wd);
     return true;
 }
@@ -131,52 +151,54 @@ bool ExecuteCommand::ExecuteToolChainChild() {
  */
 int ExecuteCommand::PipeChildToStdStream(DWORD STD_HANDLE,
                                          HANDLE reader_handle) {
-    DWORD dwRead, dwWritten;
-    CHAR chBuf[BUFSIZE];
-    BOOL bSuccess = TRUE;
-    HANDLE hParentOut;
+    DWORD dw_read;
+    DWORD dw_written;
+    CHAR ch_buf[BUFSIZE];
+    BOOL b_success = TRUE;
+    HANDLE h_parent_out;
     if (this->write_to_file && this->fileout != INVALID_HANDLE_VALUE) {
-        hParentOut = this->fileout;
+        h_parent_out = this->fileout;
     } else {
-        hParentOut = GetStdHandle(STD_HANDLE);
+        h_parent_out = GetStdHandle(STD_HANDLE);
     }
 
     for (;;) {
-        bSuccess = ReadFile(reader_handle, chBuf, BUFSIZE, &dwRead, NULL);
+        b_success = ReadFile(reader_handle, ch_buf, BUFSIZE, &dw_read, NULL);
         // For an explanation behind the use of termianted here
         // see the docstring on pipechildtostdout
-        if (!bSuccess || (dwRead == 0 && this->terminated))
+        if (!b_success || (dw_read == 0 && this->terminated))
             break;
-        if (dwRead != 0) {
-            bSuccess = WriteFile(hParentOut, chBuf, dwRead, &dwWritten, NULL);
-            if (dwWritten < dwRead && bSuccess) {
+        if (dw_read != 0) {
+            b_success =
+                WriteFile(h_parent_out, ch_buf, dw_read, &dw_written, NULL);
+            if (dw_written < dw_read && b_success) {
                 // incomplete write but not a failure
                 // since bSuccess is true
                 // So lets write until bSuccess is false or
                 // until all bytes are written
-                int currentPos = dwWritten;
-                while ((dwWritten < dwRead) || dwWritten == 0) {
-                    dwRead = dwRead - dwWritten;
-                    CHAR* partialBuf = new CHAR[dwRead];
-                    for (int i = 0; i < dwRead; ++i) {
-                        partialBuf[i] = chBuf[currentPos + i];
+                int currentPos = dw_written;
+                while ((dw_written < dw_read) || dw_written == 0) {
+                    dw_read = dw_read - dw_written;
+                    CHAR* partialBuf = new CHAR[dw_read];
+                    for (int i = 0; i < dw_read; ++i) {
+                        partialBuf[i] = ch_buf[currentPos + i];
                     }
-                    bSuccess = WriteFile(hParentOut, partialBuf, dwRead,
-                                         &dwWritten, NULL);
+                    b_success = WriteFile(h_parent_out, partialBuf, dw_read,
+                                          &dw_written, NULL);
                     delete partialBuf;
-                    if (!bSuccess)
+                    if (!b_success)
                         break;
-                    currentPos += dwWritten;
+                    currentPos += dw_written;
                 }
             }
-            if (!bSuccess) {
+            if (!b_success) {
                 break;
             }
         }
-        if (!bSuccess)
+        if (!b_success)
             break;
     }
-    return !bSuccess;
+    return static_cast<int>(static_cast<int>(b_success) == 0);
 }
 
 // /*
@@ -261,7 +283,7 @@ int ExecuteCommand::CleanupHandles() {
  * Reports the exit code of a given process, used as a callback to report
  * on the status of wrapped process which is performed asynchronously
  */
-int ExecuteCommand::ReportExitCode() {
+int ExecuteCommand::ReportExitCode() const {
     DWORD exit_code;
     while (GetExitCodeProcess(this->procInfo.hProcess, &exit_code)) {
         if (exit_code != STILL_ACTIVE)
@@ -273,12 +295,12 @@ int ExecuteCommand::ReportExitCode() {
 }
 
 std::string ExecuteCommand::ComposeCLI() {
-    std::string CLI;
-    CLI += this->base_command + " ";
-    for (auto arg : this->command_args) {
-        CLI += arg + " ";
+    std::string cli;
+    cli += this->base_command + " ";
+    for (const auto& arg : this->command_args) {
+        cli += arg + " ";
     }
-    return CLI;
+    return cli;
 }
 
 /*
@@ -297,9 +319,9 @@ bool ExecuteCommand::Execute(const std::string& filename) {
         this->fileout =
             CreateFileW(ConvertAnsiToWide(filename).c_str(), FILE_APPEND_DATA,
                         FILE_SHARE_WRITE | FILE_SHARE_READ, &this->saAttr,
-                        OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+                        OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     }
-    bool ret_code = this->ExecuteToolChainChild();
+    bool const ret_code = this->ExecuteToolChainChild();
     if (ret_code) {
         this->child_out_future = std::async(
             std::launch::async, &ExecuteCommand::PipeChildToStdStream, this,

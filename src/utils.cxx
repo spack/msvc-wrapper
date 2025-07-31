@@ -4,14 +4,28 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include "utils.h"
+#include <stringapiset.h>
+#include <winnls.h>
+#include <minwindef.h>
+#include <processenv.h>
+#include <winnt.h>
+#include <errhandlingapi.h>
+#include <minwinbase.h>
+#include <fileapi.h>
+#include <winerror.h>
+#include <handleapi.h>
 
 #include <algorithm>
+#include <cctype>
+#include <cstdlib>
+#include <cstring>
 #include <cwchar>
-#include <fstream>
 #include <iostream>
 #include <map>
 #include <regex>
 #include <string>
+#include <vector>
+#include <system_error>
 #include "shlwapi.h"
 
 //////////////////////////////////////////////////////////
@@ -20,35 +34,35 @@
 /**
  * Returns true of arg starts with match
  */
-bool startswith(const std::string& arg, const std::string& match) {
-    size_t matchLen = match.size();
-    if (matchLen > arg.size())
+static bool startswith(const std::string& arg, const std::string& match) {
+    size_t const match_len = match.size();
+    if (match_len > arg.size())
         return false;
-    return arg.compare(0, matchLen, match) == 0;
+    return arg.compare(0, match_len, match) == 0;
 }
 
 /**
  * Returns true if arg starts with match
  */
 bool startswith(const std::string& arg, const char* match) {
-    return startswith(arg, (std::string)match);
+    return startswith(arg, std::string(match));
 }
 
 /**
  * Returns true if arg ends with match
  */
-bool endswith(const std::string& arg, const std::string& match) {
-    size_t matchLen = match.size();
-    if (matchLen > arg.size())
+static bool endswith(const std::string& arg, const std::string& match) {
+    size_t const match_len = match.size();
+    if (match_len > arg.size())
         return false;
-    return arg.compare(arg.size() - matchLen, matchLen, match) == 0;
+    return arg.compare(arg.size() - match_len, match_len, match) == 0;
 }
 
 /**
  * Returns true if arg ends with match
  */
 bool endswith(const std::string& arg, char const* match) {
-    return endswith(arg, (std::string)match);
+    return endswith(arg, std::string(match));
 }
 
 /**
@@ -57,11 +71,11 @@ bool endswith(const std::string& arg, char const* match) {
  * Converts wstring to string
  */
 std::string ConvertWideToANSI(const std::wstring& wstr) {
-    int count = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), wstr.length(),
-                                    NULL, 0, NULL, NULL);
+    int const count = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), wstr.length(),
+                                    nullptr, 0, nullptr, nullptr);
     std::string str(count, 0);
-    WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), -1, &str[0], count, NULL,
-                        NULL);
+    WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), -1, str.data(), count, nullptr,
+                        nullptr);
     return str;
 }
 
@@ -71,10 +85,10 @@ std::string ConvertWideToANSI(const std::wstring& wstr) {
  * Converts string to wstring
  */
 std::wstring ConvertAnsiToWide(const std::string& str) {
-    int count =
-        MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), NULL, 0);
+    int const count =
+        MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), nullptr, 0);
     std::wstring wstr(count, 0);
-    MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), &wstr[0], count);
+    MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), wstr.data(), count);
     return wstr;
 }
 
@@ -85,13 +99,14 @@ std::wstring ConvertAnsiToWide(const std::string& str) {
  * Returns the list produced by breaking up input string s on delim
  */
 StrList split(const std::string& s, const std::string& delim) {
-    size_t pos_start = 0, pos_end;
-    size_t delim_len = delim.length();
+    size_t pos_start = 0;
+    size_t pos_end;
+    size_t const delim_len = delim.length();
     std::string token;
     StrList res = StrList();
 
     while ((pos_end = s.find(delim, pos_start)) != std::string::npos) {
-        size_t token_len = pos_end - pos_start;
+        size_t const token_len = pos_end - pos_start;
         token = s.substr(pos_start, token_len);
         pos_start = pos_end + delim_len;
         if (token == delim || token.empty()) {
@@ -130,7 +145,7 @@ std::string lstrip(const std::string& s, const std::string& substr) {
  */
 std::string join(const StrList& args, const std::string& join_char) {
     std::string joined_path;
-    for (std::string arg : args) {
+    for (const std::string& const arg : args) {
         joined_path += arg + join_char;
     }
     // Remove trailing token
@@ -141,12 +156,12 @@ std::string join(const StrList& args, const std::string& join_char) {
     return joined_path;
 }
 
-std::string getCmdOption(char** begin, char** end, const std::string& option) {
+static std::string getCmdOption(char** begin, char** end, const std::string& option) {
     char** itr = std::find(begin, end, option);
     if (itr != end && ++itr != end) {
         return std::string(*itr);
     }
-    return 0;
+    return nullptr;
 }
 
 void StripPathAndExe(std::string& command) {
@@ -157,7 +172,7 @@ void StripPathAndExe(std::string& command) {
 void StripExe(std::string& command) {
     // Normalize command to lowercase to avoid parsing issues
     lower(command);
-    std::string::size_type loc = command.rfind(".exe");
+    std::string::size_type const loc = command.rfind(".exe");
     if (std::string::npos != loc && loc + 4 == command.length())
         command.erase(loc);
 }
@@ -176,16 +191,16 @@ void lower(std::string& str) {
                    [](unsigned char c) { return std::tolower(c); });
 }
 
-std::string quoteAsNeeded(std::string& str) {
+static std::string quoteAsNeeded(std::string& str) {
     if (str.find_first_of(" &<>|()") != std::string::npos) {
         // There are spaces or special characters in string, quote it
         return "\"" + str + "\"";
     }
-    if (str.find_first_of("\"") != std::string::npos) {
+    if (str.find_first_of('\"') != std::string::npos) {
         // If there are escaped quotes in input
         // We need to escape them as well as we're adding another
         // layer of indirection between builder and compiler
-        std::regex pattern("\"");
+        std::regex const pattern("\"");
         return std::regex_replace(str, pattern, "\\\"");
     }
     return str;
@@ -195,64 +210,64 @@ void quoteList(StrList& args) {
     std::transform(args.begin(), args.end(), args.begin(), quoteAsNeeded);
 }
 
-std::regex_constants::syntax_option_type composeRegexOptions(
+static std::regex_constants::syntax_option_type composeRegexOptions(
     const std::vector<std::regex_constants::syntax_option_type>& opts) {
-    std::regex_constants::syntax_option_type composedOpt;
+    std::regex_constants::syntax_option_type composed_opt;
     if (opts.empty()) {
         // Default option
-        composedOpt = std::regex_constants::syntax_option_type::ECMAScript;
+        composed_opt = std::regex_constants::syntax_option_type::ECMAScript;
     }
-    for (std::regex_constants::syntax_option_type opt : opts) {
-        composedOpt |= opt;
+    for (std::regex_constants::syntax_option_type const opt : opts) {
+        composed_opt |= opt;
     }
-    return composedOpt;
+    return composed_opt;
 }
 
-std::regex_constants::match_flag_type composeMatchTypes(
+static std::regex_constants::match_flag_type composeMatchTypes(
     const std::vector<std::regex_constants::match_flag_type>& flags) {
-    std::regex_constants::match_flag_type composedFlag;
+    std::regex_constants::match_flag_type composed_flag;
     if (flags.empty()) {
         // Default option
-        composedFlag = std::regex_constants::match_flag_type::match_default;
+        composed_flag = std::regex_constants::match_flag_type::match_default;
     }
-    for (std::regex_constants::match_flag_type flag : flags) {
-        composedFlag |= flag;
+    for (std::regex_constants::match_flag_type const flag : flags) {
+        composed_flag |= flag;
     }
-    return composedFlag;
+    return composed_flag;
 }
 
 std::string regexSearch(
     const std::string& searchDomain, const std::string& regex,
     const std::vector<std::regex_constants::syntax_option_type>& opts,
     const std::vector<std::regex_constants::match_flag_type>& flags) {
-    std::string resultStr;
-    std::regex_constants::syntax_option_type opt = composeRegexOptions(opts);
-    std::regex_constants::match_flag_type flag = composeMatchTypes(flags);
-    std::regex reg(regex, opt);
+    std::string result_str;
+    std::regex_constants::syntax_option_type const opt = composeRegexOptions(opts);
+    std::regex_constants::match_flag_type const flag = composeMatchTypes(flags);
+    std::regex const reg(regex, opt);
     std::smatch match;
     if (!std::regex_search(searchDomain, match, reg, flag)) {
-        resultStr = std::string();
+        result_str = std::string();
     } else {
-        resultStr = match.str();
+        result_str = match.str();
     }
-    return resultStr;
+    return result_str;
 }
 
 std::string regexMatch(
     const std::string& searchDomain, const std::string& regex,
     const std::vector<std::regex_constants::syntax_option_type>& opts,
     const std::vector<std::regex_constants::match_flag_type>& flags) {
-    std::string resultStr;
-    std::regex_constants::syntax_option_type opt = composeRegexOptions(opts);
-    std::regex_constants::match_flag_type flag = composeMatchTypes(flags);
-    std::regex reg(regex, opt);
+    std::string result_str;
+    std::regex_constants::syntax_option_type const opt = composeRegexOptions(opts);
+    std::regex_constants::match_flag_type const flag = composeMatchTypes(flags);
+    std::regex const reg(regex, opt);
     std::smatch match;
     if (!std::regex_match(searchDomain, match, reg, flag)) {
-        resultStr = std::string();
+        result_str = std::string();
     } else {
-        resultStr = match.str();
+        result_str = match.str();
     }
-    return resultStr;
+    return result_str;
 }
 
 std::string regexReplace(
@@ -260,9 +275,9 @@ std::string regexReplace(
     const std::string& replacement,
     const std::vector<std::regex_constants::syntax_option_type>& opts,
     const std::vector<std::regex_constants::match_flag_type>& flags) {
-    std::regex_constants::syntax_option_type opt = composeRegexOptions(opts);
-    std::regex_constants::match_flag_type flag = composeMatchTypes(flags);
-    std::regex reg(regex, opt);
+    std::regex_constants::syntax_option_type const opt = composeRegexOptions(opts);
+    std::regex_constants::match_flag_type const flag = composeMatchTypes(flags);
+    std::regex const reg(regex, opt);
     return std::regex_replace(replaceDomain, reg, replacement);
 }
 
@@ -272,8 +287,8 @@ std::string regexReplace(
  * or an empty string as appropriate
  */
 std::string GetSpackEnv(const char* env) {
-    char* envVal = getenv(env);
-    return envVal ? envVal : std::string();
+    char* env_val = getenv(env);
+    return env_val ? env_val : std::string();
 }
 
 /**
@@ -290,19 +305,19 @@ std::string GetSpackEnv(const std::string& env) {
  * representing a list delineated by delim argument
  */
 StrList GetEnvList(const std::string& envVar, const std::string& delim) {
-    std::string envValue = GetSpackEnv(envVar);
-    if (!envValue.empty())
-        return split(envValue, delim);
-    else
+    std::string const env_value = GetSpackEnv(envVar);
+    if (!env_value.empty())
+        return split(env_value, delim);
+    
         return StrList();
 }
 
 bool ValidateSpackEnv() {
-    std::vector<std::string> SpackEnv{
+    std::vector<std::string> const spack_env{
         "SPACK_COMPILER_WRAPPER_PATH", "SPACK_DEBUG_LOG_DIR",
         "SPACK_DEBUG_LOG_ID",          "SPACK_SHORT_SPEC",
         "SPACK_SYSTEM_DIRS",           "SPACK_MANAGED_DIRS"};
-    for (auto& var : SpackEnv)
+    for (auto& var : spack_env)
         if (!getenv(var.c_str())) {
             std::cerr
                 << var +
@@ -313,7 +328,7 @@ bool ValidateSpackEnv() {
 }
 
 std::string stem(const std::string& file) {
-    std::size_t last_dot = file.find_last_of('.');
+    std::size_t const last_dot = file.find_last_of('.');
     if (last_dot == std::string::npos) {
         return file;
     }
@@ -322,7 +337,7 @@ std::string stem(const std::string& file) {
 
 std::string basename(const std::string& file) {
 std:
-    size_t last_path = file.find_last_of("\\") + 1;
+    size_t const last_path = file.find_last_of('\\') + 1;
     if (last_path == std::string::npos) {
         return file;
     }
@@ -331,16 +346,16 @@ std:
 
 std::string GetCWD() {
     DWORD buf_size;
-    buf_size = GetCurrentDirectoryW(0, NULL);
-    wchar_t* w_cwd = new wchar_t[buf_size];
+    buf_size = GetCurrentDirectoryW(0, nullptr);
+    auto* w_cwd = new wchar_t[buf_size];
     GetCurrentDirectoryW(buf_size, w_cwd);
-    std::wstring ws_cwd(w_cwd);
+    std::wstring const ws_cwd(w_cwd);
     free(w_cwd);
     return ConvertWideToANSI(ws_cwd);
 }
 
 bool IsPathAbsolute(const std::string& pth) {
-    return !PathIsRelativeA(pth.c_str());
+    return PathIsRelativeA(pth.c_str()) == 0;
 }
 
 /**
@@ -351,21 +366,21 @@ DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER& section_header,
                       DWORD number_of_sections, DWORD rva) {
 
     for (int i = 0; i < number_of_sections; ++i, ++section_header) {
-        DWORD sectionStartRVA = section_header->VirtualAddress;
-        DWORD sectionEndRVA = sectionStartRVA + section_header->SizeOfRawData;
+        DWORD const section_start_rva = section_header->VirtualAddress;
+        DWORD const section_end_rva = section_start_rva + section_header->SizeOfRawData;
         // check section bounds for RVA
-        if (rva >= sectionStartRVA && rva < sectionEndRVA) {
-            DWORD fileOffset =
-                rva - sectionStartRVA + section_header->PointerToRawData;
-            return fileOffset;
+        if (rva >= section_start_rva && rva < section_end_rva) {
+            DWORD const file_offset =
+                rva - section_start_rva + section_header->PointerToRawData;
+            return file_offset;
         }
     }
     std::cerr << "Error: RVA 0x" << std::hex << rva
-              << " not found in any section." << std::endl;
+              << " not found in any section." << '\n';
     return 0;
 }
 
-void debug(std::string dbgStmt) {
+void debug(const std::string& dbgStmt) {
     if (DEBUG || getenv("SPACK_DEBUG_WRAPPER")) {
         std::cout << "DEBUG: " << dbgStmt << "\n";
     }
@@ -389,7 +404,7 @@ void normalArg(std::string& arg) {
 }
 
 std::string reportLastError() {
-    DWORD error = GetLastError();
+    DWORD const error = GetLastError();
     return std::system_category().message(error);
 }
 
@@ -433,7 +448,7 @@ void replace_path_characters(char in[], int len) {
  * \param bsize the lengh of the padding to add
  */
 char* pad_path(const char* pth, DWORD str_size, DWORD bsize) {
-    size_t extended_buf = bsize - str_size + 2;
+    size_t const extended_buf = bsize - str_size + 2;
     char* padded_path = new char[bsize + 1];
     for (int i = 0, j = 0; i < bsize && j < str_size; ++i) {
         if (i < 2) {
@@ -499,8 +514,8 @@ std::string mangle_name(const std::string& name) {
  *  \param name string to check for path characters
  */
 bool hasPathCharacters(const std::string& name) {
-    typedef std::map<char, char>::const_iterator PathCharMap;
-    for (PathCharMap it = path_to_special_characters.begin();
+    using PathCharMap = std::map<char, char>::const_iterator;
+    for (auto it = path_to_special_characters.begin();
          it != path_to_special_characters.end(); ++it) {
         if (!(name.find(it->first) == std::string::npos)) {
             return true;
@@ -520,7 +535,7 @@ std::string LibraryFinder::FindLibrary(const std::string& lib_name,
         return std::string();
     }
     // next search the CWD
-    std::string cwd(GetCWD());
+    std::string const cwd(GetCWD());
     auto res = this->Finder(cwd, lib_name);
     if (!res.empty()) {
         return res;
@@ -530,10 +545,10 @@ std::string LibraryFinder::FindLibrary(const std::string& lib_name,
         return std::string();
     }
     // next search env variable paths
-    for (std::string var : this->search_vars) {
-        std::vector<std::string> searchable_paths =
+    for (const std::string& const var : this->search_vars) {
+        std::vector<std::string> const searchable_paths =
             this->evald_search_paths.at(var);
-        for (std::string pth : searchable_paths) {
+        for (const std::string& const pth : searchable_paths) {
             auto res = this->Finder(pth, lib_name);
             if (!res.empty()) {
                 return res;
@@ -546,10 +561,10 @@ std::string LibraryFinder::FindLibrary(const std::string& lib_name,
 void LibraryFinder::EvalSearchPaths() {
     if (!this->evald_search_paths.empty())
         return;
-    for (std::string var : this->search_vars) {
-        std::string envVal = GetSpackEnv(var.c_str());
-        if (!envVal.empty()) {
-            this->evald_search_paths[var] = split(envVal, ";");
+    for (const std::string& const var : this->search_vars) {
+        std::string const env_val = GetSpackEnv(var.c_str());
+        if (!env_val.empty()) {
+            this->evald_search_paths[var] = split(env_val, ";");
         }
     }
 }
@@ -564,43 +579,43 @@ void LibraryFinder::EvalSearchPaths() {
  */
 std::string LibraryFinder::Finder(const std::string& pth,
                                   const std::string& lib_name) {
-    WIN32_FIND_DATAW findFileData;
+    WIN32_FIND_DATAW find_file_data;
     // Globs all files at the provided path and matches to search
     // for lib name
-    std::string searcher = pth + "\\*";
-    HANDLE hFind =
-        FindFirstFileW(ConvertAnsiToWide(searcher).c_str(), &findFileData);
+    std::string const searcher = pth + "\\*";
+    HANDLE h_find =
+        FindFirstFileW(ConvertAnsiToWide(searcher).c_str(), &find_file_data);
 
-    if (hFind == INVALID_HANDLE_VALUE) {
+    if (h_find == INVALID_HANDLE_VALUE) {
         std::cerr << "Find file failed: " << reportLastError() << " "
                   << searcher << "\n";
-        FindClose(hFind);
+        FindClose(h_find);
         return std::string();
     }
 
     do {
-        if (!wcscmp(findFileData.cFileName,
-                    ConvertAnsiToWide(lib_name).c_str())) {
-            return pth + "\\" + ConvertWideToANSI(findFileData.cFileName);
+        if (wcscmp(find_file_data.cFileName,
+                    ConvertAnsiToWide(lib_name).c_str()) == 0) {
+            return pth + "\\" + ConvertWideToANSI(find_file_data.cFileName);
         }
-    } while (FindNextFileW(hFind, &findFileData));
+    } while (FindNextFileW(h_find, &find_file_data));
 
-    DWORD dwError = GetLastError();
-    if (dwError != ERROR_NO_MORE_FILES) {
+    DWORD const dw_error = GetLastError();
+    if (dw_error != ERROR_NO_MORE_FILES) {
         std::cerr << "Find file failed: " << reportLastError() << "\n";
     }
-    FindClose(hFind);
+    FindClose(h_find);
     return std::string();
 }
 
-std::vector<std::string> system_locations = {
+static std::vector<std::string> system_locations = {
     "api-ms-", "ext-ms-",   "ieshims", "emclient", "devicelock",
     "wpax",    "vcruntime", "WINDOWS", "system32", "KERNEL32",
     "WS2_32",  "dbghelp",   "bcrypt",  "ADVAPI32", "SHELL32",
     "CRYPT32", "USER32",    "ole32",   "OLEAUTH32"};
 
 bool LibraryFinder::IsSystem(const std::string& pth) {
-    for (auto loc : system_locations) {
+    for (const auto& loc : system_locations) {
         if (pth.find(loc) != std::string::npos) {
             return true;
         }
@@ -618,12 +633,12 @@ int SafeHandleCleanup(HANDLE& handle) {
 }
 
 DWORD ToLittleEndian(DWORD val) {
-    DWORD little_endian_val = (val >> 24) | ((val & 0x00FF0000) >> 8) |
+    DWORD const little_endian_val = (val >> 24) | ((val & 0x00FF0000) >> 8) |
                               ((val & 0x0000FF00) << 8) | (val << 24);
     return little_endian_val;
 }
 
-int get_slash_name_length(char* slash_name) {
+int get_slash_name_length(const char* slash_name) {
     if (slash_name == nullptr) {
         return 0;
     }
@@ -637,12 +652,12 @@ int get_slash_name_length(char* slash_name) {
 
 char* findstr(char* search_str, const char* substr, int size) {
     char* search = search_str;
-    int str_size = strlen(substr);
+    int const str_size = strlen(substr);
     while (search < search_str + size) {
         if (!strncmp(search, substr, str_size)) {
             return search;
         }
         ++search;
     }
-    return NULL;
+    return nullptr;
 }

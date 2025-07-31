@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include "spack_env.h"
+#include "utils.h"
 
 SpackEnvState SpackEnvState::LoadSpackEnvState() {
     // For list type env variables, a second argument of

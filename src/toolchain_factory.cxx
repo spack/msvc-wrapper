@@ -3,10 +3,18 @@
  *
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
+#include <memory>
+
 #include "toolchain_factory.h"
+#include <memory>
+#include <string>
+#include <iostream>
+#include <map>
 #include "cl.h"
 #include "intel.h"
 #include "ld.h"
+#include "toolchain.h"
+#include "utils.h"
 
 std::unique_ptr<ToolChainInvocation> ToolChainFactory::ParseToolChain(
     char const* const* argv) {
@@ -16,25 +24,25 @@ std::unique_ptr<ToolChainInvocation> ToolChainFactory::ParseToolChain(
     using lang = ToolChainFactory::Language;
     auto lang_it = SupportedTools.find(command);
     if (lang_it != SupportedTools.end()) {
-        ToolChainFactory::Language language = lang_it->second;
-        std::unique_ptr<ToolChainInvocation> Tool;
+        ToolChainFactory::Language const language = lang_it->second;
+        std::unique_ptr<ToolChainInvocation> tool;
         if (language == lang::cpp) {
-            Tool =
-                std::unique_ptr<ClInvocation>(new ClInvocation(command, cli));
+            tool =
+                std::make_unique<ClInvocation>(command, cli);
         } else if (language == lang::Fortran) {
-            Tool = std::unique_ptr<FortranInvocation>(
-                new FortranInvocation(command, cli));
+            tool = std::make_unique<FortranInvocation>(
+                command, cli);
         } else if (language == lang::link) {
             // If it's not c/c++ or fortran, we're linking
-            Tool =
-                std::unique_ptr<LdInvocation>(new LdInvocation(command, cli));
+            tool =
+                std::make_unique<LdInvocation>(command, cli);
         } else {
             std::cerr
                 << "Unable to determine wrapper language or link context for "
                 << command << "\n";
             return std::unique_ptr<ToolChainInvocation>(nullptr);
         }
-        return Tool;
+        return tool;
     }
     return std::unique_ptr<ToolChainInvocation>(nullptr);
 }

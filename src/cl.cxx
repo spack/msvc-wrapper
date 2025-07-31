@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include "cl.h"
+#include "spack_env.h"
 
 void ClInvocation::LoadToolchainDependentSpackVars(SpackEnvState& spackenv) {
     this->command = spackenv.SpackCC;
