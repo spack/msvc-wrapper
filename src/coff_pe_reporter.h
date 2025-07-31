@@ -10,8 +10,7 @@
 /**
  * Takes a coff header struct and displays it to the terminal
  */
-void reportArchiveHeader(const PIMAGE_ARCHIVE_MEMBER_HEADER header)
-{
+void reportArchiveHeader(const PIMAGE_ARCHIVE_MEMBER_HEADER header) {
     printf("----------------------------------\n");
     printf("  Name:    %.16s\n", header->Name);
     printf("  Date:    %.16s\n", header->Date);
@@ -21,9 +20,7 @@ void reportArchiveHeader(const PIMAGE_ARCHIVE_MEMBER_HEADER header)
     printf("  Size:     %.12s\n", header->Size);
 }
 
-
-void reportFileHeader(const PIMAGE_FILE_HEADER pfile_h)
-{
+void reportFileHeader(const PIMAGE_FILE_HEADER pfile_h) {
     printf("------------------------------------\n");
     printf("  Machine:    %.16s\n", pfile_h->Machine);
     printf("  NumberOfSections    %.16s\n", pfile_h->NumberOfSections);
@@ -34,9 +31,7 @@ void reportFileHeader(const PIMAGE_FILE_HEADER pfile_h)
     printf("  Characteristics    %.16s\n", pfile_h->Characteristics);
 }
 
-
-void reportSectionHeader(const PIMAGE_SECTION_HEADER psection)
-{
+void reportSectionHeader(const PIMAGE_SECTION_HEADER psection) {
     printf("  Name    %.16s\n", psection->Name);
     printf("  PhysicalAddress    %.16s\n", psection->Misc.PhysicalAddress);
     printf("  VirtualSize    %.16s\n", psection->Misc.VirtualSize);
@@ -50,9 +45,7 @@ void reportSectionHeader(const PIMAGE_SECTION_HEADER psection)
     printf("  Characteristics    %.16s\n", psection->Characteristics);
 }
 
-
-void reportImageSymbol(const PIMAGE_SYMBOL psymbol)
-{
+void reportImageSymbol(const PIMAGE_SYMBOL psymbol) {
     printf("  LongName    %.16s\n", psymbol->N.LongName);
     printf("  ShortName    %.16s\n", psymbol->N.ShortName);
     printf("  Short    %.16s\n", psymbol->N.Name.Short);
@@ -64,9 +57,7 @@ void reportImageSymbol(const PIMAGE_SYMBOL psymbol)
     printf("  NumberOfAuxSymbols    %.16s\n", psymbol->NumberOfAuxSymbols);
 }
 
-
-void reportImportObjectHeader(const IMPORT_OBJECT_HEADER* imp_h)
-{
+void reportImportObjectHeader(const IMPORT_OBJECT_HEADER* imp_h) {
     printf("  Sig1    %.16s\n", imp_h->Sig1);
     printf("  Sig2    %.16s\n", imp_h->Sig2);
     printf("  Version    %.16s\n", imp_h->Version);
@@ -80,36 +71,32 @@ void reportImportObjectHeader(const IMPORT_OBJECT_HEADER* imp_h)
     printf("  Hint    %.16s\n", imp_h->Hint);
 }
 
-
-void reportCoffSections(const long_import_member *mem)
-{
-    for(int i=0; i < mem->pfile_h->NumberOfSections; ++i) {
-        PIMAGE_SECTION_HEADER head = mem->pp_sections+i;
+void reportCoffSections(const long_import_member* mem) {
+    for (int i = 0; i < mem->pfile_h->NumberOfSections; ++i) {
+        PIMAGE_SECTION_HEADER head = mem->pp_sections + i;
         reportSectionHeader(head);
         int section_size = head->SizeOfRawData;
         int virtual_size = head->Misc.VirtualSize;
         if (virtual_size > section_size) {
             section_size += (virtual_size - section_size);
         }
-        char * section = *(mem->section_data+i);
+        char* section = *(mem->section_data + i);
         printf("SECTION:\n");
         printf("%.*s\n", section_size, section);
     }
 }
 
-
-void reportCoffSymbols(const long_import_member *mem)
-{
-    for(int i=0; i < mem->pfile_h->NumberOfSymbols; ++i) {
-        PIMAGE_SYMBOL sym = mem->symbol_table+i;
+void reportCoffSymbols(const long_import_member* mem) {
+    for (int i = 0; i < mem->pfile_h->NumberOfSymbols; ++i) {
+        PIMAGE_SYMBOL sym = mem->symbol_table + i;
         reportImageSymbol(sym);
         DWORD name_string_table_offset;
-        if (!sym->N.Name.Short){
-            name_string_table_offset = sym->N.Name.Long-sizeof(DWORD);
+        if (!sym->N.Name.Short) {
+            name_string_table_offset = sym->N.Name.Long - sizeof(DWORD);
+        } else {
+            name_string_table_offset = sym->N.Name.Short - sizeof(DWORD);
         }
-        else {
-            name_string_table_offset = sym->N.Name.Short-sizeof(DWORD);
-        }
-        printf("%.*s", mem->size_of_string_table, mem->string_table+name_string_table_offset);
+        printf("%.*s", mem->size_of_string_table,
+               mem->string_table + name_string_table_offset);
     }
 }

@@ -5,19 +5,19 @@
  */
 #pragma once
 
-#include <stdlib.h>
-#include <string>
 #include <stdio.h>
-#include <vector>
-#include <map>
-#include <iostream>
-#include <fstream>
+#include <stdlib.h>
+#include <strsafe.h>
 #include <windows.h>
 #include <winnt.h>
-#include <strsafe.h>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <string>
+#include <vector>
 
-#include "utils.h"
 #include "execute.h"
+#include "utils.h"
 
 // Structs for holding coff/PE data
 // winnt headers define a number of
@@ -36,16 +36,17 @@ typedef struct long_import_member {
     PIMAGE_FILE_HEADER pfile_h;
     PIMAGE_SECTION_HEADER pp_sections;
     PIMAGE_SYMBOL symbol_table;
-    char ** section_data;
-    char * string_table;
+    char** section_data;
+    char* string_table;
+
     ~long_import_member() {
-        for (int i=0; i< this->pfile_h->NumberOfSections; ++i) {
-            delete *(this->section_data+i);
+        for (int i = 0; i < this->pfile_h->NumberOfSections; ++i) {
+            delete *(this->section_data + i);
         }
         delete this->symbol_table;
         delete this->section_data;
         delete this->pp_sections;
-        if(this->string_table) {
+        if (this->string_table) {
             delete this->string_table;
         }
     }
@@ -55,9 +56,9 @@ typedef struct long_import_member {
  * @brief
  */
 typedef struct short_import_member {
-    IMPORT_OBJECT_HEADER *im_h;
-    char * short_name;
-    char * short_dll;
+    IMPORT_OBJECT_HEADER* im_h;
+    char* short_name;
+    char* short_dll;
 } short_import_member;
 
 /**
@@ -66,7 +67,7 @@ typedef struct short_import_member {
 typedef struct first_linker_member {
     DWORD symbols;
     PDWORD offsets;
-    char * strings;
+    char* strings;
 } first_linker_member;
 
 /**
@@ -77,22 +78,21 @@ typedef struct second_linker_member {
     DWORD symbols;
     PDWORD offsets;
     PWORD indicies;
-    char * strings;
+    char* strings;
 } second_linker_member;
-
-
 
 /**
  * @brief coff member 
  */
 typedef struct coff_member {
-    char * data;
-    short_import_member *short_member;
-    long_import_member *long_member;
-    first_linker_member *first_link;
-    second_linker_member *second_link;
+    char* data;
+    short_import_member* short_member;
+    long_import_member* long_member;
+    first_linker_member* first_link;
+    second_linker_member* second_link;
     bool is_short;
     bool is_longname;
+
     coff_member() {
         this->is_short = false;
         this->is_longname = false;
@@ -101,7 +101,8 @@ typedef struct coff_member {
         this->short_member = NULL;
         this->long_member = NULL;
     }
-    ~coff_member () {
+
+    ~coff_member() {
         delete short_member;
         delete long_member;
         delete first_link;
@@ -116,7 +117,7 @@ typedef struct coff_member {
 typedef struct coff_entry {
     std::streampos offset;
     PIMAGE_ARCHIVE_MEMBER_HEADER header;
-    coff_member * member;
+    coff_member* member;
 } coff_entry;
 
 /**
@@ -126,11 +127,9 @@ typedef struct coff {
     char signature[IMAGE_ARCHIVE_START_SIZE];
     std::vector<coff_entry> members;
     bool read_first_linker;
-    coff() {
-        this->read_first_linker = false;
-    }
-} coff;
 
+    coff() { this->read_first_linker = false; }
+} coff;
 
 /**
  * @brief Encapsulates a stream for reading and writing to a coff object
@@ -150,10 +149,11 @@ typedef struct coff {
  * This is not structured and expects to recives a series of bytes to write into the COFF binary.
  */
 class CoffReaderWriter {
-private:
+   private:
     std::fstream pe_stream;
     std::string _file;
-public:
+
+   public:
     CoffReaderWriter(std::string file);
     ~CoffReaderWriter() = default;
     bool Open();
@@ -161,52 +161,56 @@ public:
     bool IsOpen();
     bool IsClosed();
     void ReadHeader(PIMAGE_ARCHIVE_MEMBER_HEADER coff_in);
-    void ReadMember(PIMAGE_ARCHIVE_MEMBER_HEADER head, coff_member *coff_in);
-    bool ReadSig(coff &coff_in);
-    void write(char * in, int size);
-    void read(char * out, int size);
-    void seek(int bytes=-1, std::ios_base::seekdir way=std::ios_base::beg);
+    void ReadMember(PIMAGE_ARCHIVE_MEMBER_HEADER head, coff_member* coff_in);
+    bool ReadSig(coff& coff_in);
+    void write(char* in, int size);
+    void read(char* out, int size);
+    void seek(int bytes = -1, std::ios_base::seekdir way = std::ios_base::beg);
     int peek();
     void clear();
     void flush();
     std::string get_file();
     std::streampos tell();
     bool end();
-
 };
 
 class CoffParser {
-private:
+   private:
     CoffReaderWriter* coffStream;
     coff coff;
     bool verified = false;
-    bool ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member *member);
-    void ParseShortImport(coff_member *member);
-    void ParseFullImport(coff_member *member);
-    void ParseFirstLinkerMember(coff_member *member);
-    void ParseSecondLinkerMember(coff_member *member);
-    void ReportLongImportMember(long_import_member *li);
-    void ReportShortImportMember(short_import_member *si);
-    void ReportLongName(char * data);
-    void NormalizeLinkerMember(const std::string &name, const int &base_offset, const int &offset, const char * strings, const DWORD symbols);
-    void NormalizeSectionNames(const std::string &name, char* section, const DWORD &section_data_start_offset, int data_size);
-    bool ValidateLongName(coff_member *member, int size);
-    void writeRename(char *name, const int size, const int loc);
-    bool matchesName(char *old_name, std::string new_name);
-public:
-    CoffParser(CoffReaderWriter * cr);
+    bool ParseData(PIMAGE_ARCHIVE_MEMBER_HEADER header, coff_member* member);
+    void ParseShortImport(coff_member* member);
+    void ParseFullImport(coff_member* member);
+    void ParseFirstLinkerMember(coff_member* member);
+    void ParseSecondLinkerMember(coff_member* member);
+    void ReportLongImportMember(long_import_member* li);
+    void ReportShortImportMember(short_import_member* si);
+    void ReportLongName(char* data);
+    void NormalizeLinkerMember(const std::string& name, const int& base_offset,
+                               const int& offset, const char* strings,
+                               const DWORD symbols);
+    void NormalizeSectionNames(const std::string& name, char* section,
+                               const DWORD& section_data_start_offset,
+                               int data_size);
+    bool ValidateLongName(coff_member* member, int size);
+    void writeRename(char* name, const int size, const int loc);
+    bool matchesName(char* old_name, std::string new_name);
+
+   public:
+    CoffParser(CoffReaderWriter* cr);
     ~CoffParser() = default;
     bool Parse();
-    bool NormalizeName(std::string &name);
+    bool NormalizeName(std::string& name);
     void Report();
     int Verify();
-    static int Validate(std::string &coff);
+    static int Validate(std::string& coff);
 };
 
 class LinkerInvocation {
-public:
-    LinkerInvocation(const std::string &linkLine);
-    LinkerInvocation(const StrList &linkline);
+   public:
+    LinkerInvocation(const std::string& linkLine);
+    LinkerInvocation(const StrList& linkline);
     ~LinkerInvocation() = default;
     void Parse();
     bool IsExeLink();
@@ -217,7 +221,7 @@ public:
     std::string get_def_file();
     std::string get_rsp_file();
 
-private:
+   private:
     std::string line;
     StrList tokens;
     std::string name;
@@ -230,10 +234,10 @@ private:
     bool is_exe;
 };
 
-
 class LibRename {
-public:
-    LibRename(std::string pe, std::string coff, bool full, bool deploy, bool replace);
+   public:
+    LibRename(std::string pe, std::string coff, bool full, bool deploy,
+              bool replace);
     LibRename(std::string pe, bool full, bool deploy, bool replace);
     bool ExecuteRename();
     bool ExecuteLibRename();
@@ -242,10 +246,10 @@ public:
     std::string ComputeRenameLink();
     std::string ComputeDefLine();
 
-private:
-    bool FindDllAndRename(HANDLE &pe_in);
-    bool SpackCheckForDll(const std::string &dll_path);
-    bool RenameDll(char* pos, const std::string &dll_path);
+   private:
+    bool FindDllAndRename(HANDLE& pe_in);
+    bool SpackCheckForDll(const std::string& dll_path);
+    bool RenameDll(char* pos, const std::string& dll_path);
     ExecuteCommand def_executor;
     ExecuteCommand lib_executor;
     std::string pe;
@@ -259,5 +263,4 @@ private:
     bool is_exe;
 };
 
-
-bool reportCoff(CoffParser &coff);
+bool reportCoff(CoffParser& coff);

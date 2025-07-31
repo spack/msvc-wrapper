@@ -5,24 +5,27 @@
  */
 #pragma once
 
-#include "utils.h"
-#include "spack_env.h"
 #include "execute.h"
+#include "spack_env.h"
+#include "utils.h"
 
 /**
  * @brief
  */
-class ToolChainInvocation{
-public:
+class ToolChainInvocation {
+   public:
     ToolChainInvocation(std::string command, char const* const* cli);
+
     virtual ~ToolChainInvocation() {}
-    virtual void InterpolateSpackEnv(SpackEnvState &spackenv);
+
+    virtual void InterpolateSpackEnv(SpackEnvState& spackenv);
     virtual int InvokeToolchain();
-protected:
+
+   protected:
     virtual void ParseCommandArgs(char const* const* cli);
-    virtual void LoadToolchainDependentSpackVars(SpackEnvState &spackenv) = 0;
-    std::string ComposeIncludeArg(std::string &include);
-    std::string ComposeLibPathArg(std::string &libPath);
+    virtual void LoadToolchainDependentSpackVars(SpackEnvState& spackenv) = 0;
+    std::string ComposeIncludeArg(std::string& include);
+    std::string ComposeLibPathArg(std::string& libPath);
     void AddExtraLibPaths(StrList paths);
     StrList ComposeCommandLists(std::vector<StrList> command_args);
 
