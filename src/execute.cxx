@@ -164,8 +164,6 @@ int ExecuteCommand::PipeChildToStdStream(DWORD STD_HANDLE,
 
     for (;;) {
         b_success = ReadFile(reader_handle, ch_buf, BUFSIZE, &dw_read, NULL);
-        // For an explanation behind the use of termianted here
-        // see the docstring on pipechildtostdout
         if (!b_success || (dw_read == 0 && this->terminated))
             break;
         if (dw_read != 0) {
@@ -200,66 +198,6 @@ int ExecuteCommand::PipeChildToStdStream(DWORD STD_HANDLE,
     }
     return static_cast<int>(static_cast<int>(b_success) == 0);
 }
-
-// /*
-//  * Reads for the member variable holding a pipe to the wrapped processes'
-//  * STDERR and writes either to this processes' STDERR or a file, depending on
-//  * how the process wrapper is configured
-//  */
-// int ExecuteCommand::PipeChildToStdErr()
-// {
-//     DWORD dwRead, dwWritten;
-//     CHAR chBuf[BUFSIZE];
-//     BOOL bSuccess = TRUE;
-//     HANDLE hParentOut;
-//     if (this->write_to_file) {
-//         hParentOut = this->fileout;
-//     }
-//     else {
-//         hParentOut = GetStdHandle(STD_ERROR_HANDLE);
-//     }
-
-//     for (;;)
-//     {
-//         bSuccess = ReadFile( this->ChildStdErr_Rd, chBuf, BUFSIZE, &dwRead, NULL);
-//         if( ! bSuccess || dwRead == 0 ) break;
-
-//         bSuccess = WriteFile(hParentOut, chBuf,
-//                             dwRead, &dwWritten, NULL);
-//         if (! bSuccess ) break;
-//     }
-//     return !bSuccess;
-// }
-
-// /*
-//  * Reads for the member variable holding a pipe to the wrapped processes'
-//  * STDOUT and writes either to this processes' STDOUT or a file, depending on
-//  * how the process wrapper is configured
-//  */
-// int ExecuteCommand::PipeChildToStdout()
-// {
-//     DWORD dwRead, dwWritten;
-//     CHAR chBuf[BUFSIZE];
-//     BOOL bSuccess = TRUE;
-//     HANDLE hParentOut;
-//     if (this->write_to_file) {
-//         hParentOut = this->fileout;
-//     }
-//     else {
-//         hParentOut = GetStdHandle(STD_OUTPUT_HANDLE);
-//     }
-
-//     for (;;)
-//     {
-//         bSuccess = ReadFile( this->ChildStdOut_Rd, chBuf, BUFSIZE, &dwRead, NULL);
-//         if( ! bSuccess || dwRead == 0 ) break;
-
-//         bSuccess = WriteFile(hParentOut, chBuf,
-//                             dwRead, &dwWritten, NULL);
-//         if (! bSuccess ) break;
-//     }
-//     return !bSuccess;
-// }
 
 /*
  * Ensures handles and their underlying resources are
