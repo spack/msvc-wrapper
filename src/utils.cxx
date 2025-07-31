@@ -429,6 +429,156 @@ std::string reportLastError()
     return std::system_category().message(error);
 }
 
+/**
+ * Replaces characters used to mangle path characters with
+ * valid path characters
+ * 
+ * \param in a pointer to the string to replace the mangled path characters in
+ * \param len the length of the mangled path
+ */
+void replace_special_characters(char in[], int len)
+{
+    for (int i = 0; i < len; ++i) {
+        if (special_character_to_path.count(in[i]))
+        {
+            in[i] = special_character_to_path.at(in[i]);
+        }
+            
+    }
+}
+
+/**
+ * Replaces path characters with special, non path, replacement characters
+ * 
+ * \param in a pointer to the string to have its path characters replace with special placeholders
+ * \param len the length of the path to be mangled
+ */
+void replace_path_characters(char in[], int len)
+{
+    for (int i = 0; i < len; i++ ) {
+        if (path_to_special_characters.count(in[i]))
+            in[i] = path_to_special_characters.at(in[i]);
+    }
+}
+
+/**
+ * Pads a given path with an amount of padding of special characters
+ *  Paths are padded after the drive separator but before any path
+ *  characters, i.e. C:[\\\\\\\]\path\to\exe with the section in []
+ *  being the padded component
+ * 
+ * \param pth a pointer to the path to be padded
+ * \param str_size the length of the path - not including any
+ *                  null terminators.
+ * \param bsize the lengh of the padding to add
+ */
+char * pad_path(const char *pth, DWORD str_size, DWORD bsize)
+{
+    size_t extended_buf = bsize - str_size + 2;
+    char * padded_path = new char[bsize+1];
+    for(int i = 0, j = 0; i < bsize && j < str_size; ++i){
+        if(i < 2){
+            padded_path[i] = pth[j];
+            ++j;
+        }
+        else if(i < extended_buf){
+            padded_path[i] = '|';
+        }
+        else{
+            padded_path[i] = pth[j];
+            ++j;
+        }
+    }
+    padded_path[bsize] = '\0';
+    return padded_path;
+}
+
+/**
+ * Given a padded library path, return how much the path
+ *  has been padded
+ * 
+ *  \param name the path for which to determine pad count
+ */
+int get_padding_length(const std::string &name)
+{
+    int c = 0;
+    std::string::const_iterator p = name.cbegin();
+    p+=2;
+    while(p != name.end() && *p == '\\') {
+        ++c;
+        ++p;
+    }
+    return c;
+}
+
+std::string strip_padding(const std::string &lib)
+{
+    // One of the padding characters is a legitimate
+    // path separator
+    int pad_len = get_padding_length(lib)-1;
+    // Capture the drive and drive separator
+    std::string::const_iterator p = lib.cbegin();
+    std::string::const_iterator e = lib.cbegin()+2;
+    std::string stripped_drive(p, e);
+    e = e + pad_len;
+    std::string path_remainder(e, lib.end());
+    return stripped_drive + path_remainder;
+}
+
+/**
+ * Mangles a string representing a path to have no path characters
+ *  instead path characters (i.e. \\, :, etc) are replaced with
+ *  special replacement characters
+ * 
+ * \param name the string to be mangled
+ */
+std::string mangle_name(const std::string &name)
+{
+    std::string abs_out;
+    std::string mangled_abs_out;
+    if(IsPathAbsolute(name)){
+        abs_out = name;
+    }
+    else{
+        // relative paths, assume they're relative to the CWD of the linker (as they have to be)
+        abs_out = join({GetCWD(), name}, "\\");
+    }
+    char * chr_abs_out = new char [abs_out.length() + 1];
+    strcpy(chr_abs_out, abs_out.c_str());
+    replace_path_characters(chr_abs_out, abs_out.length());
+    char * padded_path = pad_path(chr_abs_out, abs_out.length());
+    mangled_abs_out = std::string(padded_path, MAX_NAME_LEN);
+
+    delete chr_abs_out;
+    delete padded_path;
+    return mangled_abs_out;
+}
+
+/**
+ * Determines whether a string contains path characters
+ *  \param name string to check for path characters
+ */
+bool hasPathCharacters(const std::string &name) {
+    typedef std::map<char, char>::const_iterator PathCharMap;
+    for(PathCharMap it = path_to_special_characters.begin();
+                it != path_to_special_characters.end(); ++it){
+        if(!(name.find(it->first) == std::string::npos)){
+            return true;
+        }
+    }
+    return false;
+}
+
+bool SpackInstalledLib(const std::string &lib) {
+    const std::string prefix = GetSpackEnv("SPACK_INSTALL_PREFIX");
+    if (prefix.empty()) {
+        debug("Unable to determine Spack install prefix, SPACK_INSTALL_PREFIX unset");
+        return false;
+    }
+    std::string stripped_lib = strip_padding(lib);
+    startswith(stripped_lib, prefix);
+}
+
 LibraryFinder::LibraryFinder() : search_vars{"SPACK_RELOCATE_PATH"} {}
 
 std::string LibraryFinder::FindLibrary(const std::string &lib_name, const std::string &lib_path) {
