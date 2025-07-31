@@ -107,7 +107,8 @@ int main(int argc, const char* argv[]) {
             return -1;
         }
         if (report_args.find("pe") != report_args.end()) {
-            LibRename pe(report_args.at("pe"), false, false, false, true);
+            LibRename pe(report_args.at("pe"), std::string(), false, false,
+                         true);
             pe.ExecuteRename();
         } else {
             CoffReaderWriter cr(report_args.at("coff"));
