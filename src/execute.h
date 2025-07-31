@@ -5,14 +5,14 @@
  */
 #pragma once
 
-#include <iostream>
-#include <string>
-#include <windows.h>
-#include <tchar.h>
 #include <stdio.h>
 #include <strsafe.h>
-#include <vector>
+#include <tchar.h>
+#include <windows.h>
 #include <future>
+#include <iostream>
+#include <string>
+#include <vector>
 
 #include "utils.h"
 
@@ -24,20 +24,20 @@ const std::string empty = std::string();
  * @brief
  */
 class ExecuteCommand {
-public:
+   public:
     // constructor for single executable/arguments + command in one string
     ExecuteCommand(std::string command);
-    ExecuteCommand(std::string arg, StrList args);
+    ExecuteCommand(std::string arg, const StrList& args);
     ExecuteCommand() = default;
-    ExecuteCommand& operator=(ExecuteCommand &&ec);
+    ExecuteCommand& operator=(ExecuteCommand&& ec) noexcept;
     ~ExecuteCommand();
-    bool Execute(const std::string &filename = empty);
+    bool Execute(const std::string& filename = empty);
     int Join();
-private:
+
+   private:
     void SetupExecute();
     bool ExecuteToolChainChild();
-    int PipeChildToStdout();
-    int PipeChildToStdErr();
+    int PipeChildToStdStream(DWORD STD_HANDLE, HANDLE reader_handle);
     int CreateChildPipes();
     int CleanupHandles();
     int ReportExitCode();
@@ -48,7 +48,7 @@ private:
     // Holds the exit code of the pipe
     // from child to parent stderr
     std::future<int> child_err_future;
-    // Holds the exit code of the 
+    // Holds the exit code of the
     // command wrapped by this class
     std::future<int> exit_code_future;
     std::string ComposeCLI();

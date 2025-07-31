@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include "spack_env.h"
-
+#include "utils.h"
 
 SpackEnvState SpackEnvState::LoadSpackEnvState() {
     // For list type env variables, a second argument of
@@ -23,12 +23,16 @@ SpackEnvState SpackEnvState::LoadSpackEnvState() {
     spackenv.SpackCxxFlags = GetEnvList("SPACK_CXXFLAGS", " ");
     spackenv.SpackLdFlags = GetEnvList("SPACK_LDFLAGS", " ");
     spackenv.SpackLdLibs = GetEnvList("SPACK_LDLIBS", " ");
-    spackenv.SpackCompilerExtraRPaths = GetEnvList("SPACK_COMPILER_EXTRA_RPATHS", "|");
-    spackenv.SpackCompilerImplicitRPaths = GetEnvList("SPACK_COMPILER_IMPLICIT_RPATHS", "|");
+    spackenv.SpackCompilerExtraRPaths =
+        GetEnvList("SPACK_COMPILER_EXTRA_RPATHS", "|");
+    spackenv.SpackCompilerImplicitRPaths =
+        GetEnvList("SPACK_COMPILER_IMPLICIT_RPATHS", "|");
     spackenv.SpackIncludeDirs = GetEnvList("SPACK_INCLUDE_DIRS", "|");
     spackenv.SpackLinkDirs = GetEnvList("SPACK_LINK_DIRS", "|");
-    spackenv.SpackCompilerFlagsKeep = GetEnvList("SPACK_COMPILER_FLAGS_KEEP", "|");
-    spackenv.SpackCompilerFlagsReplace = GetEnvList("SPACK_COMPILER_FLAGS_REPLACE", "|");
+    spackenv.SpackCompilerFlagsKeep =
+        GetEnvList("SPACK_COMPILER_FLAGS_KEEP", "|");
+    spackenv.SpackCompilerFlagsReplace =
+        GetEnvList("SPACK_COMPILER_FLAGS_REPLACE", "|");
     spackenv.SpackEnvPath = GetEnvList("SPACK_ENV_PATH");
     spackenv.SpackCCRPathArg = GetSpackEnv("SPACK_CC_RPATH_ARG");
     spackenv.SpackCXXRPathArg = GetSpackEnv("SPACK_CXX_RPATH_ARG");
