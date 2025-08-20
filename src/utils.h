@@ -64,7 +64,7 @@ std::string strip(const std::string& s, const std::string& substr);
 std::string lstrip(const std::string& s, const std::string& substr);
 
 // Joins vector of strings by join character
-std::string join(const StrList& strs, const std::string& join_char = " ");
+std::string join(const StrList& args, const std::string& join_char = " ");
 
 // Returns filename stem
 std::string stem(const std::string& file);
@@ -152,9 +152,9 @@ int get_padding_length(const std::string& name);
 
 char* pad_path(const char* pth, DWORD str_size, DWORD bsize = MAX_NAME_LEN);
 
-void replace_path_characters(char in[], int len);
+void replace_path_characters(char* path, int len);
 
-void replace_special_characters(char in[], int len);
+void replace_special_characters(char* mangled, int len);
 
 // File and File handle helpers //
 
@@ -182,9 +182,9 @@ void debug(const std::string& dbgStmt);
 
 void debug(char* dbgStmt, int len);
 
-bool isCommandArg(const std::string &arg, const std::string &opt);
+bool isCommandArg(const std::string& arg, const std::string& command);
 
-void normalArg(std::string &arg);
+void normalArg(std::string& arg);
 
 /**
  * Library Searching utility class
@@ -202,7 +202,8 @@ class LibraryFinder {
     std::map<std::string, std::string> found_libs;
     std::vector<std::string> search_vars;
     std::map<std::string, std::vector<std::string>> evald_search_paths;
-    static std::string Finder(const std::string& pth, const std::string& lib_name);
+    static std::string Finder(const std::string& pth,
+                              const std::string& lib_name);
     static bool IsSystem(const std::string& pth);
 
    public:

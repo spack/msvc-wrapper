@@ -163,30 +163,30 @@ int ExecuteCommand::PipeChildToStdStream(DWORD STD_HANDLE,
     }
 
     for (;;) {
-        b_success = ReadFile(reader_handle, ch_buf, BUFSIZE, &dw_read, NULL);
+        b_success = ReadFile(reader_handle, ch_buf, BUFSIZE, &dw_read, nullptr);
         if (!b_success || (dw_read == 0 && this->terminated))
             break;
         if (dw_read != 0) {
             b_success =
-                WriteFile(h_parent_out, ch_buf, dw_read, &dw_written, NULL);
+                WriteFile(h_parent_out, ch_buf, dw_read, &dw_written, nullptr);
             if (dw_written < dw_read && b_success) {
                 // incomplete write but not a failure
                 // since bSuccess is true
                 // So lets write until bSuccess is false or
                 // until all bytes are written
-                int currentPos = dw_written;
+                int current_pos = dw_written;
                 while ((dw_written < dw_read) || dw_written == 0) {
                     dw_read = dw_read - dw_written;
-                    CHAR* partialBuf = new CHAR[dw_read];
+                    CHAR* partial_buf = new CHAR[dw_read];
                     for (int i = 0; i < dw_read; ++i) {
-                        partialBuf[i] = ch_buf[currentPos + i];
+                        partial_buf[i] = ch_buf[current_pos + i];
                     }
-                    b_success = WriteFile(h_parent_out, partialBuf, dw_read,
-                                          &dw_written, NULL);
-                    delete partialBuf;
+                    b_success = WriteFile(h_parent_out, partial_buf, dw_read,
+                                          &dw_written, nullptr);
+                    delete partial_buf;
                     if (!b_success)
                         break;
-                    currentPos += dw_written;
+                    current_pos += dw_written;
                 }
             }
             if (!b_success) {
@@ -284,10 +284,10 @@ int ExecuteCommand::Join() {
     // terminate, so the primary thread must be
     // joined first so we have a guaruntee that the
     // reader processes can exit
-    int commandError = this->exit_code_future.get();
+    int const command_error = this->exit_code_future.get();
     if (!this->child_out_future.get())
         return -999;
     if (!this->child_err_future.get())
         return -999;
-    return commandError;
+    return command_error;
 }

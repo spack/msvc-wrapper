@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include "ld.h"
+#include <cstdio>
 #include "spack_env.h"
 #include "toolchain.h"
 #include "utils.h"
-#include <cstdio>
 #include "winrpath.h"
 
 void LdInvocation::LoadToolchainDependentSpackVars(SpackEnvState& spackenv) {
@@ -24,7 +24,7 @@ int LdInvocation::InvokeToolchain() {
     // Next we want to construct the proper commmand line to
     // recreate the import library from the same set of obj files
     // and libs
-    LinkerInvocation link_run(this->ComposeCommandLists(
+    LinkerInvocation link_run(LdInvocation::ComposeCommandLists(
         {this->command_args, this->include_args, this->lib_args,
          this->lib_dir_args, this->obj_args}));
     link_run.Parse();
@@ -40,7 +40,7 @@ int LdInvocation::InvokeToolchain() {
         // create command line to generate new import lib
         this->rpath_executor = ExecuteCommand(
             "lib.exe",
-            this->ComposeCommandLists({
+            LdInvocation::ComposeCommandLists({
                 {def_line, "-name:" + dll_name, "-out:" + abs_out_imp_lib_name},
                 {link_run.get_rsp_file()},
                 this->obj_args,
@@ -52,8 +52,8 @@ int LdInvocation::InvokeToolchain() {
         if (err_code != 0) {
             return err_code;
         }
-        CoffReaderWriter cr(abs_out_imp_lib_name);
-        CoffParser coff(&cr);
+        CoffReaderWriter coff_reader(abs_out_imp_lib_name);
+        CoffParser coff(&coff_reader);
         if (!coff.Parse()) {
             debug("Failed to parse COFF file: " + abs_out_imp_lib_name);
             return -9;

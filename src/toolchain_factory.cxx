@@ -5,15 +5,14 @@
  */
 #include <memory>
 
-#include "toolchain_factory.h"
-#include <memory>
-#include <string>
 #include <iostream>
 #include <map>
+#include <string>
 #include "cl.h"
 #include "intel.h"
 #include "ld.h"
 #include "toolchain.h"
+#include "toolchain_factory.h"
 #include "utils.h"
 
 std::unique_ptr<ToolChainInvocation> ToolChainFactory::ParseToolChain(
@@ -27,15 +26,12 @@ std::unique_ptr<ToolChainInvocation> ToolChainFactory::ParseToolChain(
         ToolChainFactory::Language const language = lang_it->second;
         std::unique_ptr<ToolChainInvocation> tool;
         if (language == lang::cpp) {
-            tool =
-                std::make_unique<ClInvocation>(command, cli);
+            tool = std::make_unique<ClInvocation>(command, cli);
         } else if (language == lang::Fortran) {
-            tool = std::make_unique<FortranInvocation>(
-                command, cli);
+            tool = std::make_unique<FortranInvocation>(command, cli);
         } else if (language == lang::link) {
             // If it's not c/c++ or fortran, we're linking
-            tool =
-                std::make_unique<LdInvocation>(command, cli);
+            tool = std::make_unique<LdInvocation>(command, cli);
         } else {
             std::cerr
                 << "Unable to determine wrapper language or link context for "

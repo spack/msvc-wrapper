@@ -77,8 +77,8 @@ int main(int argc, const char* argv[]) {
             return CoffParser::Validate(patch_args.at("coff"));
         }
         if (report) {
-            CoffReaderWriter cr(patch_args.at("coff"));
-            CoffParser coff(&cr);
+            CoffReaderWriter coff_reader(patch_args.at("coff"));
+            CoffParser coff(&coff_reader);
             if (!reportCoff(coff)) {
                 return 1;
             }
@@ -107,12 +107,12 @@ int main(int argc, const char* argv[]) {
             return -1;
         }
         if (report_args.find("pe") != report_args.end()) {
-            LibRename pe(report_args.at("pe"), std::string(), false, false,
-                         true);
-            pe.ExecuteRename();
+            LibRename portable_executable(report_args.at("pe"), std::string(),
+                                          false, false, true);
+            portable_executable.ExecuteRename();
         } else {
-            CoffReaderWriter cr(report_args.at("coff"));
-            CoffParser coff(&cr);
+            CoffReaderWriter coff_reader(report_args.at("coff"));
+            CoffParser coff(&coff_reader);
             return static_cast<int>(reportCoff(coff));
         }
     } else {

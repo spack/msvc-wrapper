@@ -8,10 +8,9 @@
 #include <iostream>
 #include <string>
 #include <utility>
-#include <utility>
+#include <vector>
 #include "spack_env.h"
 #include "utils.h"
-#include <vector>
 
 ToolChainInvocation::ToolChainInvocation(std::string command,
                                          char const* const* cli)
@@ -22,7 +21,7 @@ ToolChainInvocation::ToolChainInvocation(std::string command,
 void ToolChainInvocation::InterpolateSpackEnv(SpackEnvState& spackenv) {
     // inject Spack includes before the default includes
     for (auto& include : spackenv.SpackIncludeDirs) {
-        auto inc_arg = this->ComposeIncludeArg(include);
+        auto inc_arg = ToolChainInvocation::ComposeIncludeArg(include);
         this->include_args.insert(this->include_args.begin(), inc_arg);
     }
     for (auto& lib : spackenv.SpackLdLibs) {
@@ -36,7 +35,7 @@ void ToolChainInvocation::InterpolateSpackEnv(SpackEnvState& spackenv) {
 }
 
 int ToolChainInvocation::InvokeToolchain() {
-    StrList const command_line(this->ComposeCommandLists(
+    StrList const command_line(ToolChainInvocation::ComposeCommandLists(
         {this->command_args, this->include_args, this->lib_args,
          this->lib_dir_args, this->obj_args}));
     this->executor = ExecuteCommand(this->command, command_line);
@@ -55,8 +54,8 @@ int ToolChainInvocation::InvokeToolchain() {
 void ToolChainInvocation::ParseCommandArgs(char const* const* cli) {
     // Collect include args as we need to ensure Spack
     // Includes come first
-    for (char const* const* c = cli; *c; c++) {
-        std::string const arg = std::string(*c);
+    for (char const* const* co = cli; *co; co++) {
+        std::string const arg = std::string(*co);
         if (startswith(arg, "/I") || startswith(arg, "-I")) {
             // We have an include arg
             // can have an optional space
@@ -67,7 +66,7 @@ void ToolChainInvocation::ParseCommandArgs(char const* const* cli) {
                 this->include_args.push_back(arg);
             else {
                 this->include_args.push_back(arg);
-                this->include_args.emplace_back(*(++c));
+                this->include_args.emplace_back(*(++co));
             }
         } else if (endswith(arg, ".lib") &&
                    (arg.find("implib:") == std::string::npos))
@@ -95,7 +94,8 @@ std::string ToolChainInvocation::ComposeLibPathArg(std::string& libPath) {
 
 void ToolChainInvocation::AddExtraLibPaths(StrList paths) {
     for (auto& lib_dir : paths) {
-        this->lib_dir_args.push_back(this->ComposeLibPathArg(lib_dir));
+        this->lib_dir_args.push_back(
+            ToolChainInvocation::ComposeLibPathArg(lib_dir));
     }
 }
 
@@ -105,7 +105,8 @@ StrList ToolChainInvocation::ComposeCommandLists(
     for (auto arg_list : command_args) {
         // Ensure arguments are appropriately quoted
         quoteList(arg_list);
-        command_line.insert(command_line.end(), arg_list.begin(), arg_list.end());
+        command_line.insert(command_line.end(), arg_list.begin(),
+                            arg_list.end());
     }
     return command_line;
 }

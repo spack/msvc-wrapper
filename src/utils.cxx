@@ -21,8 +21,10 @@
 #include <cstring>
 #include <cwchar>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <regex>
+#include <stdexcept>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -31,10 +33,21 @@
 //////////////////////////////////////////////////////////
 // String helper methods adding cxx20 features to cxx14 //
 //////////////////////////////////////////////////////////
+
+bool checkSizeTConversion(const std::string& str) {
+    constexpr int kMaxInt = (std::numeric_limits<int>::max)();
+    return str.length() <= static_cast<size_t>(kMaxInt);
+}
+
+bool checkSizeTConversion(const std::wstring& wstr) {
+    constexpr int kMaxInt = (std::numeric_limits<int>::max)();
+    return wstr.length() <= static_cast<size_t>(kMaxInt);
+}
+
 /**
  * Returns true of arg starts with match
  */
-static bool startswith(const std::string& arg, const std::string& match) {
+bool startswith(const std::string& arg, const std::string& match) {
     size_t const match_len = match.size();
     if (match_len > arg.size())
         return false;
@@ -51,7 +64,7 @@ bool startswith(const std::string& arg, const char* match) {
 /**
  * Returns true if arg ends with match
  */
-static bool endswith(const std::string& arg, const std::string& match) {
+bool endswith(const std::string& arg, const std::string& match) {
     size_t const match_len = match.size();
     if (match_len > arg.size())
         return false;
@@ -71,8 +84,15 @@ bool endswith(const std::string& arg, char const* match) {
  * Converts wstring to string
  */
 std::string ConvertWideToANSI(const std::wstring& wstr) {
-    int const count = WideCharToMultiByte(
-        CP_ACP, 0, wstr.c_str(), wstr.length(), nullptr, 0, nullptr, nullptr);
+    bool const string_too_long = checkSizeTConversion(wstr);
+    if (string_too_long) {
+        throw std::overflow_error(
+            "Input string is too long: size_t-length doesn't fit into int.");
+    }
+
+    int const count = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(),
+                                          static_cast<int>(wstr.length()),
+                                          nullptr, 0, nullptr, nullptr);
     std::string str(count, 0);
     WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), -1, &str[0], count, nullptr,
                         nullptr);
@@ -85,10 +105,16 @@ std::string ConvertWideToANSI(const std::wstring& wstr) {
  * Converts string to wstring
  */
 std::wstring ConvertAnsiToWide(const std::string& str) {
-    int const count =
-        MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), NULL, 0);
+    bool const str_too_long = checkSizeTConversion(str);
+    if (str_too_long) {
+        throw std::overflow_error(
+            "Input string is too long: size_t-length doesn't fit into int.");
+    }
+    int const count = MultiByteToWideChar(
+        CP_ACP, 0, str.c_str(), static_cast<int>(str.length()), nullptr, 0);
     std::wstring wstr(count, 0);
-    MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.length(), &wstr[0], count);
+    MultiByteToWideChar(CP_ACP, 0, str.c_str(), static_cast<int>(str.length()),
+                        &wstr[0], count);
     return wstr;
 }
 
@@ -98,23 +124,23 @@ std::wstring ConvertAnsiToWide(const std::string& str) {
  * 
  * Returns the list produced by breaking up input string s on delim
  */
-StrList split(const std::string& s, const std::string& delim) {
+StrList split(const std::string& str, const std::string& delim) {
     size_t pos_start = 0;
     size_t pos_end;
     size_t const delim_len = delim.length();
     std::string token;
     StrList res = StrList();
 
-    while ((pos_end = s.find(delim, pos_start)) != std::string::npos) {
+    while ((pos_end = str.find(delim, pos_start)) != std::string::npos) {
         size_t const token_len = pos_end - pos_start;
-        token = s.substr(pos_start, token_len);
+        token = str.substr(pos_start, token_len);
         pos_start = pos_end + delim_len;
         if (token == delim || token.empty()) {
             continue;
         }
         res.push_back(token);
     }
-    res.push_back(s.substr(pos_start));
+    res.push_back(str.substr(pos_start));
     return res;
 }
 
@@ -123,10 +149,10 @@ StrList split(const std::string& s, const std::string& delim) {
  * 
  * Returns stripped version of s
  */
-std::string strip(const std::string& s, const std::string& substr) {
-    if (!endswith(s, substr))
-        return s;
-    return s.substr(0, s.size() - substr.size());
+std::string strip(const std::string& str, const std::string& substr) {
+    if (!endswith(str, substr))
+        return str;
+    return str.substr(0, str.size() - substr.size());
 }
 
 /**
@@ -134,10 +160,10 @@ std::string strip(const std::string& s, const std::string& substr) {
  * 
  * Returns stripped version of s
  */
-std::string lstrip(const std::string& s, const std::string& substr) {
-    if (!startswith(s, substr))
-        return s;
-    return s.substr(substr.size() - 1, s.size());
+std::string lstrip(const std::string& str, const std::string& substr) {
+    if (!startswith(str, substr))
+        return str;
+    return str.substr(substr.size() - 1, str.size());
 }
 
 /**
@@ -145,7 +171,7 @@ std::string lstrip(const std::string& s, const std::string& substr) {
  */
 std::string join(const StrList& args, const std::string& join_char) {
     std::string joined_path;
-    for (const std::string& const arg : args) {
+    for (const std::string& arg : args) {
         joined_path += arg + join_char;
     }
     // Remove trailing token
@@ -154,15 +180,6 @@ std::string join(const StrList& args, const std::string& join_char) {
         joined_path.erase(last_token_pos, joined_path.length());
     }
     return joined_path;
-}
-
-static std::string getCmdOption(char** begin, char** end,
-                                const std::string& option) {
-    char** itr = std::find(begin, end, option);
-    if (itr != end && ++itr != end) {
-        return std::string(*itr);
-    }
-    return nullptr;
 }
 
 void StripPathAndExe(std::string& command) {
@@ -189,10 +206,10 @@ void StripPath(std::string& command) {
  */
 void lower(std::string& str) {
     std::transform(str.begin(), str.end(), str.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+                   [](unsigned char item) { return std::tolower(item); });
 }
 
-static std::string quoteAsNeeded(std::string& str) {
+std::string quoteAsNeeded(std::string& str) {
     if (str.find_first_of(" &<>|()") != std::string::npos) {
         // There are spaces or special characters in string, quote it
         return "\"" + str + "\"";
@@ -211,7 +228,7 @@ void quoteList(StrList& args) {
     std::transform(args.begin(), args.end(), args.begin(), quoteAsNeeded);
 }
 
-static std::regex_constants::syntax_option_type composeRegexOptions(
+std::regex_constants::syntax_option_type composeRegexOptions(
     const std::vector<std::regex_constants::syntax_option_type>& opts) {
     std::regex_constants::syntax_option_type composed_opt;
     if (opts.empty()) {
@@ -224,7 +241,7 @@ static std::regex_constants::syntax_option_type composeRegexOptions(
     return composed_opt;
 }
 
-static std::regex_constants::match_flag_type composeMatchTypes(
+std::regex_constants::match_flag_type composeMatchTypes(
     const std::vector<std::regex_constants::match_flag_type>& flags) {
     std::regex_constants::match_flag_type composed_flag;
     if (flags.empty()) {
@@ -321,7 +338,7 @@ bool ValidateSpackEnv() {
         "SPACK_COMPILER_WRAPPER_PATH", "SPACK_DEBUG_LOG_DIR",
         "SPACK_DEBUG_LOG_ID",          "SPACK_SHORT_SPEC",
         "SPACK_SYSTEM_DIRS",           "SPACK_MANAGED_DIRS"};
-    for (auto& var : spack_env)
+    for (const auto& var : spack_env)
         if (!getenv(var.c_str())) {
             std::cerr
                 << var +
@@ -410,7 +427,8 @@ void normalArg(std::string& arg) {
 
 std::string reportLastError() {
     DWORD const error = GetLastError();
-    return std::system_category().message(error);
+    return std::system_category().message(
+        error);  // NOLINT(bugprone-narrowing-conversion)
 }
 
 /**
@@ -420,10 +438,10 @@ std::string reportLastError() {
  * \param in a pointer to the string to replace the mangled path characters in
  * \param len the length of the mangled path
  */
-void replace_special_characters(char in[], int len) {
+void replace_special_characters(char* mangled, int len) {
     for (int i = 0; i < len; ++i) {
-        if (special_character_to_path.count(in[i])) {
-            in[i] = special_character_to_path.at(in[i]);
+        if (special_character_to_path.count(mangled[i])) {
+            mangled[i] = special_character_to_path.at(mangled[i]);
         }
     }
 }
@@ -434,10 +452,10 @@ void replace_special_characters(char in[], int len) {
  * \param in a pointer to the string to have its path characters replace with special placeholders
  * \param len the length of the path to be mangled
  */
-void replace_path_characters(char in[], int len) {
+void replace_path_characters(char* path, size_t len) {
     for (int i = 0; i < len; i++) {
-        if (path_to_special_characters.count(in[i]))
-            in[i] = path_to_special_characters.at(in[i]);
+        if (path_to_special_characters.count(path[i]))
+            path[i] = path_to_special_characters.at(path[i]);
     }
 }
 
@@ -456,14 +474,11 @@ char* pad_path(const char* pth, DWORD str_size, DWORD bsize) {
     size_t const extended_buf = bsize - str_size + 2;
     char* padded_path = new char[bsize + 1];
     for (int i = 0, j = 0; i < bsize && j < str_size; ++i) {
-        if (i < 2) {
+        if (i < 2 || i >= extended_buf) {
             padded_path[i] = pth[j];
             ++j;
-        } else if (i < extended_buf) {
-            padded_path[i] = '|';
         } else {
-            padded_path[i] = pth[j];
-            ++j;
+            padded_path[i] = '|';
         }
     }
     padded_path[bsize] = '\0';
@@ -477,14 +492,14 @@ char* pad_path(const char* pth, DWORD str_size, DWORD bsize) {
  *  \param name the path for which to determine pad count
  */
 int get_padding_length(const std::string& name) {
-    int c = 0;
-    std::string::const_iterator p = name.cbegin();
-    p += 2;
-    while (p != name.end() && *p == '\\') {
-        ++c;
-        ++p;
+    int count = 0;
+    std::string::const_iterator padding = name.cbegin();
+    padding += 2;
+    while (padding != name.end() && *padding == '\\') {
+        ++count;
+        ++padding;
     }
-    return c;
+    return count;
 }
 
 /**
@@ -536,12 +551,12 @@ std::string LibraryFinder::FindLibrary(const std::string& lib_name,
     // Read env variables and split into paths
     // Only ever run once
     // First check if lib is absolute path
-    if (this->IsSystem(lib_path)) {
+    if (LibraryFinder::IsSystem(lib_path)) {
         return std::string();
     }
     // next search the CWD
     std::string const cwd(GetCWD());
-    auto res = this->Finder(cwd, lib_name);
+    auto res = LibraryFinder::Finder(cwd, lib_name);
     if (!res.empty()) {
         return res;
     }
@@ -550,11 +565,11 @@ std::string LibraryFinder::FindLibrary(const std::string& lib_name,
         return std::string();
     }
     // next search env variable paths
-    for (const std::string& const var : this->search_vars) {
+    for (const std::string& var : this->search_vars) {
         std::vector<std::string> const searchable_paths =
             this->evald_search_paths.at(var);
-        for (const std::string& const pth : searchable_paths) {
-            auto res = this->Finder(pth, lib_name);
+        for (const std::string& pth : searchable_paths) {
+            auto res = LibraryFinder::Finder(pth, lib_name);
             if (!res.empty()) {
                 return res;
             }
@@ -566,7 +581,7 @@ std::string LibraryFinder::FindLibrary(const std::string& lib_name,
 void LibraryFinder::EvalSearchPaths() {
     if (!this->evald_search_paths.empty())
         return;
-    for (const std::string& const var : this->search_vars) {
+    for (const std::string& var : this->search_vars) {
         std::string const env_val = GetSpackEnv(var.c_str());
         if (!env_val.empty()) {
             this->evald_search_paths[var] = split(env_val, ";");
@@ -613,19 +628,22 @@ std::string LibraryFinder::Finder(const std::string& pth,
     return std::string();
 }
 
-static std::vector<std::string> system_locations = {
+namespace {
+std::vector<std::string> system_locations = {
     "api-ms-", "ext-ms-",   "ieshims", "emclient", "devicelock",
     "wpax",    "vcruntime", "WINDOWS", "system32", "KERNEL32",
     "WS2_32",  "dbghelp",   "bcrypt",  "ADVAPI32", "SHELL32",
     "CRYPT32", "USER32",    "ole32",   "OLEAUTH32"};
 
+}
+
 bool LibraryFinder::IsSystem(const std::string& pth) {
-    for (const auto& loc : system_locations) {
-        if (pth.find(loc) != std::string::npos) {
-            return true;
-        }
-    }
-    return false;
+    return std::any_of(system_locations.cbegin(), system_locations.cend(),
+                       [&](const std::string& loc) {
+                           if (pth.find(loc) != std::string::npos) {
+                               return true;
+                           }
+                       });
 }
 
 int SafeHandleCleanup(HANDLE& handle) {
@@ -657,7 +675,7 @@ int get_slash_name_length(const char* slash_name) {
 
 char* findstr(char* search_str, const char* substr, int size) {
     char* search = search_str;
-    int const str_size = strlen(substr);
+    size_t const str_size = strlen(substr);
     while (search < search_str + size) {
         if (!strncmp(search, substr, str_size)) {
             return search;

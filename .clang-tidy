@@ -36,6 +36,7 @@ Checks: >
   readability-*,
   -google-readability-braces-around-statements,
   -google-readability-namespace-comments,
+  -google-readability-casting,
   -google-runtime-references,
   -misc-non-private-member-variables-in-classes,
   -modernize-return-braced-init-list,
@@ -43,13 +44,13 @@ Checks: >
   -readability-named-parameter,
   -modernize-use-trailing-return-type,
   -readability-braces-around-statements,
-  -readability-redundant-declaration
+  -readability-redundant-declaration,
+  -readability-container-data-pointer,
+  -misc-use-internal-linkage,
+  -bugprone-easily-swappable-parameters
 
 # Turn all the warnings from the checks above into errors.
 WarningsAsErrors: "*"
-
-# TODO(#205) - Enable clang-tidy checks in our headers.
-#    HeaderFilterRegex: "google/cloud/.*"
 
 CheckOptions:
   - { key: readability-identifier-naming.NamespaceCase,          value: lower_case }
@@ -64,14 +65,9 @@ CheckOptions:
   - { key: readability-identifier-naming.ProtectedMemberSuffix,  value: _          }
   - { key: readability-identifier-naming.MacroDefinitionCase,    value: UPPER_CASE }
   - { key: readability-identifier-naming.EnumConstantCase,         value: CamelCase }
-  - { key: readability-identifier-naming.EnumConstantPrefix,       value: k         }
   - { key: readability-identifier-naming.ConstexprVariableCase,    value: CamelCase }
-  - { key: readability-identifier-naming.ConstexprVariablePrefix,  value: k         }
   - { key: readability-identifier-naming.GlobalConstantCase,       value: CamelCase }
-  - { key: readability-identifier-naming.GlobalConstantPrefix,     value: k         }
   - { key: readability-identifier-naming.MemberConstantCase,       value: CamelCase }
-  - { key: readability-identifier-naming.MemberConstantPrefix,     value: k         }
   - { key: readability-identifier-naming.StaticConstantCase,       value: CamelCase }
-  - { key: readability-identifier-naming.StaticConstantPrefix,     value: k         }
   - { key: readability-implicit-bool-conversion.AllowIntegerConditions,  value: 1   }
   - { key: readability-implicit-bool-conversion.AllowPointerConditions,  value: 1   }
