@@ -16,6 +16,7 @@
 #include "toolchain_factory.h"
 #include "utils.h"
 #include "winrpath.h"
+#include <Intsafe.h>
 
 int main(int argc, const char* argv[]) {
 
@@ -133,7 +134,12 @@ int main(int argc, const char* argv[]) {
         // Apply modifications to toolchain invocation
         tchain->InterpolateSpackEnv(spack);
         // Execute coolchain invocation
-        return tchain->InvokeToolchain();
+        int res;
+        HRESULT const h_res = DWordToInt(tchain->InvokeToolchain(), &res);
+        if (h_res == S_OK) {
+            return res;
+        }
+        return h_res;
     }
     return 0;
 }

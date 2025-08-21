@@ -47,7 +47,7 @@ DWORD ToolChainInvocation::InvokeToolchain() {
     int const ret_code = static_cast<int>(this->executor.Execute());
     if (!ret_code) {
         std::cerr << "Unable to launch toolchain process \n";
-        return -9999;
+        return 9999;
     }
     return this->executor.Join();
 }

@@ -39,8 +39,8 @@ ExecuteCommand::ExecuteCommand(std::string arg, const StrList& args)
     : ChildStdOut_Rd(nullptr),
       ChildStdOut_Wd(nullptr),
       base_command(std::move(arg)) {
-    for (const auto& arg : args) {
-        this->command_args.push_back(arg);
+    for (const auto& argp : args) {
+        this->command_args.push_back(argp);
     }
     this->CreateChildPipes();
     this->SetupExecute();

@@ -487,7 +487,7 @@ bool CoffParser::NormalizeName(std::string& name) {
                 DWORD const symbol_count =
                     mem.member->long_member->pfile_h->NumberOfSymbols;
                 PIMAGE_SYMBOL symbols = mem.member->long_member->symbol_table;
-                for (int j = 0; j < symbol_count; ++j) {
+                for (DWORD j = 0; j < symbol_count; ++j) {
                     PIMAGE_SYMBOL symbol = symbols + j;
                     if (symbol->N.Name.Short == 0) {
                         // name is longer than 8 bytes, it's a Spack name, search
