@@ -22,13 +22,29 @@ PREFIX="$(MAKEDIR)\install\"
 !ENDIF
 
 !IF "$(BUILD_TYPE)" == "DEBUG"
-BUILD_CFLAGS = /Zi
+BUILD_CFLAGS = /Zi /W4 /WX -D_CRT_SECURE_NO_WARNINGS
 BUILD_LINK = /DEBUG
 !ENDIF
 
 BASE_CFLAGS = /EHsc
 CFLAGS = $(BASE_CFLAGS) $(BUILD_CFLAGS) $(CLFLAGS)
 LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
+
+SRCS = cl.obj \
+execute.obj \
+intel.obj \
+ld.obj \
+main.obj \
+spack_env.obj \
+toolchain.obj \
+toolchain_factory.obj \
+utils.obj \
+commandline.obj \
+winrpath.obj \
+coff_reader_writer.obj \
+coff_parser.obj \
+linker_invocation.obj
+
 
 {src}.cxx{}.obj::
 	"$(CC)" /c $(CFLAGS) $(CVARS) /I:src $<	
@@ -38,7 +54,7 @@ LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
 
 all : install test
 
-cl.exe : cl.obj execute.obj intel.obj ld.obj main.obj spack_env.obj toolchain.obj toolchain_factory.obj utils.obj commandline.obj winrpath.obj 
+cl.exe :  $(SRCS)
 	link $(LFLAGS) $** Shlwapi.lib /out:cl.exe
 
 install : cl.exe
@@ -118,7 +134,6 @@ test_pipe_overflow: build_and_check_test_sample
 
 build_zerowrite_test: test\writezero.obj
 	link $(LFLAGS) $** Shlwapi.lib /out:writezero.exe
-
 
 test_zerowrite: build_zerowrite_test
 	set SPACK_CC_TMP=%SPACK_CC%

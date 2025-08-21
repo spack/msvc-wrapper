@@ -1,30 +1,24 @@
 #include "commandline.h"
-#include <string>
-#include "utils.h"
 #include <cstring>
-#include <map>
 #include <iostream>
+#include <map>
+#include <string>
 #include <utility>
+#include "utils.h"
 #include "version.h"
 
-static bool CLICheck(const char* arg, const char* check) {
+namespace {
+
+bool CLICheck(const char* arg, const char* check) {
     std::string normalized_arg(arg);
     StripPathAndExe(normalized_arg);
     return strcmp(normalized_arg.c_str(), check) == 0;
 }
 
-bool IsRelocate(const char* arg) {
-    return CLICheck(arg, "relocate");
-}
-
-bool IsReport(const char* arg) {
-    return CLICheck(arg, "report");
-}
-
 /**
  * Checks if an argument has already been defined on the command line
  */
-static int redefinedArgCheck(const std::map<std::string, std::string>& args,
+int redefinedArgCheck(const std::map<std::string, std::string>& args,
                       const char* arg, const char* cli_name) {
     if (args.find(arg) != args.end()) {
         std::cerr << "Invalid command line, too many values for argument: "
@@ -37,7 +31,7 @@ static int redefinedArgCheck(const std::map<std::string, std::string>& args,
 /**
  * Check for the presense of an argument in the argument map
  */
-static int checkArgumentPresence(const std::map<std::string, std::string>& args,
+int checkArgumentPresence(const std::map<std::string, std::string>& args,
                           const char* val, bool required = true) {
     if (args.find(val) == args.end()) {
         std::cerr << "Warning! Argument (" << val << ") not present\n";
@@ -48,91 +42,7 @@ static int checkArgumentPresence(const std::map<std::string, std::string>& args,
     return 1;
 }
 
-/**
- * Parse the command line arguments supportin the relocate command
- */
-std::map<std::string, std::string> ParseRelocate(const char** args, int argc) {
-    std::map<std::string, std::string> opts;
-    for (int i = 0; i < argc; i++) {
-        if (!strcmp(args[i], "--pe")) {
-            if (redefinedArgCheck(opts, "pe", "--pe")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("pe", args[++i]));
-        } else if (!strcmp(args[i], "--coff")) {
-            if (redefinedArgCheck(opts, "coff", "--coff")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("coff", args[++i]));
-        } else if (!strcmp(args[i], "--full")) {
-            if (redefinedArgCheck(opts, "full", "--full")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("full", "full"));
-        } else if (!strcmp(args[i], "--export")) {
-            // export and deploy are mutually exclusive, if one is defined
-            // the other cannot be
-            if (redefinedArgCheck(opts, "export", "--export") ||
-                redefinedArgCheck(opts, "deploy", "--deploy")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("cmd", "export"));
-        } else if (!strcmp(args[i], "--deploy")) {
-            // export and deploy are mutually exclusive, if one is defined
-            // the other cannot be
-            if (redefinedArgCheck(opts, "export", "--export") ||
-                redefinedArgCheck(opts, "deploy", "--deploy")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("cmd", "deploy"));
-        } else if (!strcmp(args[i], "--debug") || !strcmp(args[i], "-d")) {
-            opts.insert(std::pair<std::string, std::string>("debug", "on"));
-        } else if (!strcmp(args[i], "--verify")) {
-            opts.insert(std::pair<std::string, std::string>("verify", "on"));
-        } else if (!strcmp(args[i], "--report")) {
-            opts.insert(
-                std::pair<std::string, std::string>("report", "report"));
-        } else {
-            // Unknown argument, warn the user it will not be used
-            std::cerr << "Unknown argument: " << args[i]
-                      << " will be ignored\n";
-        }
-    }
-    return opts;
-}
-
-std::map<std::string, std::string> ParseReport(int argc, const char** args) {
-    std::map<std::string, std::string> opts;
-    for (int i = 0; i < argc; ++i) {
-        if (endswith(std::string(args[i]), ".dll")) {
-            if (redefinedArgCheck(opts, "pe", "pe")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("pe", args[i]));
-        } else if (endswith(std::string(args[i]), ".exe")) {
-            if (redefinedArgCheck(opts, "pe", "pe")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("pe", args[i]));
-        } else if (endswith(std::string(args[i]), ".lib")) {
-            if (redefinedArgCheck(opts, "coff", "coff")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("coff", args[i]));
-        }
-    }
-    return opts;
-}
-
-static bool print_help() {
+bool print_help() {
     std::cout << "Spack's Windows compiler wrapper\n";
     std::cout << "Version: " << STRING(MSVC_WRAPPER_VERSION) << "\n";
     std::cout << "\n";
@@ -227,10 +137,100 @@ static bool print_help() {
     return true;
 }
 
+}  // namespace
+
+bool IsRelocate(const char* arg) {
+    return CLICheck(arg, "relocate");
+}
+
+bool IsReport(const char* arg) {
+    return CLICheck(arg, "report");
+}
+
+/**
+ * Parse the command line arguments supportin the relocate command
+ */
+std::map<std::string, std::string> ParseRelocate(const char** args, int argc) {
+    std::map<std::string, std::string> opts;
+    for (int i = 0; i < argc; i++) {
+        if (!strcmp(args[i], "--pe")) {
+            if (redefinedArgCheck(opts, "pe", "--pe")) {
+                opts.clear();
+                return opts;
+            }
+            opts.insert(std::pair<std::string, std::string>("pe", args[++i]));
+        } else if (!strcmp(args[i], "--coff")) {
+            if (redefinedArgCheck(opts, "coff", "--coff")) {
+                opts.clear();
+                return opts;
+            }
+            opts.insert(std::pair<std::string, std::string>("coff", args[++i]));
+        } else if (!strcmp(args[i], "--full")) {
+            if (redefinedArgCheck(opts, "full", "--full")) {
+                opts.clear();
+                return opts;
+            }
+            opts.insert(std::pair<std::string, std::string>("full", "full"));
+        } else if (!strcmp(args[i], "--export")) {
+            // export and deploy are mutually exclusive, if one is defined
+            // the other cannot be
+            if (redefinedArgCheck(opts, "export", "--export") ||
+                redefinedArgCheck(opts, "deploy", "--deploy")) {
+                opts.clear();
+                return opts;
+            }
+            opts.insert(std::pair<std::string, std::string>("cmd", "export"));
+        } else if (!strcmp(args[i], "--deploy")) {
+            // export and deploy are mutually exclusive, if one is defined
+            // the other cannot be
+            if (redefinedArgCheck(opts, "export", "--export") ||
+                redefinedArgCheck(opts, "deploy", "--deploy")) {
+                opts.clear();
+                return opts;
+            }
+            opts.insert(std::pair<std::string, std::string>("cmd", "deploy"));
+        } else if (!strcmp(args[i], "--debug") || !strcmp(args[i], "-d")) {
+            opts.insert(std::pair<std::string, std::string>("debug", "on"));
+        } else if (!strcmp(args[i], "--verify")) {
+            opts.insert(std::pair<std::string, std::string>("verify", "on"));
+        } else if (!strcmp(args[i], "--report")) {
+            opts.insert(
+                std::pair<std::string, std::string>("report", "report"));
+        } else {
+            // Unknown argument, warn the user it will not be used
+            std::cerr << "Unknown argument: " << args[i]
+                      << " will be ignored\n";
+        }
+    }
+    return opts;
+}
+
+std::map<std::string, std::string> ParseReport(int argc, const char** args) {
+    std::map<std::string, std::string> opts;
+    for (int i = 0; i < argc; ++i) {
+        if (endswith(std::string(args[i]), ".dll") ||
+            endswith(std::string(args[i]), ".exe")) {
+            if (redefinedArgCheck(opts, "pe", "pe")) {
+                opts.clear();
+                return opts;
+            }
+            opts.insert(std::pair<std::string, std::string>("pe", args[i]));
+        } else if (endswith(std::string(args[i]), ".lib")) {
+            if (redefinedArgCheck(opts, "coff", "coff")) {
+                opts.clear();
+                return opts;
+            }
+            opts.insert(std::pair<std::string, std::string>("coff", args[i]));
+        }
+    }
+    return opts;
+}
+
 bool CheckAndPrintHelp(const char** arg, int argc) {
     if (argc < 2) {
         return print_help();
-    } if (strcmp(arg[1], "--help") == 0 || strcmp(arg[1], "-h") == 0) {
+    }
+    if (strcmp(arg[1], "--help") == 0 || strcmp(arg[1], "-h") == 0) {
         return print_help();
     }
     return false;

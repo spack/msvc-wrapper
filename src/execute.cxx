@@ -14,6 +14,7 @@
 #include <processenv.h>
 #include <processthreadsapi.h>
 #include <winbase.h>
+#include <windows.h>  // NOLINT
 #include <winnt.h>
 
 #include <cstdlib>
@@ -174,11 +175,11 @@ int ExecuteCommand::PipeChildToStdStream(DWORD STD_HANDLE,
                 // since bSuccess is true
                 // So lets write until bSuccess is false or
                 // until all bytes are written
-                int current_pos = dw_written;
+                DWORD current_pos = dw_written;
                 while ((dw_written < dw_read) || dw_written == 0) {
                     dw_read = dw_read - dw_written;
                     CHAR* partial_buf = new CHAR[dw_read];
-                    for (int i = 0; i < dw_read; ++i) {
+                    for (DWORD i = 0; i < dw_read; ++i) {
                         partial_buf[i] = ch_buf[current_pos + i];
                     }
                     b_success = WriteFile(h_parent_out, partial_buf, dw_read,
@@ -284,7 +285,7 @@ int ExecuteCommand::Join() {
     // terminate, so the primary thread must be
     // joined first so we have a guaruntee that the
     // reader processes can exit
-    int const command_error = this->exit_code_future.get();
+    const int command_error = this->exit_code_future.get();
     if (!this->child_out_future.get())
         return -999;
     if (!this->child_err_future.get())

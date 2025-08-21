@@ -35,13 +35,13 @@
 //////////////////////////////////////////////////////////
 
 bool checkSizeTConversion(const std::string& str) {
-    constexpr int kMaxInt = (std::numeric_limits<int>::max)();
-    return str.length() <= static_cast<size_t>(kMaxInt);
+    constexpr int KMaxInt = (std::numeric_limits<int>::max)();
+    return str.length() > static_cast<size_t>(KMaxInt);
 }
 
 bool checkSizeTConversion(const std::wstring& wstr) {
-    constexpr int kMaxInt = (std::numeric_limits<int>::max)();
-    return wstr.length() <= static_cast<size_t>(kMaxInt);
+    constexpr int KMaxInt = (std::numeric_limits<int>::max)();
+    return wstr.length() > static_cast<size_t>(KMaxInt);
 }
 
 /**
@@ -205,8 +205,9 @@ void StripPath(std::string& command) {
  * \arg str - string to be made lowercase
  */
 void lower(std::string& str) {
-    std::transform(str.begin(), str.end(), str.begin(),
-                   [](unsigned char item) { return std::tolower(item); });
+    std::transform(str.begin(), str.end(), str.begin(), [](unsigned char item) {
+        return static_cast<char>(std::tolower(item));
+    });
 }
 
 std::string quoteAsNeeded(std::string& str) {
@@ -299,7 +300,7 @@ std::string regexReplace(
         composeRegexOptions(opts);
     std::regex_constants::match_flag_type const flag = composeMatchTypes(flags);
     std::regex const reg(regex, opt);
-    return std::regex_replace(replaceDomain, reg, replacement);
+    return std::regex_replace(replaceDomain, reg, replacement, flag);
 }
 
 /**
@@ -357,7 +358,6 @@ std::string stem(const std::string& file) {
 }
 
 std::string basename(const std::string& file) {
-std:
     size_t const last_path = file.find_last_of('\\') + 1;
     if (last_path == std::string::npos) {
         return file;
@@ -386,7 +386,7 @@ bool IsPathAbsolute(const std::string& pth) {
 DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER& section_header,
                       DWORD number_of_sections, DWORD rva) {
 
-    for (int i = 0; i < number_of_sections; ++i, ++section_header) {
+    for (DWORD i = 0; i < number_of_sections; ++i, ++section_header) {
         DWORD const section_start_rva = section_header->VirtualAddress;
         DWORD const section_end_rva =
             section_start_rva + section_header->SizeOfRawData;
@@ -428,7 +428,7 @@ void normalArg(std::string& arg) {
 std::string reportLastError() {
     DWORD const error = GetLastError();
     return std::system_category().message(
-        error);  // NOLINT(bugprone-narrowing-conversion)
+        error);  // NOLINT(bugprone-narrowing-conversions)
 }
 
 /**
@@ -438,7 +438,7 @@ std::string reportLastError() {
  * \param in a pointer to the string to replace the mangled path characters in
  * \param len the length of the mangled path
  */
-void replace_special_characters(char* mangled, int len) {
+void replace_special_characters(char* mangled, size_t len) {
     for (int i = 0; i < len; ++i) {
         if (special_character_to_path.count(mangled[i])) {
             mangled[i] = special_character_to_path.at(mangled[i]);
@@ -473,7 +473,7 @@ void replace_path_characters(char* path, size_t len) {
 char* pad_path(const char* pth, DWORD str_size, DWORD bsize) {
     size_t const extended_buf = bsize - str_size + 2;
     char* padded_path = new char[bsize + 1];
-    for (int i = 0, j = 0; i < bsize && j < str_size; ++i) {
+    for (DWORD i = 0, j = 0; i < bsize && j < str_size; ++i) {
         if (i < 2 || i >= extended_buf) {
             padded_path[i] = pth[j];
             ++j;
@@ -521,7 +521,8 @@ std::string mangle_name(const std::string& name) {
     char* chr_abs_out = new char[abs_out.length() + 1];
     strcpy(chr_abs_out, abs_out.c_str());
     replace_path_characters(chr_abs_out, abs_out.length());
-    char* padded_path = pad_path(chr_abs_out, abs_out.length());
+    char* padded_path =
+        pad_path(chr_abs_out, static_cast<DWORD>(abs_out.length()));
     mangled_abs_out = std::string(padded_path, MAX_NAME_LEN);
 
     delete[] chr_abs_out;
@@ -556,9 +557,9 @@ std::string LibraryFinder::FindLibrary(const std::string& lib_name,
     }
     // next search the CWD
     std::string const cwd(GetCWD());
-    auto res = LibraryFinder::Finder(cwd, lib_name);
-    if (!res.empty()) {
-        return res;
+    auto cwd_res = LibraryFinder::Finder(cwd, lib_name);
+    if (!cwd_res.empty()) {
+        return cwd_res;
     }
     this->EvalSearchPaths();
     if (this->evald_search_paths.empty()) {
@@ -640,9 +641,7 @@ std::vector<std::string> system_locations = {
 bool LibraryFinder::IsSystem(const std::string& pth) {
     return std::any_of(system_locations.cbegin(), system_locations.cend(),
                        [&](const std::string& loc) {
-                           if (pth.find(loc) != std::string::npos) {
-                               return true;
-                           }
+                           return pth.find(loc) != std::string::npos;
                        });
 }
 
@@ -673,7 +672,7 @@ int get_slash_name_length(const char* slash_name) {
     return len;
 }
 
-char* findstr(char* search_str, const char* substr, int size) {
+char* findstr(char* search_str, const char* substr, size_t size) {
     char* search = search_str;
     size_t const str_size = strlen(substr);
     while (search < search_str + size) {

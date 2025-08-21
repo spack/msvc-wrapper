@@ -3,31 +3,26 @@
  *
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
+#include <cstdio>
+#include <cstdio>
+#include <windows.h>  // NOLINT
 #include "winrpath.h"
 #include <fileapi.h>
 #include <handleapi.h>
 #include <memoryapi.h>
 #include <minwindef.h>
-#include <cstdio>
-#include "coff.h"
+#include <winnt.h>
 #include "coff_parser.h"
-#include "coff_pe_reporter.h"
 #include "coff_reader_writer.h"
 #include "execute.h"
-#include "linker_invocation.h"
 #include "utils.h"
 
-#include <cstddef>
-#include <cstdlib>
-#include <cstring>
 #include <fstream>
-#include <ios>
 #include <iosfwd>
 #include <iostream>
 #include <ostream>
 #include <string>
 #include <utility>
-#include <vector>
 
 /*
  * Checks a DLL name for special characters, if we're deploying, a path character, if we're
@@ -96,18 +91,19 @@ bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) const {
         std::string const new_library_loc =
             lib_finder.FindLibrary(file_name, dll_path);
         if (new_library_loc.empty()) {
-            std::cerr << "Unable to find library " << file_name << " at "
+            std::cerr << "Unable to find library " << file_name << " from "
                       << dll_path << " for relocation" << "\n";
             return false;
         }
-        char* new_lib =
-            pad_path(new_library_loc.c_str(), new_library_loc.size());
+        char* new_lib_pth =
+            pad_path(new_library_loc.c_str(),
+                     static_cast<DWORD>(new_library_loc.size()));
 
-        replace_special_characters(new_lib, MAX_NAME_LEN);
+        replace_special_characters(new_lib_pth, MAX_NAME_LEN);
 
         // c_str returns a proper (i.e. null terminated) value, so we dont need to worry about
         // size differences w.r.t the path to the new library
-        snprintf(name_loc, MAX_NAME_LEN + 1, "%s", new_lib);
+        snprintf(name_loc, MAX_NAME_LEN + 1, "%s", new_lib_pth);
     }
     return true;
 }
@@ -241,9 +237,9 @@ LibRename::LibRename(std::string p_exe, std::string coff, bool full,
                      bool deploy, bool replace)
     : replace(replace),
       full(full),
-      pe(std::move(std::move(p_exe))),
+      pe(std::move(p_exe)),
       deploy(deploy),
-      coff(std::move(std::move(coff))) {
+      coff(std::move(coff)) {
     this->is_exe = endswith(this->pe, ".exe");
     std::string const coff_path = stem(this->coff);
     this->tmp_def_file = coff_path + "-tmp.def";
@@ -271,8 +267,8 @@ std::string LibRename::ComputeDefLine() {
  */
 bool LibRename::ComputeDefFile() {
     this->def_executor.Execute(this->tmp_def_file);
-    int const res = this->def_executor.Join();
-    if (res) {
+    int const def_res = this->def_executor.Join();
+    if (def_res) {
         return false;
     }
     // Need to process the produced def file because it's wrong
@@ -393,8 +389,8 @@ bool LibRename::ExecuteLibRename() {
     // mangled abs path to dll -
     // unmangle it
     CoffReaderWriter coff_reader(this->coff);
-    CoffParser coff(&coff_reader);
-    int const coff_parse_valid = coff.Verify();
+    CoffParser coff_parser(&coff_reader);
+    int const coff_parse_valid = coff_parser.Verify();
     if (coff_parse_valid) {
         std::cerr << "Unable to parse generated import library {"
                   << this->new_lib << "}: ";
@@ -405,7 +401,7 @@ bool LibRename::ExecuteLibRename() {
         return false;
     }
     std::string mangled_name = mangle_name(this->pe);
-    if (!coff.NormalizeName(mangled_name)) {
+    if (!coff_parser.NormalizeName(mangled_name)) {
         std::cerr << "Unable to normalize name: " << mangled_name << "\n";
         return false;
     }

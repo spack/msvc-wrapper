@@ -92,7 +92,7 @@ int get_slash_name_length(const char* slash_name);
 
 // Implementation of strstr but serch is bounded at size and
 // does not terminate on the first read nullptr
-char* findstr(char* search_str, const char* substr, int size);
+char* findstr(char* search_str, const char* substr, size_t size);
 
 // Adds quote to relevent strings in a list of strings
 // Strings to be quoted contain: spaces, or any of &<>|()
@@ -152,9 +152,9 @@ int get_padding_length(const std::string& name);
 
 char* pad_path(const char* pth, DWORD str_size, DWORD bsize = MAX_NAME_LEN);
 
-void replace_path_characters(char* path, int len);
+void replace_path_characters(char* path, size_t len);
 
-void replace_special_characters(char* mangled, int len);
+void replace_special_characters(char* mangled, size_t len);
 
 // File and File handle helpers //
 

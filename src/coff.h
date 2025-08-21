@@ -7,6 +7,7 @@
 
 #include <minwindef.h>
 #include <strsafe.h>
+#include <windows.h>
 #include <winnt.h>
 #include <iosfwd>
 #include <vector>

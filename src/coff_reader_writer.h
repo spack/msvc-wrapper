@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include <windows.h>
 #include <winnt.h>
 #include <fstream>
 #include <iosfwd>
@@ -16,10 +17,10 @@
 class CoffReaderWriter {
    private:
     std::fstream pe_stream_;
-    std::string file_;
+    std::string const file_;
 
    public:
-    explicit CoffReaderWriter(std::string file);
+    explicit CoffReaderWriter(std::string const& file);
     ~CoffReaderWriter() = default;
     bool Open();
     bool Close();
@@ -28,9 +29,10 @@ class CoffReaderWriter {
     void ReadHeader(PIMAGE_ARCHIVE_MEMBER_HEADER coff_in);
     void ReadMember(PIMAGE_ARCHIVE_MEMBER_HEADER head, coff_member* coff_in);
     bool ReadSig(coff& coff_in);
-    void write(char* in, int size);
+    void write(char* stream_in, long long size);
     void read(char* out, int size);
-    void seek(int bytes = -1, std::ios_base::seekdir way = std::ios_base::beg);
+    void seek(long long bytes = -1,
+              std::ios_base::seekdir way = std::ios_base::beg);
     int peek();
     void clear();
     void flush();

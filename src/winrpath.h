@@ -5,9 +5,11 @@
  */
 #pragma once
 
-#include <windows.h>
+#include <windows.h>  // NOLINT
+#include <handleapi.h>
 #include <winnt.h>
 #include <string>
+#include "execute.h"
 
 /**
  * @brief Encapsulates a stream for reading and writing to a coff object

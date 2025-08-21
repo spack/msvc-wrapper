@@ -6,6 +6,7 @@
 #pragma once
 
 #include <strsafe.h>
+#include <windows.h>  // NOLINT
 #include <winnt.h>
 #include <string>
 
@@ -25,14 +26,14 @@ class CoffParser {
     static void ReportLongImportMember(long_import_member* long_import);
     static void ReportShortImportMember(short_import_member* short_import);
     static void ReportLongName(const char* data);
-    void NormalizeLinkerMember(const std::string& name, const int& base_offset,
-                               const int& offset, const char* strings,
-                               DWORD symbols);
+    void NormalizeLinkerMember(const std::string& name,
+                               const size_t& base_offset, const size_t& offset,
+                               const char* strings, DWORD symbols);
     void NormalizeSectionNames(const std::string& name, char* section,
                                const DWORD& section_data_start_offset,
-                               int data_size);
+                               size_t data_size);
     static bool ValidateLongName(coff_member* member, int size);
-    void writeRename(char* name, int size, int loc);
+    void writeRename(char* name, size_t size, size_t loc);
     static bool matchesName(char* old_name, const std::string& new_name);
 
    public:

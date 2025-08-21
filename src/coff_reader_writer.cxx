@@ -5,102 +5,90 @@
  */
 
 #include "coff_reader_writer.h"
-#include <fileapi.h>
-#include <handleapi.h>
-#include <memoryapi.h>
-#include <minwindef.h>
-#include <cstdio>
 #include "coff.h"
-#include "coff_parser.h"
-#include "coff_pe_reporter.h"
-#include "linker_invocation.h"
-#include "utils.h"
 
 #include <winnt.h>
 #include <cstdlib>
 #include <cstring>
-#include <fstream>
 #include <ios>
 #include <iosfwd>
 #include <iostream>
-#include <ostream>
 #include <string>
 #include <utility>
-#include <vector>
 
-CoffReaderWriter::CoffReaderWriter(std::string file)
-    : _file(std::move(std::move(file))) {}
+CoffReaderWriter::CoffReaderWriter(std::string const& file)
+    : file_(std::move(file)) {}
 
 bool CoffReaderWriter::Open() {
-    this->pe_stream.open(this->_file,
-                         std::ios::in | std::ios::out | std::ios::binary);
-    return this->pe_stream.is_open();
+    this->pe_stream_.open(this->file_,
+                          std::ios::in | std::ios::out | std::ios::binary);
+    return this->pe_stream_.is_open();
 }
 
 bool CoffReaderWriter::Close() {
-    this->pe_stream.close();
-    return !this->pe_stream.is_open();
+    this->pe_stream_.close();
+    return !this->pe_stream_.is_open();
 }
 
 void CoffReaderWriter::clear() {
-    this->pe_stream.clear();
+    this->pe_stream_.clear();
 }
 
 bool CoffReaderWriter::IsOpen() {
-    return this->pe_stream.is_open();
+    return this->pe_stream_.is_open();
 }
 
 bool CoffReaderWriter::IsClosed() {
-    return !this->pe_stream.is_open();
+    return !this->pe_stream_.is_open();
 }
 
 bool CoffReaderWriter::ReadSig(coff& coff_in) {
-    this->pe_stream.read(reinterpret_cast<char*>(&coff_in.signature),
-                         IMAGE_ARCHIVE_START_SIZE);
+    this->pe_stream_.read(reinterpret_cast<char*>(&coff_in.signature),
+                          IMAGE_ARCHIVE_START_SIZE);
     return strcmp(coff_in.signature, IMAGE_ARCHIVE_START) != 0;
 }
 
 void CoffReaderWriter::ReadHeader(PIMAGE_ARCHIVE_MEMBER_HEADER coff_in) {
-    this->pe_stream.read(reinterpret_cast<char*>(coff_in),
-                         sizeof(IMAGE_ARCHIVE_MEMBER_HEADER));
+    this->pe_stream_.read(reinterpret_cast<char*>(coff_in),
+                          sizeof(IMAGE_ARCHIVE_MEMBER_HEADER));
 }
 
 void CoffReaderWriter::ReadMember(PIMAGE_ARCHIVE_MEMBER_HEADER head,
                                   coff_member* coff_in) {
     int const member_size = atoi(reinterpret_cast<char*>(head->Size));
     coff_in->data = new char[member_size];
-    this->pe_stream.read(coff_in->data, member_size);
+    this->pe_stream_.read(coff_in->data, member_size);
     if (member_size % 2 != 0) {
         this->seek(1, std::ios_base::cur);
     }
 }
 
 std::string CoffReaderWriter::get_file() {
-    return this->_file;
+    return this->file_;
 }
 
 std::streampos CoffReaderWriter::tell() {
-    return this->pe_stream.tellg();
+    return this->pe_stream_.tellg();
 }
 
-void CoffReaderWriter::seek(int bytes, std::ios_base::seekdir way) {
-    this->pe_stream.seekg(bytes, way);
+void CoffReaderWriter::seek(long long bytes, std::ios_base::seekdir way) {
+    this->pe_stream_.seekg(bytes, way);
 }
 
 int CoffReaderWriter::peek() {
-    return this->pe_stream.peek();
+    return this->pe_stream_.peek();
 }
 
 bool CoffReaderWriter::end() {
-    return this->pe_stream.eof();
+    return this->pe_stream_.eof();
 }
 
 void CoffReaderWriter::read(char* out, int size) {
-    this->pe_stream.read(out, size);
+    this->pe_stream_.read(out, size);
 }
 
-void CoffReaderWriter::write(char* stream_in, int size) {
-    this->pe_stream.write(stream_in, size);
+void CoffReaderWriter::write(char* stream_in, long long size) {
+    this->pe_stream_.write(stream_in, size);
 }
 
 /**
@@ -112,5 +100,5 @@ void CoffReaderWriter::write(char* stream_in, int size) {
  * in real time
  */
 void CoffReaderWriter::flush() {
-    this->pe_stream.flush();
+    this->pe_stream_.flush();
 }

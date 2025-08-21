@@ -5,10 +5,12 @@
  */
 #include "ld.h"
 #include <cstdio>
+#include "coff_parser.h"
+#include "coff_reader_writer.h"
+#include "linker_invocation.h"
 #include "spack_env.h"
 #include "toolchain.h"
 #include "utils.h"
-#include "winrpath.h"
 
 void LdInvocation::LoadToolchainDependentSpackVars(SpackEnvState& spackenv) {
     this->command = spackenv.SpackLD;

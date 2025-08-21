@@ -38,6 +38,7 @@ Checks: >
   -google-readability-namespace-comments,
   -google-readability-casting,
   -google-runtime-references,
+  -google-runtime-int,
   -misc-non-private-member-variables-in-classes,
   -modernize-return-braced-init-list,
   -performance-move-const-arg,

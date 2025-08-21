@@ -8,6 +8,8 @@
 #include <map>
 #include <memory>
 #include <string>
+#include "coff_parser.h"
+#include "coff_reader_writer.h"
 #include "commandline.h"
 #include "spack_env.h"
 #include "toolchain.h"
