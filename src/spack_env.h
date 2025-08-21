@@ -16,7 +16,7 @@
  * by this method and are accessible as c++ lists
  * Variables that are simple strings are also treated as such
  */
-struct SpackEnvState{
+struct SpackEnvState {
     std::string AddDebugFlags;
     StrList SpackFFlags;
     StrList SpackCFlags;
@@ -43,7 +43,7 @@ struct SpackEnvState{
     // SpackCXX is unused in the current implementation
     // but is left here for future compatibility with
     // compilers with distinct c/cxx compilers unlink MSVC
-    std::string SpackCXX; 
+    std::string SpackCXX;
     std::string SpackFC;
     std::string SpackF77;
     std::string SpackRoot;

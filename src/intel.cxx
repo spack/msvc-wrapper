@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include "intel.h"
+#include "spack_env.h"
 
-void FortranInvocation::LoadToolchainDependentSpackVars(SpackEnvState &spackenv) {
+void FortranInvocation::LoadToolchainDependentSpackVars(
+    SpackEnvState& spackenv) {
     this->command = spackenv.SpackFC;
 }
