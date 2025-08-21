@@ -29,10 +29,10 @@ class ExecuteCommand {
     ExecuteCommand(std::string command);
     ExecuteCommand(std::string arg, const StrList& args);
     ExecuteCommand() = default;
-    ExecuteCommand& operator=(ExecuteCommand&& ec) noexcept;
+    ExecuteCommand& operator=(ExecuteCommand&& execute_command) noexcept;
     ~ExecuteCommand();
     bool Execute(const std::string& filename = empty);
-    int Join();
+    DWORD Join();
 
    private:
     void SetupExecute();
@@ -40,7 +40,7 @@ class ExecuteCommand {
     int PipeChildToStdStream(DWORD STD_HANDLE, HANDLE reader_handle);
     int CreateChildPipes();
     int CleanupHandles();
-    int ReportExitCode();
+    DWORD ReportExitCode();
     // Holds the exit code of the
     // pipe from child process stdout
     // to parent std out or file
@@ -50,7 +50,7 @@ class ExecuteCommand {
     std::future<int> child_err_future;
     // Holds the exit code of the
     // command wrapped by this class
-    std::future<int> exit_code_future;
+    std::future<DWORD> exit_code_future;
     std::string ComposeCLI();
     HANDLE ChildStdOut_Rd;
     HANDLE ChildStdOut_Wd;

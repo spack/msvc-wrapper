@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include "toolchain.h"
+#include <minwindef.h>
 
 #include <iostream>
 #include <string>
@@ -34,7 +35,7 @@ void ToolChainInvocation::InterpolateSpackEnv(SpackEnvState& spackenv) {
     this->LoadToolchainDependentSpackVars(spackenv);
 }
 
-int ToolChainInvocation::InvokeToolchain() {
+DWORD ToolChainInvocation::InvokeToolchain() {
     StrList const command_line(ToolChainInvocation::ComposeCommandLists(
         {this->command_args, this->include_args, this->lib_args,
          this->lib_dir_args, this->obj_args}));

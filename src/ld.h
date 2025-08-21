@@ -14,7 +14,7 @@
 class LdInvocation : public ToolChainInvocation {
    public:
     using ToolChainInvocation::ToolChainInvocation;
-    virtual int InvokeToolchain();
+    virtual DWORD InvokeToolchain();
 
    protected:
     void LoadToolchainDependentSpackVars(SpackEnvState& spackenv);

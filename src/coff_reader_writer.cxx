@@ -71,8 +71,8 @@ std::streampos CoffReaderWriter::tell() {
     return this->pe_stream_.tellg();
 }
 
-void CoffReaderWriter::seek(long long bytes, std::ios_base::seekdir way) {
-    this->pe_stream_.seekg(bytes, way);
+void CoffReaderWriter::seek(size_t bytes, std::ios_base::seekdir way) {
+    this->pe_stream_.seekg(static_cast<long long>(bytes), way);
 }
 
 int CoffReaderWriter::peek() {
@@ -87,8 +87,8 @@ void CoffReaderWriter::read(char* out, int size) {
     this->pe_stream_.read(out, size);
 }
 
-void CoffReaderWriter::write(char* stream_in, long long size) {
-    this->pe_stream_.write(stream_in, size);
+void CoffReaderWriter::write(char* stream_in, size_t size) {
+    this->pe_stream_.write(stream_in, static_cast<long long>(size));
 }
 
 /**

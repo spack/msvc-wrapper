@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include <cstdio>
-#include <cstdio>
+#include <stdio.h>
 #include <windows.h>  // NOLINT
 #include "winrpath.h"
 #include <fileapi.h>
@@ -267,7 +267,7 @@ std::string LibRename::ComputeDefLine() {
  */
 bool LibRename::ComputeDefFile() {
     this->def_executor.Execute(this->tmp_def_file);
-    int const def_res = this->def_executor.Join();
+    DWORD const def_res = this->def_executor.Join();
     if (def_res) {
         return false;
     }
@@ -377,7 +377,7 @@ bool LibRename::ExecuteRename() {
  */
 bool LibRename::ExecuteLibRename() {
     this->lib_executor.Execute();
-    int const ret_code = this->lib_executor.Join();
+    DWORD const ret_code = this->lib_executor.Join();
     if (ret_code != 0) {
         std::cerr << "Lib Rename failed with exit code: " << ret_code << "\n";
         return false;

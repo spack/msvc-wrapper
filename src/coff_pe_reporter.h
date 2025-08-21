@@ -90,7 +90,7 @@ inline void reportCoffSections(const long_import_member* mem) {
 }
 
 inline void reportCoffSymbols(const long_import_member* mem) {
-    for (int i = 0; i < mem->pfile_h->NumberOfSymbols; ++i) {
+    for (DWORD i = 0; i < mem->pfile_h->NumberOfSymbols; ++i) {
         PIMAGE_SYMBOL sym = mem->symbol_table + i;
         reportImageSymbol(sym);
         DWORD name_string_table_offset;

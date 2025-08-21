@@ -17,6 +17,7 @@
 #include <windows.h>  // NOLINT
 #include <winnt.h>
 
+#include <cstdint>
 #include <cstdlib>
 #include <future>
 #include <iostream>
@@ -24,10 +25,12 @@
 #include <utility>
 #include "utils.h"
 
+enum : std::uint16_t { InvalidExitCode = 999 };
+
 ExecuteCommand::ExecuteCommand(std::string command)
     : ChildStdOut_Rd(nullptr),
       ChildStdOut_Wd(nullptr),
-      base_command(std::move(std::move(command))) {
+      base_command(std::move(command)) {
     this->CreateChildPipes();
     this->SetupExecute();
 }
@@ -35,25 +38,26 @@ ExecuteCommand::ExecuteCommand(std::string command)
 ExecuteCommand::ExecuteCommand(std::string arg, const StrList& args)
     : ChildStdOut_Rd(nullptr),
       ChildStdOut_Wd(nullptr),
-      base_command(std::move(std::move(arg))) {
-    for (const auto& a : args) {
-        this->command_args.push_back(a);
+      base_command(std::move(arg)) {
+    for (const auto& arg : args) {
+        this->command_args.push_back(arg);
     }
     this->CreateChildPipes();
     this->SetupExecute();
 }
 
-ExecuteCommand& ExecuteCommand::operator=(ExecuteCommand&& ec) noexcept {
-    this->ChildStdOut_Rd = std::move(ec.ChildStdOut_Rd);
-    this->ChildStdOut_Wd = std::move(ec.ChildStdOut_Wd);
-    this->procInfo = std::move(ec.procInfo);
-    this->startInfo = std::move(ec.startInfo);
-    this->saAttr = std::move(ec.saAttr);
-    this->fileout = std::move(ec.fileout);
-    this->write_to_file = std::move(ec.write_to_file);
-    this->base_command = std::move(ec.base_command);
-    this->command_args = std::move(ec.command_args);
-    this->child_out_future = std::move(ec.child_out_future);
+ExecuteCommand& ExecuteCommand::operator=(
+    ExecuteCommand&& execute_command) noexcept {
+    this->ChildStdOut_Rd = std::move(execute_command.ChildStdOut_Rd);
+    this->ChildStdOut_Wd = std::move(execute_command.ChildStdOut_Wd);
+    this->procInfo = std::move(execute_command.procInfo);
+    this->startInfo = std::move(execute_command.startInfo);
+    this->saAttr = std::move(execute_command.saAttr);
+    this->fileout = std::move(execute_command.fileout);
+    this->write_to_file = std::move(execute_command.write_to_file);
+    this->base_command = std::move(execute_command.base_command);
+    this->command_args = std::move(execute_command.command_args);
+    this->child_out_future = std::move(execute_command.child_out_future);
     this->exit_code_future = std::move(exit_code_future);
     return *this;
 }
@@ -222,7 +226,7 @@ int ExecuteCommand::CleanupHandles() {
  * Reports the exit code of a given process, used as a callback to report
  * on the status of wrapped process which is performed asynchronously
  */
-int ExecuteCommand::ReportExitCode() {
+DWORD ExecuteCommand::ReportExitCode() {
     DWORD exit_code;
     while (GetExitCodeProcess(this->procInfo.hProcess, &exit_code)) {
         if (exit_code != STILL_ACTIVE)
@@ -278,17 +282,17 @@ bool ExecuteCommand::Execute(const std::string& filename) {
  * Blocks until the command initiated by execute terminates
  * and reports exit code of the process
  */
-int ExecuteCommand::Join() {
+DWORD ExecuteCommand::Join() {
     // Join primary thread first
     // This process sets the termianted flag
     // without which the reader threads will not
     // terminate, so the primary thread must be
     // joined first so we have a guaruntee that the
     // reader processes can exit
-    const int command_error = this->exit_code_future.get();
+    const DWORD command_error = this->exit_code_future.get();
     if (!this->child_out_future.get())
-        return -999;
+        return InvalidExitCode;
     if (!this->child_err_future.get())
-        return -999;
+        return InvalidExitCode;
     return command_error;
 }

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include "ld.h"
+#include <minwindef.h>
 #include <cstdio>
 #include "coff_parser.h"
 #include "coff_reader_writer.h"
@@ -16,10 +17,10 @@ void LdInvocation::LoadToolchainDependentSpackVars(SpackEnvState& spackenv) {
     this->command = spackenv.SpackLD;
 }
 
-int LdInvocation::InvokeToolchain() {
+DWORD LdInvocation::InvokeToolchain() {
     // Run base linker invocation to produce initial
     // dll and import library
-    int const ret_code = ToolChainInvocation::InvokeToolchain();
+    DWORD const ret_code = ToolChainInvocation::InvokeToolchain();
     if (ret_code != 0) {
         return ret_code;
     }
@@ -32,7 +33,6 @@ int LdInvocation::InvokeToolchain() {
     link_run.Parse();
     // We're creating a dll, we need to create an appropriate import lib
     if (!link_run.IsExeLink()) {
-        std::string const basename = link_run.get_name();
         std::string const imp_lib_name = link_run.get_implib_name();
         std::string dll_name = link_run.get_mangled_out();
         std::string const abs_out_imp_lib_name = imp_lib_name + ".dll-abs.lib";
@@ -50,7 +50,7 @@ int LdInvocation::InvokeToolchain() {
                 this->lib_dir_args,
             }));
         this->rpath_executor.Execute();
-        int const err_code = this->rpath_executor.Join();
+        DWORD const err_code = this->rpath_executor.Join();
         if (err_code != 0) {
             return err_code;
         }

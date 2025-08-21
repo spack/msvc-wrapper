@@ -666,7 +666,7 @@ int get_slash_name_length(const char* slash_name) {
     }
     int len = 0;
     // Maximum length for a given name in the PE/COFF format is 143 chars
-    while (slash_name[len] != '/' && len < 144) {
+    while (slash_name[len] != '/' && len <= MAX_NAME_LEN) {
         ++len;
     }
     return len;

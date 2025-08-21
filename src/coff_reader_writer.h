@@ -29,9 +29,9 @@ class CoffReaderWriter {
     void ReadHeader(PIMAGE_ARCHIVE_MEMBER_HEADER coff_in);
     void ReadMember(PIMAGE_ARCHIVE_MEMBER_HEADER head, coff_member* coff_in);
     bool ReadSig(coff& coff_in);
-    void write(char* stream_in, long long size);
+    void write(char* stream_in, size_t size);
     void read(char* out, int size);
-    void seek(long long bytes = -1,
+    void seek(size_t bytes = -1,
               std::ios_base::seekdir way = std::ios_base::beg);
     int peek();
     void clear();
