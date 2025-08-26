@@ -58,12 +58,12 @@ DWORD LdInvocation::InvokeToolchain() {
         CoffParser coff(&coff_reader);
         if (!coff.Parse()) {
             debug("Failed to parse COFF file: " + abs_out_imp_lib_name);
-            return 9;
+            return ExitConditions::COFF_PARSE_FAILURE;
         }
         if (!coff.NormalizeName(dll_name)) {
             debug("Failed to normalize name for COFF file: " +
                   abs_out_imp_lib_name);
-            return 9;
+            return ExitConditions::NORMALIZE_NAME_FAILURE;
         }
         debug("Renaming library from " + abs_out_imp_lib_name + " to " +
               imp_lib_name);
@@ -71,14 +71,14 @@ DWORD LdInvocation::InvokeToolchain() {
         if (remove_exitcode) {
             debug("Failed to remove original import library with exit code: " +
                   remove_exitcode);
-            return 10;
+            return ExitConditions::LIB_REMOVE_FAILURE;
         }
         int const rename_exitcode =
             std::rename(abs_out_imp_lib_name.c_str(), imp_lib_name.c_str());
         if (rename_exitcode) {
             debug("Failed to rename temporary import library with exit code: " +
                   rename_exitcode);
-            return 11;
+            return ExitConditions::FILE_RENAME_FAILURE;
         }
     }
     return ret_code;

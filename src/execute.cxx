@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <future>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include "utils.h"
@@ -121,8 +122,14 @@ int ExecuteCommand::CreateChildPipes() {
  */
 bool ExecuteCommand::ExecuteToolChainChild() {
     LPVOID lp_msg_buf;
+    std::wstring c_command_line;
     debug("Executing Command: " + this->ComposeCLI());
-    const std::wstring c_command_line = ConvertAnsiToWide(this->ComposeCLI());
+    try {
+        c_command_line = ConvertAnsiToWide(this->ComposeCLI());
+    } catch (const std::overflow_error& e) {
+        std::cerr << e.what() << "\n";
+        return false;
+    }
     wchar_t* nc_command_line = _wcsdup(c_command_line.c_str());
     if (!CreateProcessW(nullptr, nc_command_line, nullptr, nullptr, TRUE, 0,
                         nullptr, nullptr, &this->startInfo, &this->procInfo)) {
@@ -132,8 +139,17 @@ bool ExecuteCommand::ExecuteToolChainChild() {
                 FORMAT_MESSAGE_IGNORE_INSERTS,
             nullptr, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
             reinterpret_cast<LPTSTR>(&lp_msg_buf), 0, nullptr);
-        std::cerr << "Failed to initiate child process from: "
-                  << ConvertWideToANSI(nc_command_line) << " ";
+
+        try {
+            std::cerr << "Failed to initiate child process from: "
+                      << ConvertWideToANSI(nc_command_line) << " ";
+        } catch (const std::overflow_error& e) {
+            std::cerr << "While handling the exception below another exception "
+                         "occured\n";
+            std::cerr << e.what() << "\n";
+            std::cerr << "Previous exception was:\n";
+        }
+
         std::cerr << "With error: ";
         std::cerr << static_cast<char*>(lp_msg_buf) << "\n";
         free(nc_command_line);
@@ -259,10 +275,15 @@ std::string ExecuteCommand::ComposeCLI() {
 bool ExecuteCommand::Execute(const std::string& filename) {
     if (!filename.empty()) {
         this->write_to_file = true;
-        this->fileout =
-            CreateFileW(ConvertAnsiToWide(filename).c_str(), FILE_APPEND_DATA,
-                        FILE_SHARE_WRITE | FILE_SHARE_READ, &this->saAttr,
-                        OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        try {
+            this->fileout = CreateFileW(
+                ConvertAnsiToWide(filename).c_str(), FILE_APPEND_DATA,
+                FILE_SHARE_WRITE | FILE_SHARE_READ, &this->saAttr, OPEN_ALWAYS,
+                FILE_ATTRIBUTE_NORMAL, nullptr);
+        } catch (const std::overflow_error& e) {
+            std::cerr << e.what() << "\n";
+            return false;
+        }
     }
     bool const ret_code = this->ExecuteToolChainChild();
     if (ret_code) {

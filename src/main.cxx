@@ -47,34 +47,34 @@ int main(int argc, const char* argv[]) {
         // relocated DLL, but with an EXE there is nothing to do
         if (!has_coff && !has_pe) {
             std::cout << "No binaries to operate on... nothing to do\n";
-            return -1;
+            return ExitConditions::CLI_FAILURE;
         }
         if (is_exe && !full) {
             std::cout << "Executable file provided but --full not specified, "
                          "nothing to do...\n";
-            return -1;
+            return ExitConditions::CLI_FAILURE;
         }
         // The only scenario its ok to have a dll/exe and no coff is when we're creating a cache
         // entry
         if (!is_exe && !has_coff && !deploy) {
             std::cout << "Attempting to relocate DLL without coff file, please "
                          "provide a coff file.\n";
-            return -1;
+            return ExitConditions::CLI_FAILURE;
         }
         if (is_validate && !has_coff) {
             std::cout << "Attempting to validate without a coff file, nothing "
                          "to validate\n";
-            return -1;
+            return ExitConditions::CLI_FAILURE;
         }
         if (report && !has_coff) {
             std::cout << "Attempting to report without a binary, nothing to "
                          "report...\n";
-            return -1;
+            return ExitConditions::CLI_FAILURE;
         }
         if (!(is_validate || report) && !has_pe) {
             std::cout << "Attempting to perform relocation without a PE file, "
                          "please provide one.\n";
-            return -1;
+            return ExitConditions::CLI_FAILURE;
         }
         if (is_validate) {
             return CoffParser::Validate(patch_args.at("coff"));
@@ -83,9 +83,9 @@ int main(int argc, const char* argv[]) {
             CoffReaderWriter coff_reader(patch_args.at("coff"));
             CoffParser coff(&coff_reader);
             if (!reportCoff(coff)) {
-                return 1;
+                return ExitConditions::REPORT_FAILURE;
             }
-            return 0;
+            return ExitConditions::SUCCESS;
         }
         DEBUG = debug;
         std::unique_ptr<LibRename> rpath_lib;
@@ -98,7 +98,7 @@ int main(int argc, const char* argv[]) {
         }
         if (!rpath_lib->ExecuteRename()) {
             std::cerr << "Library rename failed\n";
-            return 9;
+            return ExitConditions::RENAME_FAILURE;
         }
     } else if (IsReport(argv[0])) {
         std::map<std::string, std::string> report_args =
@@ -107,7 +107,7 @@ int main(int argc, const char* argv[]) {
             std::cerr << "Unable to parse command line for reporting\n"
                       << "run command with --help flag for accepted command "
                          "line arguments\n";
-            return -1;
+            return ExitConditions::CLI_FAILURE;
         }
         if (report_args.find("pe") != report_args.end()) {
             LibRename portable_executable(report_args.at("pe"), std::string(),
@@ -121,13 +121,13 @@ int main(int argc, const char* argv[]) {
     } else {
         // Ensure required variables are set
         if (!ValidateSpackEnv()) {
-            return -99;
+            return ExitConditions::INVALID_ENVIRONMENT;
         }
         // Determine which tool we're trying to run
         std::unique_ptr<ToolChainInvocation> const tchain(
             ToolChainFactory::ParseToolChain(argv));
         if (!tchain) {
-            return -3;
+            return ExitConditions::TOOLCHAIN_FAILURE;
         }
         // Establish Spack compiler/linker modifications from env
         SpackEnvState spack = SpackEnvState::LoadSpackEnvState();
@@ -141,5 +141,5 @@ int main(int argc, const char* argv[]) {
         }
         return h_res;
     }
-    return 0;
+    return ExitConditions::SUCCESS;
 }

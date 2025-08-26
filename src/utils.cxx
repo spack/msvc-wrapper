@@ -372,7 +372,13 @@ std::string GetCWD() {
     GetCurrentDirectoryW(buf_size, w_cwd);
     std::wstring const ws_cwd(w_cwd);
     free(w_cwd);
-    return ConvertWideToANSI(ws_cwd);
+    try {
+        std::string s_cwd = ConvertWideToANSI(ws_cwd);
+        return s_cwd;
+    } catch (const std::overflow_error& e) {
+        std::cerr << e.what() << "\n";
+        return std::string();
+    }
 }
 
 bool IsPathAbsolute(const std::string& pth) {
@@ -604,9 +610,14 @@ std::string LibraryFinder::Finder(const std::string& pth,
     // Globs all files at the provided path and matches to search
     // for lib name
     std::string const searcher = pth + "\\*";
-    HANDLE h_find =
-        FindFirstFileW(ConvertAnsiToWide(searcher).c_str(), &find_file_data);
-
+    std::wstring search_str;
+    try {
+        search_str = ConvertAnsiToWide(searcher);
+    } catch (const std::overflow_error& e) {
+        std::cerr << e.what() << "\n";
+        return std::string();
+    }
+    HANDLE h_find = FindFirstFileW(search_str.c_str(), &find_file_data);
     if (h_find == INVALID_HANDLE_VALUE) {
         std::cerr << "Find file failed: " << reportLastError() << " "
                   << searcher << "\n";
@@ -615,9 +626,14 @@ std::string LibraryFinder::Finder(const std::string& pth,
     }
 
     do {
-        if (wcscmp(find_file_data.cFileName,
-                   ConvertAnsiToWide(lib_name).c_str()) == 0) {
-            return pth + "\\" + ConvertWideToANSI(find_file_data.cFileName);
+        try {
+            if (wcscmp(find_file_data.cFileName,
+                       ConvertAnsiToWide(lib_name).c_str()) == 0) {
+                return pth + "\\" + ConvertWideToANSI(find_file_data.cFileName);
+            }
+        } catch (const std::overflow_error& e) {
+            debug("Overflow converting " + lib_name +
+                  "to alternate representation\n" + "Exception: " + e.what());
         }
     } while (FindNextFileW(h_find, &find_file_data));
 

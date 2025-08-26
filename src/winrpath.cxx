@@ -21,6 +21,7 @@
 #include <iosfwd>
 #include <iostream>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -68,7 +69,7 @@ bool LibRename::SpackCheckForDll(const std::string& dll_path) const {
 bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) const {
     if (this->deploy) {
         int const padding_len = get_padding_length(dll_path);
-        if (padding_len < 8) {
+        if (padding_len < MIN_PADDING_THRESHOLD) {
             // path is too long to mark as a Spack path
             // use shorter sigil
             char short_sigil[] = "<sp>";
@@ -413,7 +414,13 @@ bool LibRename::ExecuteLibRename() {
  * 
  */
 bool LibRename::ExecutePERename() {
-    std::wstring const pe_path = ConvertAnsiToWide(this->pe);
+    std::wstring pe_path;
+    try {
+        pe_path = ConvertAnsiToWide(this->pe);
+    } catch (const std::overflow_error& e) {
+        std::cerr << e.what() << "\n";
+        return false;
+    }
     HANDLE pe_handle = CreateFileW(
         pe_path.c_str(), (GENERIC_READ | GENERIC_WRITE), FILE_SHARE_READ,
         nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);

@@ -24,6 +24,22 @@
 
 #define MAX_NAME_LEN 143
 
+#define MIN_PADDING_THRESHOLD 8
+
+enum ExitConditions {
+    SUCCESS = 0,
+    CLI_FAILURE,
+    REPORT_FAILURE,
+    RENAME_FAILURE,
+    INVALID_ENVIRONMENT,
+    INVALID_TOOLCHAIN,
+    TOOLCHAIN_FAILURE,
+    LIB_REMOVE_FAILURE,
+    NORMALIZE_NAME_FAILURE,
+    COFF_PARSE_FAILURE,
+    FILE_RENAME_FAILURE
+};
+
 typedef std::vector<std::string> StrList;
 
 // Environment Helper Methods
