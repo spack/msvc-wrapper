@@ -125,7 +125,7 @@ bool ExecuteCommand::ExecuteToolChainChild() {
     std::wstring c_command_line;
     debug("Executing Command: " + this->ComposeCLI());
     try {
-        c_command_line = ConvertAnsiToWide(this->ComposeCLI());
+        c_command_line = ConvertASCIIToWide(this->ComposeCLI());
     } catch (const std::overflow_error& e) {
         std::cerr << e.what() << "\n";
         return false;
@@ -142,7 +142,7 @@ bool ExecuteCommand::ExecuteToolChainChild() {
 
         try {
             std::cerr << "Failed to initiate child process from: "
-                      << ConvertWideToANSI(nc_command_line) << " ";
+                      << ConvertWideToASCII(nc_command_line) << " ";
         } catch (const std::overflow_error& e) {
             std::cerr << "While handling the exception below another exception "
                          "occured\n";
@@ -277,7 +277,7 @@ bool ExecuteCommand::Execute(const std::string& filename) {
         this->write_to_file = true;
         try {
             this->fileout = CreateFileW(
-                ConvertAnsiToWide(filename).c_str(), FILE_APPEND_DATA,
+                ConvertASCIIToWide(filename).c_str(), FILE_APPEND_DATA,
                 FILE_SHARE_WRITE | FILE_SHARE_READ, &this->saAttr, OPEN_ALWAYS,
                 FILE_ATTRIBUTE_NORMAL, nullptr);
         } catch (const std::overflow_error& e) {

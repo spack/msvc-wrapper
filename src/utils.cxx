@@ -79,11 +79,11 @@ bool endswith(const std::string& arg, char const* match) {
 }
 
 /**
- * Converts wide strings to ANSI (standard) strings
+ * Converts wide strings to ASCII (standard) strings
  * 
  * Converts wstring to string
  */
-std::string ConvertWideToANSI(const std::wstring& wstr) {
+std::string ConvertWideToASCII(const std::wstring& wstr) {
     bool const string_too_long = checkSizeTConversion(wstr);
     if (string_too_long) {
         throw std::overflow_error(
@@ -104,7 +104,7 @@ std::string ConvertWideToANSI(const std::wstring& wstr) {
  * 
  * Converts string to wstring
  */
-std::wstring ConvertAnsiToWide(const std::string& str) {
+std::wstring ConvertASCIIToWide(const std::string& str) {
     bool const str_too_long = checkSizeTConversion(str);
     if (str_too_long) {
         throw std::overflow_error(
@@ -373,7 +373,7 @@ std::string GetCWD() {
     std::wstring const ws_cwd(w_cwd);
     free(w_cwd);
     try {
-        std::string s_cwd = ConvertWideToANSI(ws_cwd);
+        std::string s_cwd = ConvertWideToASCII(ws_cwd);
         return s_cwd;
     } catch (const std::overflow_error& e) {
         std::cerr << e.what() << "\n";
@@ -612,7 +612,7 @@ std::string LibraryFinder::Finder(const std::string& pth,
     std::string const searcher = pth + "\\*";
     std::wstring search_str;
     try {
-        search_str = ConvertAnsiToWide(searcher);
+        search_str = ConvertASCIIToWide(searcher);
     } catch (const std::overflow_error& e) {
         std::cerr << e.what() << "\n";
         return std::string();
@@ -628,8 +628,9 @@ std::string LibraryFinder::Finder(const std::string& pth,
     do {
         try {
             if (wcscmp(find_file_data.cFileName,
-                       ConvertAnsiToWide(lib_name).c_str()) == 0) {
-                return pth + "\\" + ConvertWideToANSI(find_file_data.cFileName);
+                       ConvertASCIIToWide(lib_name).c_str()) == 0) {
+                return pth + "\\" +
+                       ConvertWideToASCII(find_file_data.cFileName);
             }
         } catch (const std::overflow_error& e) {
             debug("Overflow converting " + lib_name +

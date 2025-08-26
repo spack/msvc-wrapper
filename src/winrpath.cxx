@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include <cstdio>
-#include <stdio.h>
+#include <cstdio>
 #include <windows.h>  // NOLINT
 #include "winrpath.h"
 #include <fileapi.h>
@@ -416,7 +416,7 @@ bool LibRename::ExecuteLibRename() {
 bool LibRename::ExecutePERename() {
     std::wstring pe_path;
     try {
-        pe_path = ConvertAnsiToWide(this->pe);
+        pe_path = ConvertASCIIToWide(this->pe);
     } catch (const std::overflow_error& e) {
         std::cerr << e.what() << "\n";
         return false;

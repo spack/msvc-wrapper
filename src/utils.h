@@ -62,11 +62,11 @@ bool endswith(const std::string& arg, std::string& match);
 // Returns true of arg ends with match
 bool endswith(const std::string& arg, char const* match);
 
-// Converts W-char (std::wstring) string to ansi (std::string) string
-std::string ConvertWideToANSI(const std::wstring& wstr);
+// Converts W-char (std::wstring) string to ASCII (std::string) string
+std::string ConvertWideToASCII(const std::wstring& wstr);
 
-// Converts ANSI (std::string) to wide string (std::wstring)
-std::wstring ConvertAnsiToWide(const std::string& str);
+// Converts ASCII (std::string) to wide string (std::wstring)
+std::wstring ConvertASCIIToWide(const std::string& str);
 
 // Splits argument "s" by delineator delim
 // Returns vector of strings, if delim is present
