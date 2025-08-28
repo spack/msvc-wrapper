@@ -508,6 +508,20 @@ int get_padding_length(const std::string& name) {
     return count;
 }
 
+std::string strip_padding(const std::string &lib)
+{
+    // One of the padding characters is a legitimate
+    // path separator
+    int pad_len = get_padding_length(lib)-1;
+    // Capture the drive and drive separator
+    std::string::const_iterator p = lib.cbegin();
+    std::string::const_iterator e = lib.cbegin()+2;
+    std::string stripped_drive(p, e);
+    e = e + pad_len;
+    std::string path_remainder(e, lib.end());
+    return stripped_drive + path_remainder;
+}
+
 /**
  * Mangles a string representing a path to have no path characters
  *  instead path characters (i.e. \\, :, etc) are replaced with
@@ -541,7 +555,6 @@ std::string mangle_name(const std::string& name) {
  *  \param name string to check for path characters
  */
 bool hasPathCharacters(const std::string& name) {
-    using PathCharMap = std::map<char, char>::const_iterator;
     for (auto it = path_to_special_characters.begin();
          it != path_to_special_characters.end(); ++it) {
         if (!(name.find(it->first) == std::string::npos)) {
@@ -549,6 +562,18 @@ bool hasPathCharacters(const std::string& name) {
         }
     }
     return false;
+}
+
+bool SpackInstalledLib(const std::string& lib) {
+    const std::string prefix = GetSpackEnv("SPACK_INSTALL_PREFIX");
+    if (prefix.empty()) {
+        debug(
+            "Unable to determine Spack install prefix, SPACK_INSTALL_PREFIX "
+            "unset");
+        return false;
+    }
+    std::string stripped_lib = strip_padding(lib);
+    startswith(stripped_lib, prefix);
 }
 
 LibraryFinder::LibraryFinder() : search_vars{"SPACK_RELOCATE_PATH"} {}
