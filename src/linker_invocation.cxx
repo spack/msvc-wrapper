@@ -32,7 +32,7 @@ void LinkerInvocation::Parse() {
     for (auto token = this->tokens_.begin(); token != this->tokens_.end();
          ++token) {
         std::string normal_token = *token;
-        lower(normal_token);
+        normalArg(normal_token);
         // implib specifies the eventuall import libraries name_
         // and thus will contain a ".lib" extension, which
         // the next check will process as a library argument
@@ -53,9 +53,6 @@ void LinkerInvocation::Parse() {
             this->output_ = split(*token, ":")[1];
         } else if (endswith(normal_token, ".obj")) {
             this->objs_.push_back(*token);
-        } else if (normal_token.find("def:") != std::string::npos) {
-            StrList def_line = split(*token, ":");
-            this->def_file_ = def_line[1];
         } else if (startswith(normal_token, "@") &&
                    endswith(normal_token, ".rsp")) {
             // RSP files are used to describe object files, libraries, other CLI
@@ -63,6 +60,9 @@ void LinkerInvocation::Parse() {
             // Primarily utilized by CMake and MSBuild projects to bypass
             // Command line length limits
             this->rsp_file_ = *token;
+        } else if (this->piped_args_.find(normal_token) !=
+                   this->piped_args_.end()) {
+            this->piped_args_.at(normal_token).emplace_back(normal_token);
         }
     }
     std::string const ext = this->is_exe_ ? ".exe" : ".dll";
@@ -81,6 +81,22 @@ std::string LinkerInvocation::get_name() {
 
 std::string LinkerInvocation::get_implib_name() {
     return this->implibname_;
+}
+
+std::string LinkerInvocation::get_lib_link_args() {
+    std::string lib_link_line;
+    for (const auto& var_args : this->piped_args_) {
+        // Most of these should be single arguments
+        // however some can be defined multiple times
+        // namely libpath and include
+        // this allows for all arguments to be processed
+        // correctly
+        auto vars = var_args.second;
+        if (!vars.empty()) {
+            lib_link_line += join(var_args.second);
+        }
+    }
+    return lib_link_line;
 }
 
 std::string LinkerInvocation::get_def_file() {
