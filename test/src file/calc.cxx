@@ -7,10 +7,9 @@
 #if defined(CALC_HEADER)
 #include CALC_HEADER /* "calc.h" */
 #else
-#include "calc.h"
+#include "calc header/calc.h"
 #endif
 
-extern "C" int add(int a, int b)
-{
+extern "C" int add(int a, int b) {
     return a + b;
 }
