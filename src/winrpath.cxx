@@ -250,6 +250,7 @@ LibRename::LibRename(std::string p_exe, std::string coff, bool full,
     this->def_file = coff_path + ".def";
     this->def_executor =
         ExecuteCommand("dumpbin.exe", {this->ComputeDefLine()});
+    std::string rename_link = this->ComputeRenameLink();
     this->lib_executor = ExecuteCommand("lib.exe", {this->ComputeRenameLink()});
 }
 
@@ -405,6 +406,10 @@ bool LibRename::ExecuteLibRename() {
         return false;
     }
     std::string mangled_name = mangle_name(this->pe);
+    if (mangled_name.empty()) {
+        // Mangle name failed
+        return false;
+    }
     if (!coff_parser.NormalizeName(mangled_name)) {
         std::cerr << "Unable to normalize name: " << mangled_name << "\n";
         return false;
@@ -461,7 +466,11 @@ std::string LibRename::ComputeRenameLink() {
     std::string line("-def:");
     line += this->def_file + " ";
     line += "-name:";
-    line += mangle_name(this->pe) + " ";
+    std::string const mangled_name = mangle_name(this->pe);
+    if (mangled_name.empty()) {
+        return std::string()
+    }
+    line += mangled_name + " ";
     std::string const name(stem(this->coff));
     if (!this->replace) {
         this->new_lib = name + ".abs-name.lib";
