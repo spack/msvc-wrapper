@@ -515,17 +515,16 @@ int get_padding_length(const std::string& name) {
     return count;
 }
 
-std::string strip_padding(const std::string &lib)
-{
+std::string strip_padding(const std::string& lib) {
     // One of the padding characters is a legitimate
     // path separator
-    int pad_len = get_padding_length(lib)-1;
+    int const pad_len = get_padding_length(lib) - 1;
     // Capture the drive and drive separator
-    std::string::const_iterator p = lib.cbegin();
-    std::string::const_iterator e = lib.cbegin()+2;
-    std::string stripped_drive(p, e);
+    std::string::const_iterator const p = lib.cbegin();
+    std::string::const_iterator e = lib.cbegin() + 2;
+    std::string const stripped_drive(p, e);
     e = e + pad_len;
-    std::string path_remainder(e, lib.end());
+    std::string const path_remainder(e, lib.end());
     return stripped_drive + path_remainder;
 }
 
@@ -579,7 +578,7 @@ bool SpackInstalledLib(const std::string& lib) {
             "unset");
         return false;
     }
-    std::string stripped_lib = strip_padding(lib);
+    std::string const stripped_lib = strip_padding(lib);
     startswith(stripped_lib, prefix);
 }
 
