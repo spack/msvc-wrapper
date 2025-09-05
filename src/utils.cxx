@@ -544,6 +544,31 @@ std::string mangle_name(const std::string& name) {
         // relative paths, assume they're relative to the CWD of the linker (as they have to be)
         abs_out = join({GetCWD(), name}, "\\");
     }
+    // Now that we have the full path, check size
+    if (abs_out.length() > MAX_NAME_LEN) {
+        // Name is too long we need to attempt to shorten
+        // strip prefix
+        // TODO(john.parent): check this var name
+        std::string const pre = getenv("SPACK_STAGE_PREFIX");
+        std::string const rel = R"(\\?\)" + lstrip(abs_out, pre);
+        std::wstring const wrel = ConvertASCIIToWide(rel);
+        wchar_t sfn;
+        DWORD const sfn_size =
+            GetShortPathName(wrel.c_str(), &sfn, wrel.length());
+        std::wstring const wrel_sfn = std::wstring(sfn, sfn_size);
+        std::string const rel_sfn = ConvertWideToASCII(wrel_sfn);
+        std::string const new_abs_out = join({pre, rel_sfn}, "\\");
+        // If new, shortened path is too long, bail
+        if (new_abs_out.length() > MAX_NAME_LEN) {
+            std::cerr << "DLL path " << abs_out << " too long to relocate.\n";
+            std::cerr << "Shortened DLL path " << new_abs_out
+                      << " also too long to relocate.\n";
+            std::cerr << "Please move prefix " << pre
+                      << " to a shorter directory.\n";
+            return std::string();
+        }
+        abs_out = new_abs_out;
+    }
     char* chr_abs_out = new char[abs_out.length() + 1];
     strcpy(chr_abs_out, abs_out.c_str());
     replace_path_characters(chr_abs_out, abs_out.length());
