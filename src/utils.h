@@ -172,7 +172,7 @@ void replace_path_characters(char* path, size_t len);
 
 void replace_special_characters(char* mangled, size_t len);
 
-bool SpackInstalledLib(const std::string &lib);
+bool SpackInstalledLib(const std::string& lib);
 
 // File and File handle helpers //
 
@@ -236,5 +236,11 @@ const std::map<char, char> special_character_to_path{{'|', '\\'}, {';', ':'}};
 const std::map<char, char> path_to_special_characters{{'\\', '|'},
                                                       {'/', '|'},
                                                       {':', ';'}};
+
+class SpackCompilerWrapperError : public std::runtime_error {
+   public:
+    SpackCompilerWrapperError(char const* const message);
+    virtual char const* what() const;
+};
 
 static bool DEBUG = false;

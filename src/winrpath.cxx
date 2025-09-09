@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include <cstdio>
-#include <stdio.h>
+#include <cstdio>
 #include <windows.h>  // NOLINT
 #include "winrpath.h"
 #include <fileapi.h>
@@ -102,7 +102,9 @@ bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) const {
         char* new_lib_pth =
             pad_path(new_library_loc.c_str(),
                      static_cast<DWORD>(new_library_loc.size()));
-
+        if (!new_lib_pth) {
+            return false;
+        }
         replace_special_characters(new_lib_pth, MAX_NAME_LEN);
 
         // c_str returns a proper (i.e. null terminated) value, so we dont need to worry about
@@ -250,7 +252,6 @@ LibRename::LibRename(std::string p_exe, std::string coff, bool full,
     this->def_file = coff_path + ".def";
     this->def_executor =
         ExecuteCommand("dumpbin.exe", {this->ComputeDefLine()});
-    std::string rename_link = this->ComputeRenameLink();
     this->lib_executor = ExecuteCommand("lib.exe", {this->ComputeRenameLink()});
 }
 
@@ -405,15 +406,18 @@ bool LibRename::ExecuteLibRename() {
         std::cerr << err;
         return false;
     }
-    std::string mangled_name = mangle_name(this->pe);
-    if (mangled_name.empty()) {
-        // Mangle name failed
+    try {
+        std::string mangled_name = mangle_name(this->pe);
+        if (!coff_parser.NormalizeName(mangled_name)) {
+            std::cerr << "Unable to normalize name: " << mangled_name << "\n";
+            return false;
+        }
+    } catch (const SpackCompilerWrapperError& e) {
+        std::cerr << "Unable to mangle name, DLL name " << this->pe
+                  << " too long\n";
         return false;
     }
-    if (!coff_parser.NormalizeName(mangled_name)) {
-        std::cerr << "Unable to normalize name: " << mangled_name << "\n";
-        return false;
-    }
+
     return true;
 }
 
@@ -466,11 +470,7 @@ std::string LibRename::ComputeRenameLink() {
     std::string line("-def:");
     line += this->def_file + " ";
     line += "-name:";
-    std::string const mangled_name = mangle_name(this->pe);
-    if (mangled_name.empty()) {
-        return std::string()
-    }
-    line += mangled_name + " ";
+    line += mangle_name(this->pe) + " ";
     std::string const name(stem(this->coff));
     if (!this->replace) {
         this->new_lib = name + ".abs-name.lib";

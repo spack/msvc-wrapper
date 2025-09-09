@@ -89,12 +89,19 @@ int main(int argc, const char* argv[]) {
         }
         DEBUG = debug;
         std::unique_ptr<LibRename> rpath_lib;
-        if (has_coff) {
-            rpath_lib = std::make_unique<LibRename>(
-                patch_args.at("pe"), patch_args.at("coff"), full, deploy, true);
-        } else {
-            rpath_lib = std::make_unique<LibRename>(patch_args.at("pe"), full,
-                                                    deploy, true);
+        try {
+            if (has_coff) {
+                rpath_lib = std::make_unique<LibRename>(patch_args.at("pe"),
+                                                        patch_args.at("coff"),
+                                                        full, deploy, true);
+            } else {
+                rpath_lib = std::make_unique<LibRename>(patch_args.at("pe"),
+                                                        full, deploy, true);
+            }
+        } catch (const SpackCompilerWrapperError& e) {
+            std::cerr << "Cannot Rename PE file " << patch_args.at("pe")
+                      << " it contains references that are too long.\n";
+            return ExitConditions::RENAME_FAILURE;
         }
         if (!rpath_lib->ExecuteRename()) {
             std::cerr << "Library rename failed\n";
@@ -110,9 +117,17 @@ int main(int argc, const char* argv[]) {
             return ExitConditions::CLI_FAILURE;
         }
         if (report_args.find("pe") != report_args.end()) {
-            LibRename portable_executable(report_args.at("pe"), std::string(),
-                                          false, false, true);
-            portable_executable.ExecuteRename();
+            try {
+                LibRename portable_executable(
+                    report_args.at("pe"), std::string(), false, false, true);
+                portable_executable.ExecuteRename();
+            } catch (const SpackCompilerWrapperError& e) {
+                std::cerr
+                    << "Unable to parse command line for reporting\n"
+                    << "run command with --help flag for accepted command "
+                       "line arguments\n";
+                return ExitConditions::CLI_FAILURE;
+            }
         } else {
             CoffReaderWriter coff_reader(report_args.at("coff"));
             CoffParser coff(&coff_reader);

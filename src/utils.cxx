@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cwchar>
+#include <exception>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -484,6 +485,12 @@ void replace_path_characters(char* path, size_t len) {
  * \param bsize the lengh of the padding to add
  */
 char* pad_path(const char* pth, DWORD str_size, DWORD bsize) {
+    // If str_size > bsize we get inappropriate conversion
+    // from signed to unsigned
+    if (str_size > bsize) {
+        debug("Padding string is greater than max string size allowed");
+        return nullptr;
+    }
     size_t const extended_buf = bsize - str_size + 2;
     char* padded_path = new char[bsize + 1];
     for (DWORD i = 0, j = 0; i < bsize && j < str_size; ++i) {
@@ -565,7 +572,8 @@ std::string mangle_name(const std::string& name) {
                       << " also too long to relocate.\n";
             std::cerr << "Please move prefix " << pre
                       << " to a shorter directory.\n";
-            return std::string();
+            throw SpackCompilerWrapperError(
+                "DLL Path too long, cannot be relocated.");
         }
         abs_out = new_abs_out;
     }
@@ -755,4 +763,11 @@ char* findstr(char* search_str, const char* substr, size_t size) {
         ++search;
     }
     return nullptr;
+}
+
+SpackCompilerWrapperError::SpackCompilerWrapperError(char const* const message)
+    : std::runtime_error(message) {}
+
+char const* SpackCompilerWrapperError::what() const {
+    return exception::what();
 }
