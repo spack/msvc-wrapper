@@ -561,7 +561,7 @@ std::string mangle_name(const std::string& name) {
         std::wstring const wrel = ConvertASCIIToWide(rel);
         wchar_t sfn;
         DWORD const sfn_size =
-            GetShortPathName(wrel.c_str(), &sfn, wrel.length());
+            GetShortPathNameW(wrel.c_str(), &sfn, wrel.length());
         std::wstring const wrel_sfn = std::wstring(sfn, sfn_size);
         std::string const rel_sfn = ConvertWideToASCII(wrel_sfn);
         std::string const new_abs_out = join({pre, rel_sfn}, "\\");
