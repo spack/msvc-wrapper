@@ -556,7 +556,10 @@ std::string mangle_name(const std::string& name) {
     if (abs_out.length() > MAX_NAME_LEN) {
         // Name is too long we need to attempt to shorten
         // strip prefix
-        std::string const pre = getenv("SPACK_STAGE_DIR");
+        std::string pre = GetSpackEnv("SPACK_STAGE_DIR");
+        if (pre.empty()) {
+            pre = GetCWD();
+        }
         std::string const rel = R"(\\?\)" + lstrip(abs_out, pre);
         // Get SFN length so we can create buffer
         DWORD const sfn_size = GetShortPathNameA(rel.c_str(), nullptr, 0);
