@@ -37,8 +37,6 @@ int main(int argc, const char* argv[]) {
                             patch_args.at("cmd") == "deploy";
         bool const report = !(patch_args.find("report") == patch_args.end());
         bool const has_pe = !(patch_args.find("pe") == patch_args.end());
-        bool const is_exe =
-            has_pe ? endswith(patch_args.at("pe"), ".exe") : false;
         bool const debug = !(patch_args.find("debug") == patch_args.end());
         bool const is_validate =
             !(patch_args.find("verify") == patch_args.end());
@@ -49,14 +47,9 @@ int main(int argc, const char* argv[]) {
             std::cout << "No binaries to operate on... nothing to do\n";
             return ExitConditions::CLI_FAILURE;
         }
-        if (is_exe && !full) {
-            std::cout << "Executable file provided but --full not specified, "
-                         "nothing to do...\n";
-            return ExitConditions::CLI_FAILURE;
-        }
         // The only scenario its ok to have a dll/exe and no coff is when we're creating a cache
         // entry
-        if (!is_exe && !has_coff && !deploy) {
+        if (!has_coff && !deploy) {
             std::cout << "Attempting to relocate DLL without coff file, please "
                          "provide a coff file.\n";
             return ExitConditions::CLI_FAILURE;

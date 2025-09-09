@@ -87,7 +87,7 @@ bool print_help() {
     std::cout << "          [--coff <path to coff file>]                 = "
                  "COFF (import library) file to be relocated\n";
     std::cout << "                                                         If "
-                 "relocating an exe, this is not required.\n";
+                 "relocating an exe, this may not be required.\n";
     std::cout << "          --full                                       = "
                  "Relocate dynamic references inside\n";
     std::cout << "                                                          "
@@ -95,15 +95,7 @@ bool print_help() {
     std::cout << "                                                          "
                  "the import library\n";
     std::cout << "                                                          "
-                 "Note: this is assumed to be true if\n";
-    std::cout << "                                                           "
-                 "relocating an executable.\n";
-    std::cout << "                                                          If "
-                 "an executable is relocated, no import\n";
-    std::cout << "                                                          "
-                 "library operations are performed.\n";
-    std::cout << "                                                          "
-                 "When relocating a DLL, the import library for\n";
+                 "When relocating a PE, the import library for\n";
     std::cout << "                                                          "
                  "said library is regenerated and the old imp lib\n";
     std::cout << "                                                          "
