@@ -11,6 +11,7 @@
 #include <minwindef.h>
 #include <processenv.h>
 #include <stringapiset.h>
+#include <winbase.h>
 #include <winerror.h>
 #include <winnls.h>
 #include <winnt.h>
@@ -555,15 +556,14 @@ std::string mangle_name(const std::string& name) {
     if (abs_out.length() > MAX_NAME_LEN) {
         // Name is too long we need to attempt to shorten
         // strip prefix
-        // TODO(john.parent): check this var name
-        std::string const pre = getenv("SPACK_STAGE_PREFIX");
+        std::string const pre = getenv("SPACK_STAGE_DIR");
         std::string const rel = R"(\\?\)" + lstrip(abs_out, pre);
-        std::wstring const wrel = ConvertASCIIToWide(rel);
-        wchar_t sfn;
-        DWORD const sfn_size =
-            GetShortPathNameW(wrel.c_str(), &sfn, wrel.length());
-        std::wstring const wrel_sfn = std::wstring(sfn, sfn_size);
-        std::string const rel_sfn = ConvertWideToASCII(wrel_sfn);
+        // Get SFN length so we can create buffer
+        DWORD const sfn_size = GetShortPathNameA(rel.c_str(), nullptr, 0);
+        char* sfn = new char[sfn_size + 1];
+        GetShortPathNameA(rel.c_str(), sfn, rel.length());
+        // sfn is null terminated per win32 api
+        std::string const rel_sfn = std::string(sfn);
         std::string const new_abs_out = join({pre, rel_sfn}, "\\");
         // If new, shortened path is too long, bail
         if (new_abs_out.length() > MAX_NAME_LEN) {
@@ -572,9 +572,11 @@ std::string mangle_name(const std::string& name) {
                       << " also too long to relocate.\n";
             std::cerr << "Please move prefix " << pre
                       << " to a shorter directory.\n";
+            delete[] sfn;
             throw SpackCompilerWrapperError(
                 "DLL Path too long, cannot be relocated.");
         }
+        delete[] sfn;
         abs_out = new_abs_out;
     }
     char* chr_abs_out = new char[abs_out.length() + 1];
