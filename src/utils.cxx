@@ -15,6 +15,7 @@
 #include <winerror.h>
 #include <winnls.h>
 #include <winnt.h>
+#include <winsock.h>
 
 #include <algorithm>
 #include <cctype>
@@ -124,16 +125,25 @@ std::wstring ConvertASCIIToWide(const std::string& str) {
  * Decomposes the input string into a list separated by
  * delim
  * 
+ * Count determines how many delims will be processed
+ * if count > 0
+ * 
  * Returns the list produced by breaking up input string s on delim
  */
-StrList split(const std::string& str, const std::string& delim) {
+StrList split(const std::string& str, const std::string& delim,
+              const u_int count) {
     size_t pos_start = 0;
     size_t pos_end;
     size_t const delim_len = delim.length();
     std::string token;
     StrList res = StrList();
-
-    while ((pos_end = str.find(delim, pos_start)) != std::string::npos) {
+    u_int delim_count = count;
+    if (!count) {
+        delim_count += 1;
+    }
+    u_int delim_found = 0;
+    while (((pos_end = str.find(delim, pos_start)) != std::string::npos) &&
+           delim_found < delim_count) {
         size_t const token_len = pos_end - pos_start;
         token = str.substr(pos_start, token_len);
         pos_start = pos_end + delim_len;
@@ -141,6 +151,9 @@ StrList split(const std::string& str, const std::string& delim) {
             continue;
         }
         res.push_back(token);
+        if (count) {
+            delim_found += 1;
+        }
     }
     res.push_back(str.substr(pos_start));
     return res;

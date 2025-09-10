@@ -71,7 +71,8 @@ std::wstring ConvertASCIIToWide(const std::string& str);
 // Splits argument "s" by delineator delim
 // Returns vector of strings, if delim is present
 // Returns a single item list
-StrList split(const std::string& s, const std::string& delim);
+StrList split(const std::string& s, const std::string& delim,
+              const u_int count = 0);
 
 //Strips substr off the RHS of the larger string
 std::string strip(const std::string& s, const std::string& substr);
