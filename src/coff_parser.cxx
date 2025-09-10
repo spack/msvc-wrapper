@@ -378,7 +378,8 @@ bool CoffParser::NormalizeName(std::string& name) {
     // The dll is found with and without an extenion, depending on the context of the location
     // i.e. in the section data, it can be found with both an extension and extensionless
     //  whereas in the symbol table or linker member strings, it's always found without an extension
-    std::string const name_no_ext = strip(name, ".dll");
+    std::string const name_no_dll = strip(name, ".dll");
+    std::string const name_no_ext = strip(name_no_dll, ".DLL");
     // Flag allowing us to skip multiple attempts
     // to rename the long names member this name
     bool long_name_renamed = false;
