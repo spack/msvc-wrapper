@@ -549,6 +549,19 @@ std::string strip_padding(const std::string& lib) {
     return stripped_drive + path_remainder;
 }
 
+std::string getSFN(const std::string& path) {
+    std::string const escaped = R"(\\?\)" + path;
+    // Get SFN length so we can create buffer
+    DWORD const sfn_size =
+        GetShortPathNameA(escaped.c_str(), NULL, 0);  //NOLINT
+    char* sfn = new char[sfn_size + 1];
+    GetShortPathNameA(escaped.c_str(), sfn, escaped.length());
+    // sfn is null terminated per win32 api
+    std::string s_sfn = std::string(sfn);
+    delete[] sfn;
+    return s_sfn;
+}
+
 /**
  * Mangles a string representing a path to have no path characters
  *  instead path characters (i.e. \\, :, etc) are replaced with
@@ -569,18 +582,22 @@ std::string mangle_name(const std::string& name) {
     if (abs_out.length() > MAX_NAME_LEN) {
         // Name is too long we need to attempt to shorten
         // strip prefix
-        std::string pre = GetSpackEnv("SPACK_STAGE_DIR");
+        std::string pre = GetSpackEnv("SPACK_STAGE_ROOT");
         if (pre.empty()) {
             pre = GetCWD();
         }
-        std::string const rel = R"(\\?\)" + lstrip(abs_out, pre);
-        // Get SFN length so we can create buffer
-        DWORD const sfn_size = GetShortPathNameA(rel.c_str(), nullptr, 0);
-        char* sfn = new char[sfn_size + 1];
-        GetShortPathNameA(rel.c_str(), sfn, rel.length());
-        // sfn is null terminated per win32 api
-        std::string const rel_sfn = std::string(sfn);
-        std::string const new_abs_out = join({pre, rel_sfn}, "\\");
+        // Get SFN for path to name
+        // Use "disable string parsing" prefix in case
+        // the path is too long
+        std::string const abs_sfn = getSFN(abs_out);
+        // Get SFN for path to name prefix
+        std::string const pre_sfn = getSFN(pre);
+        // Strip prefix SFN so we can prepend the real prefix to it
+        // Prefix should be spack stage root, which allows us the maximal
+        // possible path shortening without effecting potential naming collisions
+        // and still allowing us to determine we're in a spack context
+        std::string const rel_sfn = lstrip(abs_sfn, pre_sfn);
+        std::string const new_abs_out = pre + rel_sfn;
         // If new, shortened path is too long, bail
         if (new_abs_out.length() > MAX_NAME_LEN) {
             std::cerr << "DLL path " << abs_out << " too long to relocate.\n";
@@ -588,11 +605,9 @@ std::string mangle_name(const std::string& name) {
                       << " also too long to relocate.\n";
             std::cerr << "Please move prefix " << pre
                       << " to a shorter directory.\n";
-            delete[] sfn;
             throw SpackCompilerWrapperError(
                 "DLL Path too long, cannot be relocated.");
         }
-        delete[] sfn;
         abs_out = new_abs_out;
     }
     char* chr_abs_out = new char[abs_out.length() + 1];
