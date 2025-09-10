@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include <cstdio>
-#include <cstdio>
+#include <stdio.h>
 #include <windows.h>  // NOLINT
 #include "winrpath.h"
 #include <fileapi.h>
@@ -92,12 +92,21 @@ bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) const {
             return false;
         }
         LibraryFinder lib_finder;
-        std::string const new_library_loc =
+        std::string new_library_loc =
             lib_finder.FindLibrary(file_name, dll_path);
         if (new_library_loc.empty()) {
             std::cerr << "Unable to find library " << file_name << " from "
                       << dll_path << " for relocation" << "\n";
             return false;
+        }
+        if (new_library_loc.length() > MAX_NAME_LEN) {
+            try {
+                std::string const short_lib_loc =
+                    short_name_post_prefix(new_library_loc);
+                new_library_loc = short_lib_loc;
+            } catch (SpackCompilerWrapperError& e) {
+                return false;
+            }
         }
         char* new_lib_pth =
             pad_path(new_library_loc.c_str(),
