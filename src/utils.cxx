@@ -178,7 +178,7 @@ std::string strip(const std::string& str, const std::string& substr) {
 std::string lstrip(const std::string& str, const std::string& substr) {
     if (!startswith(str, substr))
         return str;
-    return str.substr(substr.size() - 1, str.size());
+    return str.substr(substr.size(), str.size());
 }
 
 /**
