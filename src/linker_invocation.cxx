@@ -50,10 +50,7 @@ void LinkerInvocation::Parse() {
             this->is_exe_ = false;
         } else if (startswith(normal_token, "-out") ||
                    startswith(normal_token, "/out")) {
-            StrList split_out = split(*token, ":", 1);
-            StrList const split_name =
-                StrList(split_out.begin() + 1, split_out.end());
-            this->output_ = join(split_name, "\\");
+            this->output_ = split(*token, ":", 1)[1];
         } else if (endswith(normal_token, ".obj")) {
             this->objs_.push_back(*token);
         } else if (startswith(normal_token, "@") &&
