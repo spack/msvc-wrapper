@@ -22,6 +22,21 @@
 #define _STRING(m) #m
 #define STRING(m) _STRING(m)
 
+/**
+ * This MACRO represents an undocumented
+ * limit to the potential length of a
+ * dll "name" in a COFF/PE file.
+ * Names longer than this can cause the 
+ * librarian tool (lib.exe) to overwrite
+ * sections of the file adjacent to the
+ * name.
+ * The limit appears to be 143 characters
+ * A size of 144 is valid, except in cases
+ * where the name in the PE/COFF file must
+ * be null terminated, so we use 143
+ * to avoid the null terminator causing an
+ * overwrite.
+ */
 #define MAX_NAME_LEN 143
 
 #define MIN_PADDING_THRESHOLD 8
