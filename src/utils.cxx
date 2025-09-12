@@ -566,7 +566,8 @@ std::string getSFN(const std::string& path) {
     char* sfn = new char[sfn_size + 1];
     GetShortPathNameA(escaped.c_str(), sfn, escaped.length());
     // sfn is null terminated per win32 api
-    std::string s_sfn = std::string(sfn);
+    // Ensure we strip out the disable string parsing prefix
+    std::string s_sfn = lstrip(sfn, R"(\\?\)");
     delete[] sfn;
     return s_sfn;
 }
