@@ -127,6 +127,7 @@ std::wstring ConvertASCIIToWide(const std::string& str) {
  * 
  * Count determines how many delims will be processed
  * if count > 0
+ * if count == 0, all delimiters are split
  * 
  * Returns the list produced by breaking up input string s on delim
  */
@@ -137,13 +138,10 @@ StrList split(const std::string& str, const std::string& delim,
     size_t const delim_len = delim.length();
     std::string token;
     StrList res = StrList();
-    u_int delim_count = count;
-    if (!count) {
-        delim_count += 1;
-    }
-    u_int delim_found = 0;
+    bool delim_count_reached = false;
+    u_int delim_count = 0;
     while (((pos_end = str.find(delim, pos_start)) != std::string::npos) &&
-           delim_found < delim_count) {
+           !delim_count_reached) {
         size_t const token_len = pos_end - pos_start;
         token = str.substr(pos_start, token_len);
         pos_start = pos_end + delim_len;
@@ -151,8 +149,9 @@ StrList split(const std::string& str, const std::string& delim,
             continue;
         }
         res.push_back(token);
+        ++delim_count;
         if (count) {
-            delim_found += 1;
+            delim_count_reached = count == delim_count;
         }
     }
     res.push_back(str.substr(pos_start));
