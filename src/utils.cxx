@@ -549,7 +549,16 @@ std::string strip_padding(const std::string& lib) {
     return stripped_drive + path_remainder;
 }
 
+/**
+ * Compute and return the SFN of a given path
+ *   utilizes the string parsing escape prefix
+ *   to allow processing paths that are longer
+ *   than the system MAX_PATH_LENGTH
+ *   (different from MAX_NAME_LEN)
+ */
 std::string getSFN(const std::string& path) {
+    // Use "disable string parsing" prefix in case
+    // the path is too long
     std::string const escaped = R"(\\?\)" + path;
     // Get SFN length so we can create buffer
     DWORD const sfn_size =
@@ -563,26 +572,14 @@ std::string getSFN(const std::string& path) {
 }
 
 /**
- * Replace path after a given prefix with the SFN representation
+ * Replace path with the SFN representation
+ *   will raise an exception NameTooLongError if
+ *   post SFN conversion, the path is still longer
+ *   than the MAX_NAME_LEN limit
  */
-std::string short_name_post_prefix(const std::string& path) {
-    // strip prefix
-    std::string pre = GetSpackEnv("SPACK_CONTEXT_ROOT");
-    if (pre.empty()) {
-        pre = GetCWD();
-    }
+std::string short_name(const std::string& path) {
     // Get SFN for path to name
-    // Use "disable string parsing" prefix in case
-    // the path is too long
-    std::string const abs_sfn = getSFN(path);
-    // Get SFN for path to name prefix
-    std::string const pre_sfn = getSFN(pre);
-    // Strip prefix SFN so we can prepend the real prefix to it
-    // Prefix should be spack stage root, which allows us the maximal
-    // possible path shortening without effecting potential naming collisions
-    // and still allowing us to determine we're in a spack context
-    std::string const rel_sfn = lstrip(abs_sfn, pre_sfn);
-    std::string new_abs_out = pre + rel_sfn;
+    std::string const new_abs_out = getSFN(path);
     if (new_abs_out.length() > MAX_NAME_LEN) {
         std::cerr << "DLL path " << path << " too long to relocate.\n";
         std::cerr << "Shortened DLL path " << new_abs_out
@@ -613,7 +610,7 @@ std::string mangle_name(const std::string& name) {
     // Now that we have the full path, check size
     if (abs_out.length() > MAX_NAME_LEN) {
         // Name is too long we need to attempt to shorten
-        std::string const new_abs_out = short_name_post_prefix(abs_out);
+        std::string const new_abs_out = short_name(abs_out);
         // If new, shortened path is too long, bail
         abs_out = new_abs_out;
     }

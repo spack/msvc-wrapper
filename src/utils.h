@@ -163,7 +163,7 @@ bool IsPathAbsolute(const std::string& pth);
 
 bool hasPathCharacters(const std::string& name);
 
-std::string short_name_post_prefix(const std::string& path);
+std::string short_name(const std::string& path);
 
 std::string mangle_name(const std::string& name);
 

@@ -101,9 +101,7 @@ bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) const {
         }
         if (new_library_loc.length() > MAX_NAME_LEN) {
             try {
-                std::string const short_lib_loc =
-                    short_name_post_prefix(new_library_loc);
-                new_library_loc = short_lib_loc;
+                new_library_loc = short_name(new_library_loc);
             } catch (NameTooLongError& e) {
                 return false;
             }
