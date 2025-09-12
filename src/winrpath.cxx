@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include <cstdio>
-#include <stdio.h>
+#include <cstdio>
 #include <windows.h>  // NOLINT
 #include "winrpath.h"
 #include <fileapi.h>
@@ -104,7 +104,7 @@ bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) const {
                 std::string const short_lib_loc =
                     short_name_post_prefix(new_library_loc);
                 new_library_loc = short_lib_loc;
-            } catch (SpackCompilerWrapperError& e) {
+            } catch (NameTooLongError& e) {
                 return false;
             }
         }
@@ -421,7 +421,7 @@ bool LibRename::ExecuteLibRename() {
             std::cerr << "Unable to normalize name: " << mangled_name << "\n";
             return false;
         }
-    } catch (const SpackCompilerWrapperError& e) {
+    } catch (const NameTooLongError& e) {
         std::cerr << "Unable to mangle name, DLL name " << this->pe
                   << " too long\n";
         return false;

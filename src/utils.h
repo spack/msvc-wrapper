@@ -240,9 +240,9 @@ const std::map<char, char> path_to_special_characters{{'\\', '|'},
                                                       {'/', '|'},
                                                       {':', ';'}};
 
-class SpackCompilerWrapperError : public std::runtime_error {
+class NameTooLongError : public std::runtime_error {
    public:
-    SpackCompilerWrapperError(char const* const message);
+    NameTooLongError(char const* const message);
     virtual char const* what() const;
 };
 

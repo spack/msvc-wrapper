@@ -98,7 +98,7 @@ int main(int argc, const char* argv[]) {
                 rpath_lib = std::make_unique<LibRename>(patch_args.at("pe"),
                                                         full, deploy, true);
             }
-        } catch (const SpackCompilerWrapperError& e) {
+        } catch (const NameTooLongError& e) {
             std::cerr << "Cannot Rename PE file " << patch_args.at("pe")
                       << " it contains references that are too long.\n";
             return ExitConditions::RENAME_FAILURE;
@@ -121,7 +121,7 @@ int main(int argc, const char* argv[]) {
                 LibRename portable_executable(
                     report_args.at("pe"), std::string(), false, false, true);
                 portable_executable.ExecuteRename();
-            } catch (const SpackCompilerWrapperError& e) {
+            } catch (const NameTooLongError& e) {
                 std::cerr
                     << "Unable to parse command line for reporting\n"
                     << "run command with --help flag for accepted command "

@@ -589,8 +589,7 @@ std::string short_name_post_prefix(const std::string& path) {
                   << " also too long to relocate.\n";
         std::cerr << "Please move Spack prefix "
                   << " to a shorter directory.\n";
-        throw SpackCompilerWrapperError(
-            "DLL Path too long, cannot be relocated.");
+        throw NameTooLongError("DLL Path too long, cannot be relocated.");
     }
     return new_abs_out;
 }
@@ -806,9 +805,9 @@ char* findstr(char* search_str, const char* substr, size_t size) {
     return nullptr;
 }
 
-SpackCompilerWrapperError::SpackCompilerWrapperError(char const* const message)
+NameTooLongError::NameTooLongError(char const* const message)
     : std::runtime_error(message) {}
 
-char const* SpackCompilerWrapperError::what() const {
+char const* NameTooLongError::what() const {
     return exception::what();
 }

@@ -17,3 +17,6 @@
 
 # Vscode 
 /.vscode/
+
+# ignore patch files
+*.patch

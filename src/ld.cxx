@@ -38,7 +38,7 @@ DWORD LdInvocation::InvokeToolchain() {
         std::string dll_name;
         try {
             dll_name = link_run.get_mangled_out();
-        } catch (const SpackCompilerWrapperError& e) {
+        } catch (const NameTooLongError& e) {
             std::cerr << "Unable to mangle PE " << link_run.get_out()
                       << " name is too long\n";
             return ExitConditions::NORMALIZE_NAME_FAILURE;
