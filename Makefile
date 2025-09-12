@@ -147,13 +147,13 @@ test_long_paths: build_and_check_test_sample
 	xcopy /E "test\src file" tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
 	xcopy test\main.cxx tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
 	cd tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
-	rename calc.cxx verylongfilepathnamethatwillmostlikelybegreaterthanonehundredandfourtyfourcharacters.cxx
+	rename calc.cxx verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.cxx
 	copy ..\..\..\..\cl.exe cl.exe
 	-@ if NOT EXIST "link.exe" mklink link.exe cl.exe
-	cl /c /EHsc "verylongfilepathnamethatwillmostlikelybegreaterthanonehundredandfourtyfourcharacters.cxx" /DCALC_EXPORTS /DCALC_HEADER="\"calc header/calc.h\"" /I include
+	cl /c /EHsc "verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.cxx" /DCALC_EXPORTS /DCALC_HEADER="\"calc header/calc.h\"" /I include
 	cl /c /EHsc main.cxx /I include
-	link $(LFLAGS) verylongfilepathnamethatwillmostlikelybegreaterthanonehundredandfourtyfourcharacters.obj /DLL
-	link $(LFLAGS) main.obj verylongfilepathnamethatwillmostlikelybegreaterthanonehundredandfourtyfourcharacters.lib /out:tester.exe
+	link $(LFLAGS) verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.obj /DLL
+	link $(LFLAGS) main.obj verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib /out:tester.exe
 	tester.exe
 	cd ../../../..
 
@@ -163,12 +163,12 @@ test_relocate_long_paths: test_long_paths
 	cd ..
 	mkdir tmp_bin
 	mkdir tmp_lib
-	move evenlongersubdirectoryname\verylongfilepathnamethatwillmostlikelybegreaterthanonehundredandfourtyfourcharacters.dll tmp_bin\verylongfilepathnamethatwillmostlikelybegreaterthanonehundredandfourtyfourcharacters.dll
-	move evenlongersubdirectoryname\verylongfilepathnamethatwillmostlikelybegreaterthanonehundredandfourtyfourcharacters.lib tmp_lib\verylongfilepathnamethatwillmostlikelybegreaterthanonehundredandfourtyfourcharacters.lib
-	evenlongersubdirectoryname\relocate.exe --pe tmp_bin\verylongfilepathnamethatwillmostlikelybegreaterthanonehundredandfourtyfourcharacters.dll --coff tmp_lib\verylongfilepathnamethatwillmostlikelybegreaterthanonehundredandfourtyfourcharacters.lib --export
+	move evenlongersubdirectoryname\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.dll tmp_bin\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.dll
+	move evenlongersubdirectoryname\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib tmp_lib\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib
+	evenlongersubdirectoryname\relocate.exe --pe tmp_bin\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.dll --coff tmp_lib\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib --export
 	cd evenlongersubdirectoryname
 	del tester.exe
-	link main.obj ..\tmp_lib\verylongfilepathnamethatwillmostlikelybegreaterthanonehundredandfourtyfourcharacters.lib /out:tester.exe
+	link main.obj ..\tmp_lib\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib /out:tester.exe
 	.\tester.exe
 	cd ../../../..
 
