@@ -50,7 +50,7 @@ void LinkerInvocation::Parse() {
             this->is_exe_ = false;
         } else if (startswith(normal_token, "-out") ||
                    startswith(normal_token, "/out")) {
-            this->output_ = split(*token, ":")[1];
+            this->output_ = split(*token, ":", 1)[1];
         } else if (endswith(normal_token, ".obj")) {
             this->objs_.push_back(*token);
         } else if (startswith(normal_token, "@") &&
@@ -67,7 +67,11 @@ void LinkerInvocation::Parse() {
     }
     std::string const ext = this->is_exe_ ? ".exe" : ".dll";
     if (this->output_.empty()) {
-        this->output_ = strip(this->objs_.front(), ".obj") + ext;
+        // with no "out" argument, the linker
+        // will place the file in the CWD
+        std::string const name_obj = this->objs_.front();
+        std::string const filename = split(name_obj, "\\").back();
+        this->output_ = join({GetCWD(), strip(filename, ".obj")}, "\\") + ext;
     }
     this->name_ = strip(this->output_, ext);
     if (this->implibname_.empty()) {

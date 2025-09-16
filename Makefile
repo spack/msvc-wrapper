@@ -141,10 +141,41 @@ test_zerowrite: build_zerowrite_test
 	cl /c EHsc "test\src file\calc.cxx"
 	set SPACK_CC=%SPACK_CC_TMP%
 
+test_long_paths: build_and_check_test_sample
+	mkdir tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
+	xcopy /E test\include tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
+	xcopy /E "test\src file" tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
+	xcopy test\main.cxx tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
+	cd tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
+	rename calc.cxx verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.cxx
+	copy ..\..\..\..\cl.exe cl.exe
+	-@ if NOT EXIST "link.exe" mklink link.exe cl.exe
+	cl /c /EHsc "verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.cxx" /DCALC_EXPORTS /DCALC_HEADER="\"calc header/calc.h\"" /I include
+	cl /c /EHsc main.cxx /I include
+	link $(LFLAGS) verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.obj /DLL
+	link $(LFLAGS) main.obj verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib /out:tester.exe
+	tester.exe
+	cd ../../../..
+
+test_relocate_long_paths: test_long_paths
+	cd tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
+	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
+	cd ..
+	mkdir tmp_bin
+	mkdir tmp_lib
+	move evenlongersubdirectoryname\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.dll tmp_bin\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.dll
+	move evenlongersubdirectoryname\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib tmp_lib\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib
+	evenlongersubdirectoryname\relocate.exe --pe tmp_bin\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.dll --coff tmp_lib\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib --export
+	cd evenlongersubdirectoryname
+	del tester.exe
+	link main.obj ..\tmp_lib\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib /out:tester.exe
+	.\tester.exe
+	cd ../../../..
+
 test_and_cleanup: test clean-test
 
 
-test: test_wrapper test_relocate_exe test_relocate_dll test_pipe_overflow
+test: test_wrapper test_relocate_exe test_relocate_dll test_long_paths test_pipe_overflow
 
 
 clean : clean-test clean-cl

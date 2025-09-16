@@ -11,15 +11,18 @@
 #include <minwindef.h>
 #include <processenv.h>
 #include <stringapiset.h>
+#include <winbase.h>
 #include <winerror.h>
 #include <winnls.h>
 #include <winnt.h>
+#include <winsock.h>
 
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <cwchar>
+#include <exception>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -122,16 +125,23 @@ std::wstring ConvertASCIIToWide(const std::string& str) {
  * Decomposes the input string into a list separated by
  * delim
  * 
+ * Count determines how many delims will be processed
+ * if count > 0
+ * if count == 0, all delimiters are split
+ * 
  * Returns the list produced by breaking up input string s on delim
  */
-StrList split(const std::string& str, const std::string& delim) {
+StrList split(const std::string& str, const std::string& delim,
+              const u_int count) {
     size_t pos_start = 0;
     size_t pos_end;
     size_t const delim_len = delim.length();
     std::string token;
     StrList res = StrList();
-
-    while ((pos_end = str.find(delim, pos_start)) != std::string::npos) {
+    bool delim_count_reached = false;
+    u_int delim_count = 0;
+    while (((pos_end = str.find(delim, pos_start)) != std::string::npos) &&
+           !delim_count_reached) {
         size_t const token_len = pos_end - pos_start;
         token = str.substr(pos_start, token_len);
         pos_start = pos_end + delim_len;
@@ -139,6 +149,10 @@ StrList split(const std::string& str, const std::string& delim) {
             continue;
         }
         res.push_back(token);
+        ++delim_count;
+        if (count) {
+            delim_count_reached = count == delim_count;
+        }
     }
     res.push_back(str.substr(pos_start));
     return res;
@@ -163,7 +177,7 @@ std::string strip(const std::string& str, const std::string& substr) {
 std::string lstrip(const std::string& str, const std::string& substr) {
     if (!startswith(str, substr))
         return str;
-    return str.substr(substr.size() - 1, str.size());
+    return str.substr(substr.size(), str.size());
 }
 
 /**
@@ -484,6 +498,12 @@ void replace_path_characters(char* path, size_t len) {
  * \param bsize the lengh of the padding to add
  */
 char* pad_path(const char* pth, DWORD str_size, DWORD bsize) {
+    // If str_size > bsize we get inappropriate conversion
+    // from signed to unsigned
+    if (str_size > bsize) {
+        debug("Padding string is greater than max string size allowed");
+        return nullptr;
+    }
     size_t const extended_buf = bsize - str_size + 2;
     char* padded_path = new char[bsize + 1];
     for (DWORD i = 0, j = 0; i < bsize && j < str_size; ++i) {
@@ -515,18 +535,60 @@ int get_padding_length(const std::string& name) {
     return count;
 }
 
-std::string strip_padding(const std::string &lib)
-{
+std::string strip_padding(const std::string& lib) {
     // One of the padding characters is a legitimate
     // path separator
-    int pad_len = get_padding_length(lib)-1;
+    int const pad_len = get_padding_length(lib) - 1;
     // Capture the drive and drive separator
-    std::string::const_iterator p = lib.cbegin();
-    std::string::const_iterator e = lib.cbegin()+2;
-    std::string stripped_drive(p, e);
+    std::string::const_iterator const p = lib.cbegin();
+    std::string::const_iterator e = lib.cbegin() + 2;
+    std::string const stripped_drive(p, e);
     e = e + pad_len;
-    std::string path_remainder(e, lib.end());
+    std::string const path_remainder(e, lib.end());
     return stripped_drive + path_remainder;
+}
+
+/**
+ * Compute and return the SFN of a given path
+ *   utilizes the string parsing escape prefix
+ *   to allow processing paths that are longer
+ *   than the system MAX_PATH_LENGTH
+ *   (different from MAX_NAME_LEN)
+ */
+std::string getSFN(const std::string& path) {
+    // Use "disable string parsing" prefix in case
+    // the path is too long
+    std::string const escaped = R"(\\?\)" + path;
+    // Get SFN length so we can create buffer
+    DWORD const sfn_size =
+        GetShortPathNameA(escaped.c_str(), NULL, 0);  //NOLINT
+    char* sfn = new char[sfn_size + 1];
+    GetShortPathNameA(escaped.c_str(), sfn, escaped.length());
+    // sfn is null terminated per win32 api
+    // Ensure we strip out the disable string parsing prefix
+    std::string s_sfn = lstrip(sfn, R"(\\?\)");
+    delete[] sfn;
+    return s_sfn;
+}
+
+/**
+ * Replace path with the SFN representation
+ *   will raise an exception NameTooLongError if
+ *   post SFN conversion, the path is still longer
+ *   than the MAX_NAME_LEN limit
+ */
+std::string short_name(const std::string& path) {
+    // Get SFN for path to name
+    std::string const new_abs_out = getSFN(path);
+    if (new_abs_out.length() > MAX_NAME_LEN) {
+        std::cerr << "DLL path " << path << " too long to relocate.\n";
+        std::cerr << "Shortened DLL path " << new_abs_out
+                  << " also too long to relocate.\n";
+        std::cerr << "Please move Spack prefix "
+                  << " to a shorter directory.\n";
+        throw NameTooLongError("DLL Path too long, cannot be relocated.");
+    }
+    return new_abs_out;
 }
 
 /**
@@ -544,6 +606,13 @@ std::string mangle_name(const std::string& name) {
     } else {
         // relative paths, assume they're relative to the CWD of the linker (as they have to be)
         abs_out = join({GetCWD(), name}, "\\");
+    }
+    // Now that we have the full path, check size
+    if (abs_out.length() > MAX_NAME_LEN) {
+        // Name is too long we need to attempt to shorten
+        std::string const new_abs_out = short_name(abs_out);
+        // If new, shortened path is too long, bail
+        abs_out = new_abs_out;
     }
     char* chr_abs_out = new char[abs_out.length() + 1];
     strcpy(chr_abs_out, abs_out.c_str());
@@ -579,7 +648,7 @@ bool SpackInstalledLib(const std::string& lib) {
             "unset");
         return false;
     }
-    std::string stripped_lib = strip_padding(lib);
+    std::string const stripped_lib = strip_padding(lib);
     startswith(stripped_lib, prefix);
 }
 
@@ -731,4 +800,11 @@ char* findstr(char* search_str, const char* substr, size_t size) {
         ++search;
     }
     return nullptr;
+}
+
+NameTooLongError::NameTooLongError(char const* const message)
+    : std::runtime_error(message) {}
+
+char const* NameTooLongError::what() const {
+    return exception::what();
 }

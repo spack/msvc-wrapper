@@ -26,6 +26,9 @@ jobs:
       - name: Remove Git Bash tools
         run: |
           rmdir /s /q "C:\Program Files\Git\usr"
+      - name: enable 8.3 names
+        run: |
+          fsutil 8dot3name set 0
       - name: "Test RPath"
         run: |
           test\setup_and_drive_test.bat

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include <cstdio>
-#include <stdio.h>
+#include <cstdio>
 #include <windows.h>  // NOLINT
 #include "winrpath.h"
 #include <fileapi.h>
@@ -92,17 +92,26 @@ bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) const {
             return false;
         }
         LibraryFinder lib_finder;
-        std::string const new_library_loc =
+        std::string new_library_loc =
             lib_finder.FindLibrary(file_name, dll_path);
         if (new_library_loc.empty()) {
             std::cerr << "Unable to find library " << file_name << " from "
                       << dll_path << " for relocation" << "\n";
             return false;
         }
+        if (new_library_loc.length() > MAX_NAME_LEN) {
+            try {
+                new_library_loc = short_name(new_library_loc);
+            } catch (NameTooLongError& e) {
+                return false;
+            }
+        }
         char* new_lib_pth =
             pad_path(new_library_loc.c_str(),
                      static_cast<DWORD>(new_library_loc.size()));
-
+        if (!new_lib_pth) {
+            return false;
+        }
         replace_special_characters(new_lib_pth, MAX_NAME_LEN);
 
         // c_str returns a proper (i.e. null terminated) value, so we dont need to worry about
@@ -404,11 +413,18 @@ bool LibRename::ExecuteLibRename() {
         std::cerr << err;
         return false;
     }
-    std::string mangled_name = mangle_name(this->pe);
-    if (!coff_parser.NormalizeName(mangled_name)) {
-        std::cerr << "Unable to normalize name: " << mangled_name << "\n";
+    try {
+        std::string mangled_name = mangle_name(this->pe);
+        if (!coff_parser.NormalizeName(mangled_name)) {
+            std::cerr << "Unable to normalize name: " << mangled_name << "\n";
+            return false;
+        }
+    } catch (const NameTooLongError& e) {
+        std::cerr << "Unable to mangle name, DLL name " << this->pe
+                  << " too long\n";
         return false;
     }
+
     return true;
 }
 

@@ -6,6 +6,7 @@
 #include "ld.h"
 #include <minwindef.h>
 #include <cstdio>
+#include <iostream>
 #include "coff_parser.h"
 #include "coff_reader_writer.h"
 #include "linker_invocation.h"
@@ -34,7 +35,14 @@ DWORD LdInvocation::InvokeToolchain() {
     // We're creating a dll, we need to create an appropriate import lib
     if (!link_run.IsExeLink()) {
         std::string const imp_lib_name = link_run.get_implib_name();
-        std::string dll_name = link_run.get_mangled_out();
+        std::string dll_name;
+        try {
+            dll_name = link_run.get_mangled_out();
+        } catch (const NameTooLongError& e) {
+            std::cerr << "Unable to mangle PE " << link_run.get_out()
+                      << " name is too long\n";
+            return ExitConditions::NORMALIZE_NAME_FAILURE;
+        }
         std::string const abs_out_imp_lib_name = imp_lib_name + ".dll-abs.lib";
         std::string def = "-def ";
         std::string piped_args = link_run.get_lib_link_args();

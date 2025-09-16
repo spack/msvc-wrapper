@@ -22,6 +22,21 @@
 #define _STRING(m) #m
 #define STRING(m) _STRING(m)
 
+/**
+ * This MACRO represents an undocumented
+ * limit to the potential length of a
+ * dll "name" in a COFF/PE file.
+ * Names longer than this can cause the 
+ * librarian tool (lib.exe) to overwrite
+ * sections of the file adjacent to the
+ * name.
+ * The limit appears to be 143 characters
+ * A size of 144 is valid, except in cases
+ * where the name in the PE/COFF file must
+ * be null terminated, so we use 143
+ * to avoid the null terminator causing an
+ * overwrite.
+ */
 #define MAX_NAME_LEN 143
 
 #define MIN_PADDING_THRESHOLD 8
@@ -71,7 +86,8 @@ std::wstring ConvertASCIIToWide(const std::string& str);
 // Splits argument "s" by delineator delim
 // Returns vector of strings, if delim is present
 // Returns a single item list
-StrList split(const std::string& s, const std::string& delim);
+StrList split(const std::string& s, const std::string& delim,
+              const u_int count = 0);
 
 //Strips substr off the RHS of the larger string
 std::string strip(const std::string& s, const std::string& substr);
@@ -162,6 +178,8 @@ bool IsPathAbsolute(const std::string& pth);
 
 bool hasPathCharacters(const std::string& name);
 
+std::string short_name(const std::string& path);
+
 std::string mangle_name(const std::string& name);
 
 int get_padding_length(const std::string& name);
@@ -172,7 +190,7 @@ void replace_path_characters(char* path, size_t len);
 
 void replace_special_characters(char* mangled, size_t len);
 
-bool SpackInstalledLib(const std::string &lib);
+bool SpackInstalledLib(const std::string& lib);
 
 // File and File handle helpers //
 
@@ -236,5 +254,11 @@ const std::map<char, char> special_character_to_path{{'|', '\\'}, {';', ':'}};
 const std::map<char, char> path_to_special_characters{{'\\', '|'},
                                                       {'/', '|'},
                                                       {':', ';'}};
+
+class NameTooLongError : public std::runtime_error {
+   public:
+    NameTooLongError(char const* const message);
+    virtual char const* what() const;
+};
 
 static bool DEBUG = false;
