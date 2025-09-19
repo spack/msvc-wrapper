@@ -8,5 +8,10 @@
 #include "spack_env.h"
 
 void ClInvocation::LoadToolchainDependentSpackVars(SpackEnvState& spackenv) {
-    this->command = spackenv.SpackCC;
+    // C and CXX compiler executables are the same for MSVC (both cl, hence the class name)
+    // However, depending on how a package depends on the languages, one or both
+    // may be present in the env. Arbitrarily prefer the C compiler as the choice
+    // truly doesn't matter
+    this->command =
+        !spackenv.SpackCC.empty() ? spackenv.SpackCC : spackenv.SpackCXX;
 }
