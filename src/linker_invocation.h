@@ -36,9 +36,8 @@ class LinkerInvocation {
     StrList objs_;
     bool is_exe_;
     std::map<std::string, StrList> piped_args_ = {
-        {"def", {}},          {"export", {}},    {"include", {}},
-        {"libpath", {}},      {"ltcg", {}},      {"machine", {}},
-        {"nodefaultlib", {}}, {"subsystem", {}}, {"verbose", {}},
-        {"wx", {}},
+        {"export", {}},    {"include", {}}, {"libpath", {}},
+        {"ltcg", {}},      {"machine", {}}, {"nodefaultlib", {}},
+        {"subsystem", {}}, {"verbose", {}}, {"wx", {}},
     };
 };

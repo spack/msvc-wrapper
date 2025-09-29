@@ -46,11 +46,10 @@ void LinkerInvocation::Parse() {
             this->implibname_ = implib_line[1];
         } else if (endswith(normal_token, ".lib")) {
             this->libs_.push_back(*token);
-        } else if (normal_token == "/dll" || normal_token == "-dll") {
+        } else if (normal_token == "dll") {
             this->is_exe_ = false;
-        } else if (startswith(normal_token, "-out") ||
-                   startswith(normal_token, "/out")) {
-            this->output_ = split(*token, ":", 1)[1];
+        } else if (startswith(normal_token, "out")) {
+            this->output_ = split(*token, ":")[1];
         } else if (endswith(normal_token, ".obj")) {
             this->objs_.push_back(*token);
         } else if (startswith(normal_token, "@") &&
@@ -60,6 +59,8 @@ void LinkerInvocation::Parse() {
             // Primarily utilized by CMake and MSBuild projects to bypass
             // Command line length limits
             this->rsp_file_ = *token;
+        } else if (startswith(normal_token, "def")) {
+            this->def_file_ = strip(split(*token, ":")[1], "\"");
         } else if (this->piped_args_.find(normal_token) !=
                    this->piped_args_.end()) {
             this->piped_args_.at(normal_token).emplace_back(normal_token);
