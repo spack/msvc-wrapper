@@ -471,7 +471,7 @@ void normalArg(std::string& arg) {
     // first normalize capitalization
     lower(arg);
     // strip leading / and -
-    arg = strip(strip(arg, "-"), "/");
+    arg = lstrip(lstrip(arg, "-"), "/");
 }
 
 std::string reportLastError() {
