@@ -46,7 +46,7 @@ DWORD LdInvocation::InvokeToolchain() {
         std::string const abs_out_imp_lib_name = imp_lib_name + ".dll-abs.lib";
         std::string const def_file = link_run.get_def_file().empty()
                                          ? " "
-                                         : ": " + link_run.get_def_file();
+                                         : ":" + link_run.get_def_file();
         std::string const def = "-def" + def_file;
 
         std::string const piped_args = link_run.get_lib_link_args();
