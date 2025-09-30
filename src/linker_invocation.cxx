@@ -60,10 +60,10 @@ void LinkerInvocation::Parse() {
             // Command line length limits
             this->rsp_file_ = *token;
         } else if (startswith(normal_token, "def")) {
-            this->def_file_ = strip(split(*token, ":")[1], "\"");
+            this->def_file_ = strip(split(*token, ":", 1)[1], "\"");
         } else if (this->piped_args_.find(normal_token) !=
                    this->piped_args_.end()) {
-            this->piped_args_.at(normal_token).emplace_back(normal_token);
+            this->piped_args_.at(normal_token).emplace_back(*token);
         }
     }
     std::string const ext = this->is_exe_ ? ".exe" : ".dll";

@@ -246,6 +246,14 @@ void lower(std::string& str) {
     });
 }
 
+/**
+ * Quotes str as needed
+ *  If str has existing escaped quotes, or a space/reserved character
+ *  Escape escaped quotes using an escaped backslash preceding the escaped
+ *  quote. Escape reserved characters by quoting the entire string
+ * 
+ *  Return the escaped string
+ */
 std::string quoteAsNeeded(std::string& str) {
     // Note: the ordering if these two conditionals is important
     // If the second conditional is executed first, the first
@@ -470,6 +478,8 @@ bool isCommandArg(const std::string& arg, const std::string& command) {
 void normalArg(std::string& arg) {
     // first normalize capitalization
     lower(arg);
+    // strip any leading/trailing quotes
+    arg = strip(lstrip(arg, "\""), "\"");
     // strip leading / and -
     arg = lstrip(lstrip(arg, "-"), "/");
 }
