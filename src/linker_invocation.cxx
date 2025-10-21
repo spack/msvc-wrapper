@@ -3,10 +3,12 @@
  *
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
-
-#include "linker_invocation.h"
+#include <fstream>
+#include <iostream>
+#include <sstream>
 #include <string>
 #include <utility>
+#include "linker_invocation.h"
 #include "utils.h"
 
 /**
@@ -67,7 +69,18 @@ void LinkerInvocation::Parse() {
         }
     }
     std::string const ext = this->is_exe_ ? ".exe" : ".dll";
-    if (this->output_.empty()) {
+    // If we have a def file and no name, attempt to
+    // scrape the def file for a name to be sure
+    // we respect the intended project name
+    // vs overriding via the CLI
+    if (!this->def_file_.empty() && this->output_.empty()) {
+        this->processDefFile();
+    }
+    // If output wasn't defined on the command line
+    // or the def file
+    // compute it based on the same logic as the linker
+    // i.e. first obj file name
+    else if (this->output_.empty()) {
         // with no "out" argument, the linker
         // will place the file in the CWD
         std::string const name_obj = this->objs_.front();
@@ -78,6 +91,43 @@ void LinkerInvocation::Parse() {
     if (this->implibname_.empty()) {
         this->implibname_ = this->name_ + ".lib";
     }
+}
+
+/**
+ * processDefFile reads a def file passed to the linker
+ *  looking for either LIBRARY or NAME keywords
+ *  If found the LinkerInvocation name_ attribute is assigned
+ *  to the def file defined library name
+ *  and the def file is re-written without that name for use
+ *  if our lib pass so we can easily compose an absolute path'd
+ *  version of that name
+ */
+void LinkerInvocation::processDefFile() {
+
+    // 2. Open input file for reading
+    std::ifstream def_in(this->def_file_);
+    if (!def_in) {
+        std::cerr << "Error: Could not open input file: " << this->def_file_
+                  << "\n";
+    }
+
+    std::string line;
+
+    // 4. Read the input file line by line
+    while (std::getline(def_in, line)) {
+        std::stringstream def_line(line);
+        std::string keyword;
+        def_line >> keyword;
+
+        // extract the intended output library name, overwrite
+        // default name derived from first obj file
+        // We can leave this def file is as we override on the
+        // CLI
+        if ((keyword == "NAME" || keyword == "LIBRARY")) {
+            def_line >> this->output_;
+        }
+    }
+    def_in.close();
 }
 
 std::string LinkerInvocation::get_name() {
