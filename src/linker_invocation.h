@@ -25,6 +25,7 @@ class LinkerInvocation {
     std::string get_lib_link_args();
 
    private:
+    void processDefFile();
     std::string line_;
     StrList tokens_;
     std::string name_;
