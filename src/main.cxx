@@ -47,20 +47,13 @@ int main(int argc, const char* argv[]) {
             std::cout << "No binaries to operate on... nothing to do\n";
             return ExitConditions::CLI_FAILURE;
         }
-        // The only scenario its ok to have a dll/exe and no coff is when we're creating a cache
-        // entry
-        if (!has_coff && !deploy) {
-            std::cout << "Attempting to relocate DLL without coff file, please "
-                         "provide a coff file.\n";
-            return ExitConditions::CLI_FAILURE;
-        }
         if (is_validate && !has_coff) {
             std::cout << "Attempting to validate without a coff file, nothing "
                          "to validate\n";
             return ExitConditions::CLI_FAILURE;
         }
         if (report && !has_coff) {
-            std::cout << "Attempting to report without a binary, nothing to "
+            std::cout << "Attempting to report without a coff file, nothing to "
                          "report...\n";
             return ExitConditions::CLI_FAILURE;
         }
