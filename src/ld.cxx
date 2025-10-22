@@ -34,6 +34,15 @@ DWORD LdInvocation::InvokeToolchain() {
     link_run.Parse();
     // We're creating a PE, we need to create an appropriate import lib
     std::string const imp_lib_name = link_run.get_implib_name();
+    // If there is no implib, we don't need to bother
+    // trying to rename
+    if (!fileExists(imp_lib_name)) {
+        // There are numerous contexts in which a PE file
+        // may not export symbols, some are bugs in the
+        // upstream project, most are valid, all are not
+        // the concern of this wrapper
+        return 0;
+    }
     std::string pe_name;
     try {
         pe_name = link_run.get_mangled_out();

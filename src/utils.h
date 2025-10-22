@@ -193,6 +193,15 @@ void replace_special_characters(char* mangled, size_t len);
 bool SpackInstalledLib(const std::string& lib);
 
 // File and File handle helpers //
+/**
+ * @brief Returns boolean indicating whether
+ * the given file exists
+ * 
+ * @param fname file to check for existence
+ * 
+ * @return true if fname exists, false otherwise
+ */
+bool fileExists(const std::string& fname);
 
 // Returns File offset given RVA
 DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER& section_header,

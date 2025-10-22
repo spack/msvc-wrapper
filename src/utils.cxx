@@ -6,6 +6,7 @@
 #include "utils.h"
 #include <errhandlingapi.h>
 #include <fileapi.h>
+#include <fstream>
 #include <handleapi.h>
 #include <minwinbase.h>
 #include <minwindef.h>
@@ -624,6 +625,13 @@ std::string mangle_name(const std::string& name) {
     delete[] chr_abs_out;
     delete padded_path;
     return mangled_abs_out;
+}
+
+bool fileExists(const std::string& fname) {
+    std::ifstream file(fname);
+    bool const exists = file.good();
+    file.close();
+    return exists;
 }
 
 /**
