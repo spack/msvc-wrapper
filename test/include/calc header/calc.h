@@ -7,6 +7,8 @@
 
 #ifdef CALC_EXPORTS
 #define CALC_API __declspec(dllexport)
+#elif CALC_DEF_EXPORTS
+#define CALC_API
 #else
 #define CALC_API __declspec(dllimport)
 #endif
