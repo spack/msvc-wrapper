@@ -191,7 +191,7 @@ std::string LinkerInvocation::get_rsp_file() {
 }
 
 std::string LinkerInvocation::get_out() {
-    return this->output_.empty() ? this->pe_name_ : this->output_;
+    return this->pe_name_.empty() ? this->output_ : this->pe_name_;
 }
 
 std::string LinkerInvocation::get_mangled_out() {

@@ -233,9 +233,9 @@ test_def_file_name_override:
 	-@ if NOT EXIST "link.exe" mklink link.exe cl.exe
 	cl /c /EHsc "calc.cxx" /DCALC_DEF_EXPORTS /DCALC_HEADER="\"calc header/calc.h\"" /I include
 	cl /c /EHsc main.cxx /I include
-# 	link $(LFLAGS) /DEF:calc.def calc.obj /DLL
-# 	link $(LFLAGS) main.obj calcdef.lib /out:tester.exe
-# 	tester.exe
+	link $(LFLAGS) /DEF:calc.def calc.obj /DLL
+	link $(LFLAGS) main.obj calc.lib /out:tester.exe
+	tester.exe
 	cd ../../../.. 
 
 test_and_cleanup: test clean-test
