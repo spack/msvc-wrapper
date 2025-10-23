@@ -16,7 +16,6 @@ class LinkerInvocation {
     ~LinkerInvocation() = default;
     void Parse();
     bool IsExeLink();
-    std::string get_name();
     std::string get_out();
     std::string get_mangled_out();
     std::string get_implib_name();
@@ -25,9 +24,10 @@ class LinkerInvocation {
     std::string get_lib_link_args();
 
    private:
+    void processDefFile();
     std::string line_;
     StrList tokens_;
-    std::string name_;
+    std::string pe_name_;
     std::string implibname_;
     std::string def_file_;
     std::string rsp_file_;
@@ -36,9 +36,8 @@ class LinkerInvocation {
     StrList objs_;
     bool is_exe_;
     std::map<std::string, StrList> piped_args_ = {
-        {"def", {}},          {"export", {}},    {"include", {}},
-        {"libpath", {}},      {"ltcg", {}},      {"machine", {}},
-        {"nodefaultlib", {}}, {"subsystem", {}}, {"verbose", {}},
-        {"wx", {}},
+        {"export", {}},    {"include", {}}, {"libpath", {}},
+        {"ltcg", {}},      {"machine", {}}, {"nodefaultlib", {}},
+        {"subsystem", {}}, {"verbose", {}}, {"wx", {}},
     };
 };

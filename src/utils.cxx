@@ -224,6 +224,14 @@ void lower(std::string& str) {
     });
 }
 
+/**
+ * Quotes str as needed
+ *  If str has existing escaped quotes, or a space/reserved character
+ *  Escape escaped quotes using an escaped backslash preceding the escaped
+ *  quote. Escape reserved characters by quoting the entire string
+ * 
+ *  Return the escaped string
+ */
 std::string quoteAsNeeded(std::string& str) {
     // Note: the ordering if these two conditionals is important
     // If the second conditional is executed first, the first
@@ -330,7 +338,7 @@ std::string regexReplace(
  * or an empty string as appropriate
  */
 std::string GetSpackEnv(const char* env) {
-    char* env_val = getenv(env);
+    char const* env_val = getenv(env);
     return env_val ? env_val : std::string();
 }
 
@@ -448,8 +456,10 @@ bool isCommandArg(const std::string& arg, const std::string& command) {
 void normalArg(std::string& arg) {
     // first normalize capitalization
     lower(arg);
+    // strip any leading/trailing quotes
+    arg = strip(lstrip(arg, "\""), "\"");
     // strip leading / and -
-    arg = strip(strip(arg, "-"), "/");
+    arg = lstrip(lstrip(arg, "-"), "/");
 }
 
 std::string reportLastError() {
@@ -617,7 +627,7 @@ std::string mangle_name(const std::string& name) {
     char* chr_abs_out = new char[abs_out.length() + 1];
     strcpy(chr_abs_out, abs_out.c_str());
     replace_path_characters(chr_abs_out, abs_out.length());
-    char* padded_path =
+    char const* padded_path =
         pad_path(chr_abs_out, static_cast<DWORD>(abs_out.length()));
     mangled_abs_out = std::string(padded_path, MAX_NAME_LEN);
 
@@ -791,7 +801,7 @@ int get_slash_name_length(const char* slash_name) {
 }
 
 char* findstr(char* search_str, const char* substr, size_t size) {
-    char* search = search_str;
+    char* search = search_str;  // NOLINT
     size_t const str_size = strlen(substr);
     while (search < search_str + size) {
         if (!strncmp(search, substr, str_size)) {
