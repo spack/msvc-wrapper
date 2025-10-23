@@ -16,7 +16,6 @@ class LinkerInvocation {
     ~LinkerInvocation() = default;
     void Parse();
     bool IsExeLink();
-    std::string get_name();
     std::string get_out();
     std::string get_mangled_out();
     std::string get_implib_name();
@@ -28,7 +27,7 @@ class LinkerInvocation {
     void processDefFile();
     std::string line_;
     StrList tokens_;
-    std::string name_;
+    std::string pe_name_;
     std::string implibname_;
     std::string def_file_;
     std::string rsp_file_;

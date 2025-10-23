@@ -68,7 +68,6 @@ void LinkerInvocation::Parse() {
             this->piped_args_.at(normal_token).emplace_back(*token);
         }
     }
-    std::string const ext = this->is_exe_ ? ".exe" : ".dll";
     // If we have a def file and no name, attempt to
     // scrape the def file for a name to be sure
     // we respect the intended project name
@@ -76,20 +75,21 @@ void LinkerInvocation::Parse() {
     if (!this->def_file_.empty() && this->output_.empty()) {
         this->processDefFile();
     }
+    std::string const ext = this->is_exe_ ? ".exe" : ".dll";
     // If output wasn't defined on the command line
     // or the def file
     // compute it based on the same logic as the linker
     // i.e. first obj file name
-    else if (this->output_.empty()) {
+    if (this->output_.empty()) {
         // with no "out" argument, the linker
         // will place the file in the CWD
         std::string const name_obj = this->objs_.front();
         std::string const filename = split(name_obj, "\\").back();
         this->output_ = join({GetCWD(), strip(filename, ".obj")}, "\\") + ext;
     }
-    this->name_ = strip(this->output_, ext);
     if (this->implibname_.empty()) {
-        this->implibname_ = this->name_ + ".lib";
+        std::string const name = strip(this->output_, ext);
+        this->implibname_ = name + ".lib";
     }
 }
 
@@ -104,16 +104,17 @@ void LinkerInvocation::Parse() {
  */
 void LinkerInvocation::processDefFile() {
 
-    // 2. Open input file for reading
+    // Def from link line
     std::ifstream def_in(this->def_file_);
     if (!def_in) {
-        std::cerr << "Error: Could not open input file: " << this->def_file_
+        std::cerr << "Error: Could not open input def file: " << this->def_file_
                   << "\n";
     }
 
     std::string line;
+    bool def_file_export_name = false;
+    StrList exports;
 
-    // 4. Read the input file line by line
     while (std::getline(def_in, line)) {
         std::stringstream def_line(line);
         std::string keyword;
@@ -123,15 +124,42 @@ void LinkerInvocation::processDefFile() {
         // default name derived from first obj file
         // We can leave this def file is as we override on the
         // CLI
-        if ((keyword == "NAME" || keyword == "LIBRARY")) {
-            def_line >> this->output_;
+        // Name renames exes
+        // Library renames DLLs
+        // These def keywords override the command line use
+        // of /DLL
+        if (keyword == "NAME") {
+            this->is_exe_ = true;
+            def_line >> this->pe_name_;
+            this->pe_name_ = this->pe_name_ + ".exe";
+            def_file_export_name = true;
+        } else if (keyword == "LIBRARY") {
+            this->is_exe_ = false;
+            def_line >> this->pe_name_;
+            this->pe_name_ = this->pe_name_ + ".dll";
+            def_file_export_name = true;
+        } else {
+            exports.push_back(line);
         }
     }
-    def_in.close();
-}
+    if (def_file_export_name) {
+        const std::string def_name = stem(this->def_file_);
+        const std::string def_path =
+            this->def_file_.substr(0, this->def_file_.find(def_name));
+        const std::string rename_def = def_path + def_name + "-rename.def";
 
-std::string LinkerInvocation::get_name() {
-    return this->name_;
+        std::ofstream def_out(rename_def);
+        if (!def_out) {
+            std::cerr << "Error: could not open output def file: " << rename_def
+                      << "\n";
+        }
+        for (const auto& line : exports) {
+            def_out << line << "\n";
+        }
+        def_out.close();
+        this->def_file_ = rename_def;
+    }
+    def_in.close();
 }
 
 std::string LinkerInvocation::get_implib_name() {
@@ -163,13 +191,13 @@ std::string LinkerInvocation::get_rsp_file() {
 }
 
 std::string LinkerInvocation::get_out() {
-    return this->output_;
+    return this->output_.empty() ? this->pe_name_ : this->output_;
 }
 
 std::string LinkerInvocation::get_mangled_out() {
-    return mangle_name(this->output_);
+    return mangle_name(this->get_out());
 }
 
 bool LinkerInvocation::IsExeLink() {
-    return this->is_exe_ || endswith(this->output_, ".exe");
+    return this->is_exe_ || endswith(this->get_out(), ".exe");
 }
