@@ -110,6 +110,8 @@ void StripPath(std::string& command);
 // Strips .exe extension from path
 void StripExe(std::string& command);
 
+std::string stripLastExt(const std::string& path);
+
 // Drives both StripPath and StripExe on the same path
 // resulting in a parentless, non exe extensioned path
 void StripPathAndExe(std::string& command);
