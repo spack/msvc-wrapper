@@ -292,7 +292,7 @@ bool CoffParser::ValidateLongName(coff_member* member, int size) {
     }
     // If a name has an object file, this is not an import
     // member
-    char* obj_res = findstr(member->data, ".obj", size);
+    char const* obj_res = findstr(member->data, ".obj", size);
     return obj_res == nullptr;
 }
 
@@ -326,7 +326,7 @@ void CoffParser::NormalizeSectionNames(const std::string& name, char* section,
                                        size_t data_size) {
     size_t const name_len = name.size();
     char* section_search_start = section;
-    char* search_terminator = section + data_size;
+    char const* search_terminator = section + data_size;
     ptrdiff_t offset = 0;
     while (section_search_start && (section_search_start < search_terminator)) {
         // findstr's final parameter takes the size of the search domain
@@ -378,8 +378,7 @@ bool CoffParser::NormalizeName(std::string& name) {
     // The dll is found with and without an extenion, depending on the context of the location
     // i.e. in the section data, it can be found with both an extension and extensionless
     //  whereas in the symbol table or linker member strings, it's always found without an extension
-    std::string const name_no_dll = strip(name, ".dll");
-    std::string const name_no_ext = strip(name_no_dll, ".DLL");
+    std::string const name_no_ext = stripLastExt(name);
     // Flag allowing us to skip multiple attempts
     // to rename the long names member this name
     bool long_name_renamed = false;

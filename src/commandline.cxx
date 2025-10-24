@@ -28,20 +28,6 @@ int redefinedArgCheck(const std::map<std::string, std::string>& args,
     return 0;
 }
 
-/**
- * Check for the presense of an argument in the argument map
- */
-int checkArgumentPresence(const std::map<std::string, std::string>& args,
-                          const char* val, bool required = true) {
-    if (args.find(val) == args.end()) {
-        std::cerr << "Warning! Argument (" << val << ") not present\n";
-        if (required) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
 bool print_help() {
     std::cout << "Spack's Windows compiler wrapper\n";
     std::cout << "Version: " << STRING(MSVC_WRAPPER_VERSION) << "\n";
@@ -82,28 +68,20 @@ bool print_help() {
                  "this file:\n";
     std::cout << "\n";
     std::cout << "      Options:\n";
-    std::cout << "          --pe <path to pe file>                       = PE "
+    std::cout << "          --pe <path to pe file>                      = PE "
                  "(dll/exe) file to be relocated\n";
-    std::cout << "          [--coff <path to coff file>]                 = "
+    std::cout << "          --coff <path to coff file>                  = "
                  "COFF (import library) file to be relocated\n";
     std::cout << "                                                         If "
-                 "relocating an exe, this is not required.\n";
-    std::cout << "          --full                                       = "
+                 "relocating an exe or dll plugin, this may not be required.\n";
+    std::cout << "          --full                                      = "
                  "Relocate dynamic references inside\n";
     std::cout << "                                                          "
                  "the pe in addition to re-generating\n";
     std::cout << "                                                          "
                  "the import library\n";
     std::cout << "                                                          "
-                 "Note: this is assumed to be true if\n";
-    std::cout << "                                                           "
-                 "relocating an executable.\n";
-    std::cout << "                                                          If "
-                 "an executable is relocated, no import\n";
-    std::cout << "                                                          "
-                 "library operations are performed.\n";
-    std::cout << "                                                          "
-                 "When relocating a DLL, the import library for\n";
+                 "When relocating a PE, the import library for\n";
     std::cout << "                                                          "
                  "said library is regenerated and the old imp lib\n";
     std::cout << "                                                          "

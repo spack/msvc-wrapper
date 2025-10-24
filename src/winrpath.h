@@ -55,5 +55,4 @@ class LibRename {
     bool full;
     bool deploy;
     bool replace;
-    bool is_exe;
 };

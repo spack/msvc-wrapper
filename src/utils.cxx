@@ -6,6 +6,7 @@
 #include "utils.h"
 #include <errhandlingapi.h>
 #include <fileapi.h>
+#include <fstream>
 #include <handleapi.h>
 #include <minwinbase.h>
 #include <minwindef.h>
@@ -196,6 +197,27 @@ std::string join(const StrList& args, const std::string& join_char) {
     return joined_path;
 }
 
+/**
+ * @brief Removes trailing extenion from a path
+ * i.e. from /path/to/my/file.txt.tmp this method
+ * would remove .tmp and return 
+ * /path/to/my/file.txt
+ * @param path - path to have trailing ext removed from 
+ * 
+ * @return path with last ext removed
+ */
+std::string stripLastExt(const std::string& path) {
+    // ensure we're only operating on file component
+    const std::string base = basename(path);
+    const size_t ext_pos = base.rfind('.');
+    std::string path_no_ext;
+    if (ext_pos != std::string::npos) {
+        const size_t ext_len = base.length() - ext_pos;
+        path_no_ext = path.substr(0, path.length() - ext_len);
+    }
+    return path_no_ext;
+}
+
 void StripPathAndExe(std::string& command) {
     StripPath(command);
     StripExe(command);
@@ -330,7 +352,7 @@ std::string regexReplace(
  * or an empty string as appropriate
  */
 std::string GetSpackEnv(const char* env) {
-    char* env_val = getenv(env);
+    char const* env_val = getenv(env);
     return env_val ? env_val : std::string();
 }
 
@@ -617,13 +639,20 @@ std::string mangle_name(const std::string& name) {
     char* chr_abs_out = new char[abs_out.length() + 1];
     strcpy(chr_abs_out, abs_out.c_str());
     replace_path_characters(chr_abs_out, abs_out.length());
-    char* padded_path =
+    char const* padded_path =
         pad_path(chr_abs_out, static_cast<DWORD>(abs_out.length()));
     mangled_abs_out = std::string(padded_path, MAX_NAME_LEN);
 
     delete[] chr_abs_out;
     delete padded_path;
     return mangled_abs_out;
+}
+
+bool fileExists(const std::string& fname) {
+    std::ifstream file(fname);
+    bool const exists = file.good();
+    file.close();
+    return exists;
 }
 
 /**
@@ -791,7 +820,7 @@ int get_slash_name_length(const char* slash_name) {
 }
 
 char* findstr(char* search_str, const char* substr, size_t size) {
-    char* search = search_str;
+    char* search = search_str;  // NOLINT
     size_t const str_size = strlen(substr);
     while (search < search_str + size) {
         if (!strncmp(search, substr, str_size)) {

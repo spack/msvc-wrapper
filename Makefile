@@ -66,6 +66,9 @@ install : cl.exe
 	mklink $(PREFIX)\relocate.exe $(PREFIX)\cl.exe
 
 setup_test: cl.exe
+	echo "-------------------"
+	echo "Running Test Setup"
+	echo "-------------------"
 	-@ if NOT EXIST "tmp\test" mkdir "tmp\test"
 	cd tmp\test
 	copy ..\..\cl.exe cl.exe
@@ -77,6 +80,9 @@ setup_test: cl.exe
 # * space in a path - preserved by quoted arguments
 # * escaped quoted arguments
 build_and_check_test_sample : setup_test
+	echo "--------------------"
+	echo "Building Test Sample"
+	echo "--------------------"
 	cd tmp\test
 	cl /c /EHsc "..\..\test\src file\calc.cxx" /DCALC_EXPORTS /DCALC_HEADER="\"calc header/calc.h\"" /I ..\..\test\include
 	cl /c /EHsc ..\..\test\main.cxx /I ..\..\test\include
@@ -88,6 +94,9 @@ build_and_check_test_sample : setup_test
 # Test basic wrapper behavior - did the absolute path to the DLL get injected
 # into the executable
 test_wrapper : build_and_check_test_sample
+	echo "--------------------"
+	echo "Running Wrapper Test"
+	echo "--------------------"
 	cd tmp
 	move test\tester.exe .\tester.exe
 	.\tester.exe
@@ -101,6 +110,9 @@ test_wrapper : build_and_check_test_sample
 
 # Test relocating an executable - re-write internal paths to dlls
 test_relocate_exe: build_and_check_test_sample
+	echo "--------------------------"
+	echo "Running Relocate Exe Test"
+	echo "--------------------------"
 	cd tmp\test
 	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
 	move calc.dll ..\calc.dll
@@ -112,6 +124,9 @@ test_relocate_exe: build_and_check_test_sample
 
 # Test relocating a dll - re-write import library
 test_relocate_dll: build_and_check_test_sample
+	echo "--------------------------"
+	echo "Running Relocate DLL test"
+	echo "--------------------------"
 	cd tmp/test
 	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
 	cd ..
@@ -127,6 +142,9 @@ test_relocate_dll: build_and_check_test_sample
 	cd ../..
 
 test_pipe_overflow: build_and_check_test_sample
+	echo "--------------------"
+	echo " Pipe overflow test"
+	echo "--------------------"
 	set SPACK_CC_TMP=%SPACK_CC%
 	set SPACK_CC=$(MAKEDIR)\test\lots-of-output.bat
 	cl /c /EHsc "test\src file\calc.cxx"
@@ -136,12 +154,18 @@ build_zerowrite_test: test\writezero.obj
 	link $(LFLAGS) $** Shlwapi.lib /out:writezero.exe
 
 test_zerowrite: build_zerowrite_test
+	echo "-----------------------"
+	echo "Running zerowrite test"
+	echo "-----------------------"
 	set SPACK_CC_TMP=%SPACK_CC%
 	set SPACK_CC=$(MAKEDIR)\writezero.exe
 	cl /c EHsc "test\src file\calc.cxx"
 	set SPACK_CC=%SPACK_CC_TMP%
 
 test_long_paths: build_and_check_test_sample
+	echo "------------------------"
+	echo "Running long paths test"
+	echo "------------------------"
 	mkdir tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
 	xcopy /E test\include tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
 	xcopy /E "test\src file" tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
@@ -158,6 +182,9 @@ test_long_paths: build_and_check_test_sample
 	cd ../../../..
 
 test_relocate_long_paths: test_long_paths
+	echo "---------------------------------"
+	echo "Running relocate logn paths test"
+	echo "---------------------------------"
 	cd tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
 	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
 	cd ..
@@ -172,10 +199,33 @@ test_relocate_long_paths: test_long_paths
 	.\tester.exe
 	cd ../../../..
 
+test_exe_with_exports:
+	echo ------------------------------
+	echo Running exe with exports test
+	echo ------------------------------
+	mkdir tmp\test\exe_with_exports
+	xcopy /E test\include tmp\test\exe_with_exports
+	xcopy /E "test\src file" tmp\test\exe_with_exports
+	xcopy test\main2.h tmp\test\exe_with_exports
+	xcopy test\main2.cxx tmp\test\exe_with_exports
+	xcopy test\main3.cxx tmp\test\exe_with_exports
+	cd tmp\test\exe_with_exports
+	copy ..\..\..\cl.exe cl.exe
+	-@ if NOT EXIST "link.exe" mklink link.exe cl.exe
+	cl /c /EHsc "calc.cxx" /DCALC_EXPORTS /DCALC_HEADER="\"calc header/calc.h\"" /I include
+	cl /c /EHsc main2.cxx /DMAIN_EXPORTS /I include
+	cl /c /EHsc main3.cxx /I include
+	link $(LFLAGS) calc.obj /out:calc.dll /DLL
+	link $(LFLAGS) main2.obj calc.lib /out:tester1.exe
+	link $(LFLAGS) main3.obj calc.lib tester1.lib /out:tester2.exe
+	tester1.exe
+	tester2.exe
+	cd ../../..
+
 test_and_cleanup: test clean-test
 
 
-test: test_wrapper test_relocate_exe test_relocate_dll test_long_paths test_pipe_overflow
+test: test_wrapper test_relocate_exe test_relocate_dll test_exe_with_exports test_long_paths test_pipe_overflow
 
 
 clean : clean-test clean-cl

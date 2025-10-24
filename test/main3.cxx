@@ -3,13 +3,11 @@
  *
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
-
-#ifdef CALC_HEADER
-#include CALC_HEADER /* "calc.h" */
-#else
+#include "main2.h"
 #include "calc header/calc.h"
-#endif
 
-extern "C" int add(int a, int b) {
-    return a + b;
+int main(int /*argc*/, char** /*argv*/) {
+    sub(2, 1);
+    add(1, 2);
+    return 0;
 }
