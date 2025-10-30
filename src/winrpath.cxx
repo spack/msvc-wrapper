@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include <cstdio>
-#include <cstdio>
+#include <stdio.h>
 #include <windows.h>  // NOLINT
 #include "winrpath.h"
 #include <fileapi.h>
@@ -253,7 +253,6 @@ LibRename::LibRename(std::string p_exe, std::string coff, bool full,
       pe(std::move(p_exe)),
       deploy(deploy),
       coff(std::move(coff)) {
-    this->is_exe = endswith(this->pe, ".exe");
     std::string const coff_path = stem(this->coff);
     this->tmp_def_file = coff_path + "-tmp.def";
     this->def_file = coff_path + ".def";
@@ -353,9 +352,8 @@ bool LibRename::ComputeDefFile() {
  */
 bool LibRename::ExecuteRename() {
     // If we're not deploying, we're extracting
-    // recompute the .def and .lib for dlls
-    // exes do not typically have import libs so we don't handle
-    // that case
+    // recompute the .def and .lib for dlls and optionally
+    // exes
     // We do not bother with defs for things that don't have
     // import libraries
     if (!this->deploy && !this->coff.empty()) {
