@@ -137,7 +137,8 @@ bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) const {
  * On extraction, we find dll names with the Spack sigil and rename (and repad) them with
  * the correct absolute path to the requisite DLL on the new host system.
  * 
- * This approach is heavily based on https://www.ired.team/miscellaneous-reversing-forensics/windows-kernel-internals/pe-file-header-parser-in-c++#first-dll-name
+ * This approach is heavily based on 
+ * https://www.ired.team/miscellaneous-reversing-forensics/windows-kernel-internals/pe-file-header-parser-in-c++#first-dll-name
  * 
  * \param pe_in the PE file for which to perform the imported DLL rename procedure
  * 

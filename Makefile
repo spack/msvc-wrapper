@@ -222,10 +222,26 @@ test_exe_with_exports:
 	tester2.exe
 	cd ../../..
 
+test_def_file_name_override:
+	mkdir tmp\test\def\def_override
+	xcopy /E test\include tmp\test\def\def_override
+	xcopy /E "test\src file" tmp\test\def\def_override
+	xcopy test\main.cxx tmp\test\def\def_override
+	xcopy test\calc.def tmp\test\def\def_override
+	cd tmp\test\def\def_override
+	copy ..\..\..\..\cl.exe cl.exe
+	-@ if NOT EXIST "link.exe" mklink link.exe cl.exe
+	cl /c /EHsc "calc.cxx" /DCALC_DEF_EXPORTS /DCALC_HEADER="\"calc header/calc.h\"" /I include
+	cl /c /EHsc main.cxx /I include
+	link $(LFLAGS) /DEF:calc.def calc.obj /DLL
+	link $(LFLAGS) main.obj calc.lib /out:tester.exe
+	tester.exe
+	cd ../../../.. 
+
 test_and_cleanup: test clean-test
 
 
-test: test_wrapper test_relocate_exe test_relocate_dll test_exe_with_exports test_long_paths test_pipe_overflow
+test: test_wrapper test_relocate_exe test_relocate_dll test_def_file_name_override test_exe_with_exports test_long_paths test_pipe_overflow
 
 
 clean : clean-test clean-cl

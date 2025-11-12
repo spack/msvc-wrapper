@@ -134,6 +134,8 @@ char* findstr(char* search_str, const char* substr, size_t size);
 // side effects on Windows
 void quoteList(StrList& args);
 
+std::string quoteAsNeeded(std::string& str);
+
 /// @brief Searches a sections of a string for a given regex using provided
 ///     options to control search behavior
 /// @param searchDomain - string to be searched

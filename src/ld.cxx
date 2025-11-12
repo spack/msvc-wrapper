@@ -52,7 +52,9 @@ DWORD LdInvocation::InvokeToolchain() {
         return ExitConditions::NORMALIZE_NAME_FAILURE;
     }
     std::string const abs_out_imp_lib_name = imp_lib_name + ".pe-abs.lib";
-    std::string def = "-def ";
+    std::string const def_file =
+        link_run.get_def_file().empty() ? " " : ":" + link_run.get_def_file();
+    std::string const def = "-def" + def_file;
     std::string piped_args = link_run.get_lib_link_args();
     // create command line to generate new import lib
     this->rpath_executor =
