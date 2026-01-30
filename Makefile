@@ -144,12 +144,23 @@ test_relocate_dll: build_and_check_test_sample
 	.\tester.exe
 	cd ../..
 
-test_pipe_overflow: build_and_check_test_sample
-	echo "--------------------"
-	echo " Pipe overflow test"
-	echo "--------------------"
+test_pipe_out_overflow: build_and_check_test_sample
+	@echo \n
+	@echo ---------------------------
+	@echo  Pipe stdout overflow test
+	@echo ---------------------------
 	set SPACK_CC_TMP=%SPACK_CC%
 	set SPACK_CC=$(MAKEDIR)\test\lots-of-output.bat
+	cl /c /EHsc "test\src file\calc.cxx"
+	set SPACK_CC=%SPACK_CC_TMP%
+
+test_pipe_error_overflow: build_and_check_test_sample
+	@echo \n
+	@echo ---------------------------
+	@echo  Pipe stderr overflow test
+	@echo ---------------------------
+	set SPACK_CC_TMP=%SPACK_CC%
+	set SPACK_CC=$(MAKEDIR)\test\lots-of-error.bat
 	cl /c /EHsc "test\src file\calc.cxx"
 	set SPACK_CC=%SPACK_CC_TMP%
 
@@ -244,7 +255,7 @@ test_def_file_name_override:
 test_and_cleanup: test clean-test
 
 
-test: test_wrapper test_relocate_exe test_relocate_dll test_def_file_name_override test_exe_with_exports test_long_paths test_pipe_overflow
+test: test_wrapper test_relocate_exe test_relocate_dll test_def_file_name_override test_exe_with_exports test_long_paths test_pipe_out_overflow test_pipe_error_overflow
 
 
 clean : clean-test clean-cl
