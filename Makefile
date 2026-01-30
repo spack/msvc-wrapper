@@ -29,6 +29,9 @@ BUILD_LINK = /DEBUG
 BASE_CFLAGS = /EHsc
 CFLAGS = $(BASE_CFLAGS) $(BUILD_CFLAGS) $(CLFLAGS)
 LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
+API_LIBS = Shlwapi.lib \
+Pathcch.lib \
+Advapi32.lib
 
 SRCS = cl.obj \
 execute.obj \
@@ -55,7 +58,7 @@ linker_invocation.obj
 all : install test
 
 cl.exe :  $(SRCS)
-	link $(LFLAGS) $** Shlwapi.lib /out:cl.exe
+	link $(LFLAGS) $** $(API_LIBS) /out:cl.exe
 
 install : cl.exe
 	mkdir $(PREFIX)
@@ -151,7 +154,7 @@ test_pipe_overflow: build_and_check_test_sample
 	set SPACK_CC=%SPACK_CC_TMP%
 
 build_zerowrite_test: test\writezero.obj
-	link $(LFLAGS) $** Shlwapi.lib /out:writezero.exe
+	link $(LFLAGS) $** $(API_LIBS) /out:writezero.exe
 
 test_zerowrite: build_zerowrite_test
 	echo "-----------------------"
