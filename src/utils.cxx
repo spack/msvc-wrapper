@@ -6,12 +6,14 @@
 #include "utils.h"
 #include <errhandlingapi.h>
 #include <fileapi.h>
+#include <cstdio>
 #include <fstream>
 #include <handleapi.h>
 #include <minwinbase.h>
 #include <minwindef.h>
 #include <processenv.h>
 #include <stringapiset.h>
+#include <strsafe.h>
 #include <winbase.h>
 #include <winerror.h>
 #include <winnls.h>
@@ -27,12 +29,17 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <memory>
 #include <regex>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
+#include <array>
 #include "shlwapi.h"
+#include "PathCch.h"
 
 //////////////////////////////////////////////////////////
 // String helper methods adding cxx20 features to cxx14 //
@@ -179,6 +186,17 @@ std::string lstrip(const std::string& str, const std::string& substr) {
     if (!startswith(str, substr))
         return str;
     return str.substr(substr.size(), str.size());
+}
+
+/**
+ * Strips double quotes from front and back of string
+ *
+ * Returns str with no leading or trailing quotes
+ *
+ * Note: removes only one set of quotes
+ */
+std::string stripquotes(const std::string& str) {
+    return strip(lstrip(str, "\""), "\"");
 }
 
 /**
@@ -337,7 +355,7 @@ std::string regexMatch(
     if (!std::regex_match(searchDomain, match, reg, flag)) {
         result_str = std::string();
     } else {
-        result_str = match.str();
+        result_str = match.str(1);
     }
     return result_str;
 }
@@ -529,7 +547,8 @@ void replace_path_characters(char* path, size_t len) {
  *                  null terminators.
  * \param bsize the lengh of the padding to add
  */
-char* pad_path(const char* pth, DWORD str_size, DWORD bsize) {
+char* pad_path(const char* pth, DWORD str_size, char padding_char,
+               DWORD bsize) {
     // If str_size > bsize we get inappropriate conversion
     // from signed to unsigned
     if (str_size > bsize) {
@@ -543,11 +562,24 @@ char* pad_path(const char* pth, DWORD str_size, DWORD bsize) {
             padded_path[i] = pth[j];
             ++j;
         } else {
-            padded_path[i] = '|';
+            padded_path[i] = padding_char;
         }
     }
     padded_path[bsize] = '\0';
     return padded_path;
+}
+
+std::string escape_backslash(const std::string& path) {
+    std::string escaped;
+    escaped.reserve(path.length() * 2);
+    for (char const c : path) {
+        if (c == '\\') {
+            escaped += "\\\\";
+        } else {
+            escaped += c;
+        }
+    }
+    return escaped;
 }
 
 /**
@@ -591,11 +623,37 @@ std::string getSFN(const std::string& path) {
     // Use "disable string parsing" prefix in case
     // the path is too long
     std::string const escaped = R"(\\?\)" + path;
+    // We cannot get the sfn for a path that doesn't exist
+    // if we find that the sfn we're looking for doesn't exist
+    // create a stub of the file, and allow the subsequent
+    // commands to overwrite it
+    if (!PathFileExistsA(path.c_str())) {
+        HANDLE h_file = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr,
+                                    CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (h_file == INVALID_HANDLE_VALUE) {
+            debug("File " + path +
+                  " does not exist, nor can it be created, unable to "
+                  "compute SFN\n");
+            CloseHandle(h_file);
+            return std::string();
+        }
+        CloseHandle(h_file);
+    }
     // Get SFN length so we can create buffer
     DWORD const sfn_size =
         GetShortPathNameA(escaped.c_str(), NULL, 0);  //NOLINT
     char* sfn = new char[sfn_size + 1];
-    GetShortPathNameA(escaped.c_str(), sfn, escaped.length());
+    DWORD const res = GetShortPathNameA(escaped.c_str(), sfn, escaped.length());
+    if (!res) {
+
+        std::cerr << "Failed to process short name for " << path
+                  << " Error: " << reportLastError() << "\n";
+    }
+    if (!sfn && res) {
+        // buffer was too small
+        debug("buffer too small; had: " + std::to_string(sfn_size) +
+              " needed: " + std::to_string(res));
+    }
     // sfn is null terminated per win32 api
     // Ensure we strip out the disable string parsing prefix
     std::string s_sfn = lstrip(sfn, R"(\\?\)");
@@ -623,6 +681,44 @@ std::string short_name(const std::string& path) {
     return new_abs_out;
 }
 
+std::string MakePathAbsolute(const std::string& path) {
+    if (IsPathAbsolute(path)) {
+        return path;
+    }
+    // relative paths, assume they're relative to the CWD of the linker (as they have to be)
+    return join({GetCWD(), path}, "\\");
+}
+
+std::string CannonicalizePath(const std::string& path) {
+    std::wstring const wpath = ConvertASCIIToWide(path);
+    wchar_t canonicalized_path[PATHCCH_MAX_CCH];
+    const size_t buffer_size = ARRAYSIZE(canonicalized_path);
+
+    HRESULT const status = PathCchCanonicalizeEx(
+        canonicalized_path, buffer_size, wpath.c_str(),
+        PATHCCH_ALLOW_LONG_PATHS  // Flags for long path support
+    );
+
+    if (!SUCCEEDED(status)) {
+        std::stringstream status_report;
+        status_report << "Cannot canonicalize path " + path + " error: "
+                      << std::hex << status;
+        throw NameTooLongError(status_report.str().c_str());
+    }
+    return ConvertWideToASCII(canonicalized_path);
+}
+
+std::string EnsureValidLengthPath(const std::string& path) {
+    std::string proper_length_path = path;
+    if (path.length() > MAX_NAME_LEN) {
+        // Name is too long we need to attempt to shorten
+        std::string const short_path = short_name(path);
+        // If new, shortened path is too long, bail
+        proper_length_path = short_path;
+    }
+    return proper_length_path;
+}
+
 /**
  * Mangles a string representing a path to have no path characters
  *  instead path characters (i.e. \\, :, etc) are replaced with
@@ -633,19 +729,10 @@ std::string short_name(const std::string& path) {
 std::string mangle_name(const std::string& name) {
     std::string abs_out;
     std::string mangled_abs_out;
-    if (IsPathAbsolute(name)) {
-        abs_out = name;
-    } else {
-        // relative paths, assume they're relative to the CWD of the linker (as they have to be)
-        abs_out = join({GetCWD(), name}, "\\");
-    }
+    abs_out = MakePathAbsolute(name);
+    abs_out = CannonicalizePath(abs_out);
     // Now that we have the full path, check size
-    if (abs_out.length() > MAX_NAME_LEN) {
-        // Name is too long we need to attempt to shorten
-        std::string const new_abs_out = short_name(abs_out);
-        // If new, shortened path is too long, bail
-        abs_out = new_abs_out;
-    }
+    abs_out = EnsureValidLengthPath(abs_out);
     char* chr_abs_out = new char[abs_out.length() + 1];
     strcpy(chr_abs_out, abs_out.c_str());
     replace_path_characters(chr_abs_out, abs_out.length());
@@ -688,7 +775,7 @@ bool SpackInstalledLib(const std::string& lib) {
         return false;
     }
     std::string const stripped_lib = strip_padding(lib);
-    startswith(stripped_lib, prefix);
+    return startswith(stripped_lib, prefix);
 }
 
 LibraryFinder::LibraryFinder() : search_vars{"SPACK_RELOCATE_PATH"} {}
@@ -845,5 +932,19 @@ NameTooLongError::NameTooLongError(char const* const message)
     : std::runtime_error(message) {}
 
 char const* NameTooLongError::what() const {
+    return exception::what();
+}
+
+RCCompilerFailure::RCCompilerFailure(char const* const message)
+    : std::runtime_error(message) {}
+
+char const* RCCompilerFailure::what() const {
+    return exception::what();
+}
+
+FileIOError::FileIOError(char const* const message)
+    : std::runtime_error(message) {}
+
+char const* FileIOError::what() const {
     return exception::what();
 }
