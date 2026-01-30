@@ -234,6 +234,21 @@ int SafeHandleCleanup(HANDLE& handle);
 // System Helpers //
 std::string reportLastError();
 
+struct LocalFreeDeleter {
+    void operator()(void* p) const {
+        if (p)
+            ::LocalFree(p);
+    }
+};
+
+// Custom deleter for Standard C pointers.
+struct FreeDeleter {
+    void operator()(void* p) const {
+        if (p)
+            std::free(p);
+    }
+};
+
 // Data helpers //
 
 // Converts big endian data to little endian form
@@ -276,6 +291,58 @@ class LibraryFinder {
     std::string FindLibrary(const std::string& lib_name,
                             const std::string& lib_path);
     void EvalSearchPaths();
+};
+
+using ScopedLocalInfo = std::unique_ptr<void, LocalFreeDeleter>;
+
+using ScopedSid = std::unique_ptr<void, FreeDeleter>;
+
+class FileSecurity {
+   public:
+    FileSecurity() = delete;
+
+    static ScopedSid GetCurrentUserSid();
+
+    static bool HasPermission(const std::wstring& file_path, DWORD access_mask,
+                              PSID sid);
+
+    static bool GrantPermission(const std::wstring& file_path,
+                                DWORD access_mask, PSID sid,
+                                PSECURITY_DESCRIPTOR* out_old_sd);
+
+    static bool ApplyDescriptor(const std::wstring& file_path,
+                                PSECURITY_DESCRIPTOR sd);
+
+    // Retrieves file attributes (e.g., ReadOnly, Hidden).
+    // Returns false if the file cannot be accessed.
+    static bool GetAttributes(const std::wstring& file_path, DWORD* out_attr);
+
+    // Sets file attributes.
+    // Returns false if the operation fails.
+    static bool SetAttributes(const std::wstring& file_path, DWORD attr);
+};
+
+class ScopedFileAccess {
+   public:
+    explicit ScopedFileAccess(std::wstring file_path,
+                              DWORD desired_access = GENERIC_WRITE);
+    ~ScopedFileAccess();
+    void Access();
+
+    bool IsAccessGranted() const;
+
+   private:
+    std::wstring file_path_;
+    DWORD desired_access_;
+
+    // ACL State
+    PSECURITY_DESCRIPTOR original_sd_;
+    ScopedSid current_user_sid_;
+    bool acl_needs_revert_;
+
+    // Attribute State
+    DWORD original_attributes_;
+    bool attributes_changed_;
 };
 
 const std::map<char, char> special_character_to_path{{'|', '\\'}, {';', ':'}};
