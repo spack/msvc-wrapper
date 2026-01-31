@@ -69,9 +69,10 @@ install : cl.exe
 	mklink $(PREFIX)\relocate.exe $(PREFIX)\cl.exe
 
 setup_test: cl.exe
-	echo "-------------------"
-	echo "Running Test Setup"
-	echo "-------------------"
+	@echo \n
+	@echo -------------------
+	@echo Running Test Setup
+	@echo -------------------
 	-@ if NOT EXIST "tmp\test" mkdir "tmp\test"
 	cd tmp\test
 	copy ..\..\cl.exe cl.exe
@@ -83,9 +84,9 @@ setup_test: cl.exe
 # * space in a path - preserved by quoted arguments
 # * escaped quoted arguments
 build_and_check_test_sample : setup_test
-	echo "--------------------"
-	echo "Building Test Sample"
-	echo "--------------------"
+	@echo --------------------
+	@echo Building Test Sample
+	@echo --------------------
 	cd tmp\test
 	cl /c /EHsc "..\..\test\src file\calc.cxx" /DCALC_EXPORTS /DCALC_HEADER="\"calc header/calc.h\"" /I ..\..\test\include
 	cl /c /EHsc ..\..\test\main.cxx /I ..\..\test\include
@@ -97,9 +98,10 @@ build_and_check_test_sample : setup_test
 # Test basic wrapper behavior - did the absolute path to the DLL get injected
 # into the executable
 test_wrapper : build_and_check_test_sample
-	echo "--------------------"
-	echo "Running Wrapper Test"
-	echo "--------------------"
+	@echo \n
+	@echo --------------------
+	@echo Running Wrapper Test
+	@echo --------------------
 	cd tmp
 	move test\tester.exe .\tester.exe
 	.\tester.exe
@@ -113,23 +115,25 @@ test_wrapper : build_and_check_test_sample
 
 # Test relocating an executable - re-write internal paths to dlls
 test_relocate_exe: build_and_check_test_sample
-	echo "--------------------------"
-	echo "Running Relocate Exe Test"
-	echo "--------------------------"
+	@echo \n
+	@echo --------------------------
+	@echo Running Relocate Exe Test
+	@echo --------------------------
 	cd tmp\test
 	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
 	move calc.dll ..\calc.dll
-	relocate.exe --pe tester.exe --deploy --full
-	relocate.exe --pe tester.exe --export --full
+	SET SPACK_RELOCATE_PATH=$(MAKEDIR)\tmp\test\calc.dll|$(MAKEDIR)\tmp\calc.dll
+	relocate.exe --pe tester.exe --full
 	tester.exe
 	move ..\calc.dll calc.dll
 	cd ../..
 
 # Test relocating a dll - re-write import library
 test_relocate_dll: build_and_check_test_sample
-	echo "--------------------------"
-	echo "Running Relocate DLL test"
-	echo "--------------------------"
+	@echo \n
+	@echo --------------------------
+	@echo Running Relocate DLL test
+	@echo --------------------------
 	cd tmp/test
 	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
 	cd ..
@@ -168,18 +172,20 @@ build_zerowrite_test: test\writezero.obj
 	link $(LFLAGS) $** $(API_LIBS) /out:writezero.exe
 
 test_zerowrite: build_zerowrite_test
-	echo "-----------------------"
-	echo "Running zerowrite test"
-	echo "-----------------------"
+	@echo \n
+	@echo -----------------------
+	@echo Running zerowrite test
+	@echo -----------------------
 	set SPACK_CC_TMP=%SPACK_CC%
 	set SPACK_CC=$(MAKEDIR)\writezero.exe
 	cl /c EHsc "test\src file\calc.cxx"
 	set SPACK_CC=%SPACK_CC_TMP%
 
 test_long_paths: build_and_check_test_sample
-	echo "------------------------"
-	echo "Running long paths test"
-	echo "------------------------"
+	@echo \n
+	@echo ------------------------
+	@echo Running long paths test
+	@echo ------------------------
 	mkdir tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
 	xcopy /E test\include tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
 	xcopy /E "test\src file" tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
@@ -196,9 +202,10 @@ test_long_paths: build_and_check_test_sample
 	cd ../../../..
 
 test_relocate_long_paths: test_long_paths
-	echo "---------------------------------"
-	echo "Running relocate logn paths test"
-	echo "---------------------------------"
+	@echo \n
+	@echo ---------------------------------
+	@echo Running relocate logn paths test
+	@echo ---------------------------------
 	cd tmp\tmp\verylongdirectoryname\evenlongersubdirectoryname
 	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
 	cd ..
@@ -214,9 +221,10 @@ test_relocate_long_paths: test_long_paths
 	cd ../../../..
 
 test_exe_with_exports:
-	echo ------------------------------
-	echo Running exe with exports test
-	echo ------------------------------
+	@echo \n
+	@echo ------------------------------
+	@echo Running exe with exports test
+	@echo ------------------------------
 	mkdir tmp\test\exe_with_exports
 	xcopy /E test\include tmp\test\exe_with_exports
 	xcopy /E "test\src file" tmp\test\exe_with_exports
@@ -237,6 +245,10 @@ test_exe_with_exports:
 	cd ../../..
 
 test_def_file_name_override:
+	@echo
+	@echo ------------------------------------
+	@echo Running Def file name override test
+	@echo ------------------------------------
 	mkdir tmp\test\def\def_override
 	xcopy /E test\include tmp\test\def\def_override
 	xcopy /E "test\src file" tmp\test\def\def_override

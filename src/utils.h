@@ -293,6 +293,20 @@ class LibraryFinder {
     void EvalSearchPaths();
 };
 
+class PathRelocator {
+   private:
+    bool bc_;
+    std::string new_prefix_;
+    std::map<std::string, std::string> old_new_map;
+    std::string relocateBC(std::string const& pe);
+    std::string relocateStage(std::string const& pe);
+    void parseRelocate();
+
+   public:
+    PathRelocator();
+    std::string getRelocation(std::string const& pe);
+};
+
 using ScopedLocalInfo = std::unique_ptr<void, LocalFreeDeleter>;
 
 using ScopedSid = std::unique_ptr<void, FreeDeleter>;
