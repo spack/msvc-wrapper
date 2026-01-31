@@ -6,6 +6,7 @@
 
 #include "coff_reader_writer.h"
 #include "coff.h"
+#include "utils.h"
 
 #include <winnt.h>
 #include <cstdlib>
@@ -13,16 +14,31 @@
 #include <ios>
 #include <iosfwd>
 #include <iostream>
+#include <stdexcept>
 #include <string>
+#include <system_error>
 #include <utility>
 
 CoffReaderWriter::CoffReaderWriter(std::string const& file)
     : file_(std::move(file)) {}
 
 bool CoffReaderWriter::Open() {
-    this->pe_stream_.open(this->file_,
-                          std::ios::in | std::ios::out | std::ios::binary);
-    return this->pe_stream_.is_open();
+    std::wstring coff_file;
+    try {
+        coff_file = ConvertASCIIToWide(this->file_);
+    } catch (std::overflow_error& e) {
+        return false;
+    }
+    try {
+        ScopedFileAccess const obtain_write(coff_file, GENERIC_ALL);
+        this->pe_stream_.open(this->file_,
+                              std::ios::in | std::ios::out | std::ios::binary);
+        return this->pe_stream_.is_open();
+    } catch (std::system_error& e) {
+        std::cerr << "Could not obtain write access: " << e.what()
+                  << " (Error Code: " << e.code().value() << ")" << '\n';
+        return false;
+    }
 }
 
 bool CoffReaderWriter::Close() {
