@@ -16,6 +16,9 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <aclapi.h>
+#include <sddl.h>
+#include <memory>
 
 #include "version.h"
 
@@ -52,7 +55,8 @@ enum ExitConditions {
     LIB_REMOVE_FAILURE,
     NORMALIZE_NAME_FAILURE,
     COFF_PARSE_FAILURE,
-    FILE_RENAME_FAILURE
+    FILE_RENAME_FAILURE,
+    CANNOT_OPEN_FILE_FAILURE
 };
 
 typedef std::vector<std::string> StrList;
@@ -94,6 +98,9 @@ std::string strip(const std::string& s, const std::string& substr);
 
 //Strips substr of LHS of the larger string
 std::string lstrip(const std::string& s, const std::string& substr);
+
+//Strips off leading and trailing quotes
+std::string stripquotes(const std::string& str);
 
 // Joins vector of strings by join character
 std::string join(const StrList& args, const std::string& join_char = " ");
@@ -186,15 +193,24 @@ std::string short_name(const std::string& path);
 
 std::string mangle_name(const std::string& name);
 
+std::string CannonicalizePath(const std::string& path);
+
 int get_padding_length(const std::string& name);
 
-char* pad_path(const char* pth, DWORD str_size, DWORD bsize = MAX_NAME_LEN);
+char* pad_path(const char* pth, DWORD str_size, char padding_char = '|',
+               DWORD bsize = MAX_NAME_LEN);
+
+std::string escape_backslash(const std::string& path);
 
 void replace_path_characters(char* path, size_t len);
 
 void replace_special_characters(char* mangled, size_t len);
 
 bool SpackInstalledLib(const std::string& lib);
+
+std::string MakePathAbsolute(const std::string& path);
+
+std::string EnsureValidLengthPath(const std::string& path);
 
 // File and File handle helpers //
 /**
@@ -217,6 +233,21 @@ int SafeHandleCleanup(HANDLE& handle);
 
 // System Helpers //
 std::string reportLastError();
+
+struct LocalFreeDeleter {
+    void operator()(void* p) const {
+        if (p)
+            ::LocalFree(p);
+    }
+};
+
+// Custom deleter for Standard C pointers.
+struct FreeDeleter {
+    void operator()(void* p) const {
+        if (p)
+            std::free(p);
+    }
+};
 
 // Data helpers //
 
@@ -262,6 +293,71 @@ class LibraryFinder {
     void EvalSearchPaths();
 };
 
+class PathRelocator {
+   private:
+    bool bc_;
+    std::string new_prefix_;
+    std::map<std::string, std::string> old_new_map;
+    std::string relocateBC(std::string const& pe);
+    std::string relocateStage(std::string const& pe);
+    void parseRelocate();
+
+   public:
+    PathRelocator();
+    std::string getRelocation(std::string const& pe);
+};
+
+using ScopedLocalInfo = std::unique_ptr<void, LocalFreeDeleter>;
+
+using ScopedSid = std::unique_ptr<void, FreeDeleter>;
+
+class FileSecurity {
+   public:
+    FileSecurity() = delete;
+
+    static ScopedSid GetCurrentUserSid();
+
+    static bool HasPermission(const std::wstring& file_path, DWORD access_mask,
+                              PSID sid);
+
+    static bool GrantPermission(const std::wstring& file_path,
+                                DWORD access_mask, PSID sid,
+                                PSECURITY_DESCRIPTOR* out_old_sd);
+
+    static bool ApplyDescriptor(const std::wstring& file_path,
+                                PSECURITY_DESCRIPTOR sd);
+
+    // Retrieves file attributes (e.g., ReadOnly, Hidden).
+    // Returns false if the file cannot be accessed.
+    static bool GetAttributes(const std::wstring& file_path, DWORD* out_attr);
+
+    // Sets file attributes.
+    // Returns false if the operation fails.
+    static bool SetAttributes(const std::wstring& file_path, DWORD attr);
+};
+
+class ScopedFileAccess {
+   public:
+    explicit ScopedFileAccess(std::wstring file_path,
+                              DWORD desired_access = GENERIC_WRITE);
+    ~ScopedFileAccess();
+
+    bool IsAccessGranted() const;
+
+   private:
+    std::wstring file_path_;
+    DWORD desired_access_;
+
+    // ACL State
+    PSECURITY_DESCRIPTOR original_sd_;
+    ScopedSid current_user_sid_;
+    bool acl_needs_revert_;
+
+    // Attribute State
+    DWORD original_attributes_;
+    bool attributes_changed_;
+};
+
 const std::map<char, char> special_character_to_path{{'|', '\\'}, {';', ':'}};
 
 const std::map<char, char> path_to_special_characters{{'\\', '|'},
@@ -271,6 +367,18 @@ const std::map<char, char> path_to_special_characters{{'\\', '|'},
 class NameTooLongError : public std::runtime_error {
    public:
     NameTooLongError(char const* const message);
+    virtual char const* what() const;
+};
+
+class RCCompilerFailure : public std::runtime_error {
+   public:
+    RCCompilerFailure(char const* const message);
+    virtual char const* what() const;
+};
+
+class FileIOError : public std::runtime_error {
+   public:
+    FileIOError(char const* const message);
     virtual char const* what() const;
 };
 
