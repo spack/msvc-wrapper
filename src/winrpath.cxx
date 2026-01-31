@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include <cstdio>
-#include <stdio.h>
 #include <windows.h>  // NOLINT
 #include "winrpath.h"
 #include <fileapi.h>
@@ -249,15 +248,15 @@ bool LibRename::FindDllAndRename(HANDLE& pe_in) {
  * \param replace a flag indicating if we're replacing the renamed import lib or making a copy with absolute dll names
  * \param report a flag indicating if we should be reporting the contents of the PE/COFF file we're parsing to stdout
 */
-LibRename::LibRename(std::string p_exe, bool full, bool deploy, bool replace)
-    : replace(replace), full(full), pe(std::move(p_exe)), deploy(deploy) {}
+LibRename::LibRename(std::string p_exe, bool full, bool replace)
+    : replace(replace), full(full), pe(std::move(p_exe)) {
+}
 
 LibRename::LibRename(std::string p_exe, std::string coff, bool full,
-                     bool deploy, bool replace)
+                     bool replace)
     : replace(replace),
       full(full),
       pe(std::move(p_exe)),
-      deploy(deploy),
       coff(std::move(coff)) {
     std::string const coff_path = stem(this->coff);
     this->tmp_def_file = coff_path + "-tmp.def";
@@ -364,7 +363,7 @@ bool LibRename::ExecuteRename() {
     // exes
     // We do not bother with defs for things that don't have
     // import libraries
-    if (!this->deploy && !this->coff.empty()) {
+    if (!this->coff.empty()) {
         // Extract DLL
         if (!this->ComputeDefFile()) {
             debug("Failed to compute def file");

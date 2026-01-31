@@ -144,7 +144,7 @@ test_relocate_dll: build_and_check_test_sample
 	mkdir tmp_lib
 	move test\calc.dll tmp_bin\calc.dll
 	move test\calc.lib tmp_lib\calc.lib
-	test\relocate.exe --pe tmp_bin\calc.dll --coff tmp_lib\calc.lib --export
+	test\relocate.exe --pe tmp_bin\calc.dll --coff tmp_lib\calc.lib
 	cd test
 	del tester.exe
 	link main.obj ..\tmp_lib\calc.lib /out:tester.exe
@@ -216,7 +216,7 @@ test_relocate_long_paths: test_long_paths
 	mkdir tmp_lib
 	move evenlongersubdirectoryname\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.dll tmp_bin\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.dll
 	move evenlongersubdirectoryname\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib tmp_lib\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib
-	evenlongersubdirectoryname\relocate.exe --pe tmp_bin\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.dll --coff tmp_lib\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib --export
+	evenlongersubdirectoryname\relocate.exe --pe tmp_bin\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.dll --coff tmp_lib\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib
 	cd evenlongersubdirectoryname
 	del tester.exe
 	link main.obj ..\tmp_lib\verylongfilepathnamethatwilldefinitelybegreaterthanonehundredandfourtyfourcharacters.lib /out:tester.exe
