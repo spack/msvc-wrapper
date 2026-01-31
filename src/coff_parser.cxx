@@ -46,8 +46,9 @@ CoffParser::CoffParser(CoffReaderWriter* coff_reader)
  */
 bool CoffParser::Parse() {
     if (!this->coffStream_->Open()) {
-        std::cerr << "Unable to open coff file for reading: "
-                  << reportLastError() << "\n";
+        std::cerr << "Unable to open coff file: "
+                  << this->coffStream_->get_file()
+                  << " for reading: " << reportLastError() << "\n";
         return false;
     }
     int const invalid_valid_sig =
@@ -576,6 +577,40 @@ void CoffParser::ReportShortImportMember(short_import_member* short_import) {
 
 void CoffParser::ReportLongName(const char* data) {
     std::cout << "DLL: " << data << "\n";
+}
+
+std::string CoffParser::GetLongName() const {
+    // TODO(johnwparent): I think we can access the
+    // 2nd index of the members vec to get the long
+    // name
+    for (auto mem : this->coff_.members) {
+        if (mem.member->is_longname) {
+            return std::string(mem.member->data);
+        }
+    }
+    return std::string();
+}
+
+std::string CoffParser::GetShortName() const {
+    for (auto mem : this->coff_.members) {
+        if (mem.header->Name[0] != '/') {
+            int i = 0;
+            while (mem.header->Name[i] != '/') {
+                ++i;
+            }
+            return std::string(reinterpret_cast<const char*>(mem.header->Name),
+                               i);
+        }
+    }
+    return std::string();
+}
+
+std::string CoffParser::GetName() const {
+    std::string maybe_name = this->GetLongName();
+    if (maybe_name.empty()) {
+        maybe_name = this->GetShortName();
+    }
+    return maybe_name;
 }
 
 void CoffParser::Report() {

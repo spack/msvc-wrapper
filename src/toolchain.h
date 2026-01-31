@@ -32,10 +32,7 @@ class ToolChainInvocation {
 
     std::string command;
     std::string lang;
-    StrList command_args;
-    StrList include_args;
-    StrList lib_dir_args;
-    StrList lib_args;
-    StrList obj_args;
+    StrList inputs;
+
     ExecuteCommand executor;
 };
