@@ -875,13 +875,74 @@ std::string LibraryFinder::Finder(const std::string& pth,
     return std::string();
 }
 
+PathRelocator::PathRelocator() {
+    this->new_prefix_ = GetSpackEnv("SPACK_INSTALL_PREFIX");
+    this->parseRelocate();
+}
+
+void PathRelocator::parseRelocate() {
+    const std::string relocations = GetSpackEnv("SPACK_RELOCATE_PATH");
+    // relocations is a semi colon separated list of
+    // | separated pairs, of old_prefix|new_prefix
+    // where old prefix is either the stage or the
+    // old install root and new prefix is the dll location in the
+    // install tree or just the new install prefix
+    if (relocations.empty()) {
+        return;
+    }
+    const StrList mappings = split(relocations, ";");
+    for (const auto& pair : mappings) {
+        const StrList old_new = split(pair, "|");
+        const std::string& old = old_new[0];
+        const std::string& new_ = old_new[1];
+        this->old_new_map[old] = new_;
+        if (endswith(old, ".dll") || endswith(old, ".exe")) {
+            this->bc_ = false;
+        }
+    }
+}
+
+std::string PathRelocator::getRelocation(std::string const& pe) {
+    if (this->bc_) {
+        return this->relocateBC(pe);
+    }
+    return this->relocateStage(pe);
+}
+
+std::string PathRelocator::relocateBC(std::string const& pe) {
+    for (auto& root : this->old_new_map) {
+        if (startswith(pe, root.first)) {
+            std::array<wchar_t, MAX_PATH> rel_root;
+            if (PathRelativePathToW(
+                    &rel_root[0], ConvertASCIIToWide(root.first).c_str(),
+                    FILE_ATTRIBUTE_DIRECTORY, ConvertASCIIToWide(pe).c_str(),
+                    FILE_ATTRIBUTE_NORMAL) != 0) {
+                // we have the pe's relative root in the old
+                // prefix, slap the new prefix on it and return
+                std::string const real_rel(
+                    ConvertWideToASCII(std::wstring(&rel_root[0])));
+                return join({root.second, real_rel}, "\\");
+            }
+        }
+    }
+    return std::string();
+}
+
+std::string PathRelocator::relocateStage(std::string const& pe) {
+    try {
+        std::string prefix_loc = this->old_new_map.at(pe);
+        return prefix_loc;
+    } catch (std::out_of_range& e) {
+        return std::string();
+    }
+}
+
 namespace {
 std::vector<std::string> system_locations = {
     "api-ms-", "ext-ms-",   "ieshims", "emclient", "devicelock",
     "wpax",    "vcruntime", "WINDOWS", "system32", "KERNEL32",
     "WS2_32",  "dbghelp",   "bcrypt",  "ADVAPI32", "SHELL32",
     "CRYPT32", "USER32",    "ole32",   "OLEAUTH32"};
-
 }
 
 bool LibraryFinder::IsSystem(const std::string& pth) {
