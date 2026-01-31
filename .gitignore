@@ -14,9 +14,14 @@
 *.exp
 *.hex
 *.def
+*.res
+*.rc
 
 # Vscode 
 /.vscode/
 
 # ignore patch files
 *.patch
+
+.clang-tidy
+.clang-format
