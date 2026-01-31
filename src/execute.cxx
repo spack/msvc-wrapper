@@ -31,6 +31,8 @@ enum : std::uint16_t { InvalidExitCode = 999 };
 ExecuteCommand::ExecuteCommand(std::string command)
     : ChildStdOut_Rd(nullptr),
       ChildStdOut_Wd(nullptr),
+      ChildStdErr_Rd(nullptr),
+      ChildStdErr_Wd(nullptr),
       base_command(std::move(command)) {
     this->CreateChildPipes();
     this->SetupExecute();
@@ -39,6 +41,8 @@ ExecuteCommand::ExecuteCommand(std::string command)
 ExecuteCommand::ExecuteCommand(std::string arg, const StrList& args)
     : ChildStdOut_Rd(nullptr),
       ChildStdOut_Wd(nullptr),
+      ChildStdErr_Rd(nullptr),
+      ChildStdErr_Wd(nullptr),
       base_command(std::move(arg)) {
     for (const auto& argp : args) {
         this->command_args.push_back(argp);
@@ -51,6 +55,8 @@ ExecuteCommand& ExecuteCommand::operator=(
     ExecuteCommand&& execute_command) noexcept {
     this->ChildStdOut_Rd = std::move(execute_command.ChildStdOut_Rd);
     this->ChildStdOut_Wd = std::move(execute_command.ChildStdOut_Wd);
+    this->ChildStdErr_Rd = std::move(execute_command.ChildStdErr_Rd);
+    this->ChildStdErr_Wd = std::move(execute_command.ChildStdErr_Wd);
     this->procInfo = std::move(execute_command.procInfo);
     this->startInfo = std::move(execute_command.startInfo);
     this->saAttr = std::move(execute_command.saAttr);
@@ -59,6 +65,7 @@ ExecuteCommand& ExecuteCommand::operator=(
     this->base_command = std::move(execute_command.base_command);
     this->command_args = std::move(execute_command.command_args);
     this->child_out_future = std::move(execute_command.child_out_future);
+    this->child_err_future = std::move(execute_command.child_err_future);
     this->exit_code_future = std::move(exit_code_future);
     return *this;
 }
@@ -76,7 +83,7 @@ void ExecuteCommand::SetupExecute() {
     // This structure specifies the STDIN and STDOUT handles for redirection.
     ZeroMemory(&si_start_info, sizeof(STARTUPINFOW));
     si_start_info.cb = sizeof(STARTUPINFOW);
-    si_start_info.hStdError = this->ChildStdOut_Wd;
+    si_start_info.hStdError = this->ChildStdErr_Wd;
     si_start_info.hStdOutput = this->ChildStdOut_Wd;
     si_start_info.dwFlags |= STARTF_USESTDHANDLES;
     this->procInfo = pi_proc_info;
@@ -162,6 +169,7 @@ bool ExecuteCommand::ExecuteToolChainChild() {
     // determine when child proc is done
     free(nc_command_line);
     CloseHandle(this->ChildStdOut_Wd);
+    CloseHandle(this->ChildStdErr_Wd);
     return true;
 }
 

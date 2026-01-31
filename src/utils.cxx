@@ -4,14 +4,20 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include "utils.h"
+#include <aclapi.h>
+#include <accctrl.h>
 #include <errhandlingapi.h>
 #include <fileapi.h>
+#include <cstdio>
 #include <fstream>
 #include <handleapi.h>
 #include <minwinbase.h>
 #include <minwindef.h>
 #include <processenv.h>
+#include <processthreadsapi.h>
+#include <securitybaseapi.h>
 #include <stringapiset.h>
+#include <strsafe.h>
 #include <winbase.h>
 #include <winerror.h>
 #include <winnls.h>
@@ -27,12 +33,17 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <memory>
 #include <regex>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
+#include <array>
 #include "shlwapi.h"
+#include "PathCch.h"
 
 //////////////////////////////////////////////////////////
 // String helper methods adding cxx20 features to cxx14 //
@@ -179,6 +190,17 @@ std::string lstrip(const std::string& str, const std::string& substr) {
     if (!startswith(str, substr))
         return str;
     return str.substr(substr.size(), str.size());
+}
+
+/**
+ * Strips double quotes from front and back of string
+ *
+ * Returns str with no leading or trailing quotes
+ *
+ * Note: removes only one set of quotes
+ */
+std::string stripquotes(const std::string& str) {
+    return strip(lstrip(str, "\""), "\"");
 }
 
 /**
@@ -337,7 +359,7 @@ std::string regexMatch(
     if (!std::regex_match(searchDomain, match, reg, flag)) {
         result_str = std::string();
     } else {
-        result_str = match.str();
+        result_str = match.str(1);
     }
     return result_str;
 }
@@ -529,7 +551,8 @@ void replace_path_characters(char* path, size_t len) {
  *                  null terminators.
  * \param bsize the lengh of the padding to add
  */
-char* pad_path(const char* pth, DWORD str_size, DWORD bsize) {
+char* pad_path(const char* pth, DWORD str_size, char padding_char,
+               DWORD bsize) {
     // If str_size > bsize we get inappropriate conversion
     // from signed to unsigned
     if (str_size > bsize) {
@@ -543,11 +566,24 @@ char* pad_path(const char* pth, DWORD str_size, DWORD bsize) {
             padded_path[i] = pth[j];
             ++j;
         } else {
-            padded_path[i] = '|';
+            padded_path[i] = padding_char;
         }
     }
     padded_path[bsize] = '\0';
     return padded_path;
+}
+
+std::string escape_backslash(const std::string& path) {
+    std::string escaped;
+    escaped.reserve(path.length() * 2);
+    for (char const c : path) {
+        if (c == '\\') {
+            escaped += "\\\\";
+        } else {
+            escaped += c;
+        }
+    }
+    return escaped;
 }
 
 /**
@@ -591,11 +627,37 @@ std::string getSFN(const std::string& path) {
     // Use "disable string parsing" prefix in case
     // the path is too long
     std::string const escaped = R"(\\?\)" + path;
+    // We cannot get the sfn for a path that doesn't exist
+    // if we find that the sfn we're looking for doesn't exist
+    // create a stub of the file, and allow the subsequent
+    // commands to overwrite it
+    if (!PathFileExistsA(path.c_str())) {
+        HANDLE h_file = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr,
+                                    CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (h_file == INVALID_HANDLE_VALUE) {
+            debug("File " + path +
+                  " does not exist, nor can it be created, unable to "
+                  "compute SFN\n");
+            CloseHandle(h_file);
+            return std::string();
+        }
+        CloseHandle(h_file);
+    }
     // Get SFN length so we can create buffer
     DWORD const sfn_size =
         GetShortPathNameA(escaped.c_str(), NULL, 0);  //NOLINT
     char* sfn = new char[sfn_size + 1];
-    GetShortPathNameA(escaped.c_str(), sfn, escaped.length());
+    DWORD const res = GetShortPathNameA(escaped.c_str(), sfn, escaped.length());
+    if (!res) {
+
+        std::cerr << "Failed to process short name for " << path
+                  << " Error: " << reportLastError() << "\n";
+    }
+    if (!sfn && res) {
+        // buffer was too small
+        debug("buffer too small; had: " + std::to_string(sfn_size) +
+              " needed: " + std::to_string(res));
+    }
     // sfn is null terminated per win32 api
     // Ensure we strip out the disable string parsing prefix
     std::string s_sfn = lstrip(sfn, R"(\\?\)");
@@ -623,6 +685,44 @@ std::string short_name(const std::string& path) {
     return new_abs_out;
 }
 
+std::string MakePathAbsolute(const std::string& path) {
+    if (IsPathAbsolute(path)) {
+        return path;
+    }
+    // relative paths, assume they're relative to the CWD of the linker (as they have to be)
+    return join({GetCWD(), path}, "\\");
+}
+
+std::string CannonicalizePath(const std::string& path) {
+    std::wstring const wpath = ConvertASCIIToWide(path);
+    wchar_t canonicalized_path[PATHCCH_MAX_CCH];
+    const size_t buffer_size = ARRAYSIZE(canonicalized_path);
+
+    HRESULT const status = PathCchCanonicalizeEx(
+        canonicalized_path, buffer_size, wpath.c_str(),
+        PATHCCH_ALLOW_LONG_PATHS  // Flags for long path support
+    );
+
+    if (!SUCCEEDED(status)) {
+        std::stringstream status_report;
+        status_report << "Cannot canonicalize path " + path + " error: "
+                      << std::hex << status;
+        throw NameTooLongError(status_report.str().c_str());
+    }
+    return ConvertWideToASCII(canonicalized_path);
+}
+
+std::string EnsureValidLengthPath(const std::string& path) {
+    std::string proper_length_path = path;
+    if (path.length() > MAX_NAME_LEN) {
+        // Name is too long we need to attempt to shorten
+        std::string const short_path = short_name(path);
+        // If new, shortened path is too long, bail
+        proper_length_path = short_path;
+    }
+    return proper_length_path;
+}
+
 /**
  * Mangles a string representing a path to have no path characters
  *  instead path characters (i.e. \\, :, etc) are replaced with
@@ -633,19 +733,10 @@ std::string short_name(const std::string& path) {
 std::string mangle_name(const std::string& name) {
     std::string abs_out;
     std::string mangled_abs_out;
-    if (IsPathAbsolute(name)) {
-        abs_out = name;
-    } else {
-        // relative paths, assume they're relative to the CWD of the linker (as they have to be)
-        abs_out = join({GetCWD(), name}, "\\");
-    }
+    abs_out = MakePathAbsolute(name);
+    abs_out = CannonicalizePath(abs_out);
     // Now that we have the full path, check size
-    if (abs_out.length() > MAX_NAME_LEN) {
-        // Name is too long we need to attempt to shorten
-        std::string const new_abs_out = short_name(abs_out);
-        // If new, shortened path is too long, bail
-        abs_out = new_abs_out;
-    }
+    abs_out = EnsureValidLengthPath(abs_out);
     char* chr_abs_out = new char[abs_out.length() + 1];
     strcpy(chr_abs_out, abs_out.c_str());
     replace_path_characters(chr_abs_out, abs_out.length());
@@ -688,7 +779,7 @@ bool SpackInstalledLib(const std::string& lib) {
         return false;
     }
     std::string const stripped_lib = strip_padding(lib);
-    startswith(stripped_lib, prefix);
+    return startswith(stripped_lib, prefix);
 }
 
 LibraryFinder::LibraryFinder() : search_vars{"SPACK_RELOCATE_PATH"} {}
@@ -786,13 +877,74 @@ std::string LibraryFinder::Finder(const std::string& pth,
     return std::string();
 }
 
+PathRelocator::PathRelocator() {
+    this->new_prefix_ = GetSpackEnv("SPACK_INSTALL_PREFIX");
+    this->parseRelocate();
+}
+
+void PathRelocator::parseRelocate() {
+    const std::string relocations = GetSpackEnv("SPACK_RELOCATE_PATH");
+    // relocations is a semi colon separated list of
+    // | separated pairs, of old_prefix|new_prefix
+    // where old prefix is either the stage or the
+    // old install root and new prefix is the dll location in the
+    // install tree or just the new install prefix
+    if (relocations.empty()) {
+        return;
+    }
+    const StrList mappings = split(relocations, ";");
+    for (const auto& pair : mappings) {
+        const StrList old_new = split(pair, "|");
+        const std::string& old = old_new[0];
+        const std::string& new_ = old_new[1];
+        this->old_new_map[old] = new_;
+        if (endswith(old, ".dll") || endswith(old, ".exe")) {
+            this->bc_ = false;
+        }
+    }
+}
+
+std::string PathRelocator::getRelocation(std::string const& pe) {
+    if (this->bc_) {
+        return this->relocateBC(pe);
+    }
+    return this->relocateStage(pe);
+}
+
+std::string PathRelocator::relocateBC(std::string const& pe) {
+    for (auto& root : this->old_new_map) {
+        if (startswith(pe, root.first)) {
+            std::array<wchar_t, MAX_PATH> rel_root;
+            if (PathRelativePathToW(
+                    &rel_root[0], ConvertASCIIToWide(root.first).c_str(),
+                    FILE_ATTRIBUTE_DIRECTORY, ConvertASCIIToWide(pe).c_str(),
+                    FILE_ATTRIBUTE_NORMAL) != 0) {
+                // we have the pe's relative root in the old
+                // prefix, slap the new prefix on it and return
+                std::string const real_rel(
+                    ConvertWideToASCII(std::wstring(&rel_root[0])));
+                return join({root.second, real_rel}, "\\");
+            }
+        }
+    }
+    return std::string();
+}
+
+std::string PathRelocator::relocateStage(std::string const& pe) {
+    try {
+        std::string prefix_loc = this->old_new_map.at(pe);
+        return prefix_loc;
+    } catch (std::out_of_range& e) {
+        return std::string();
+    }
+}
+
 namespace {
 std::vector<std::string> system_locations = {
     "api-ms-", "ext-ms-",   "ieshims", "emclient", "devicelock",
     "wpax",    "vcruntime", "WINDOWS", "system32", "KERNEL32",
     "WS2_32",  "dbghelp",   "bcrypt",  "ADVAPI32", "SHELL32",
     "CRYPT32", "USER32",    "ole32",   "OLEAUTH32"};
-
 }
 
 bool LibraryFinder::IsSystem(const std::string& pth) {
@@ -841,9 +993,230 @@ char* findstr(char* search_str, const char* substr, size_t size) {
     return nullptr;
 }
 
+ScopedSid FileSecurity::GetCurrentUserSid() {
+    HANDLE token_handle = nullptr;
+    if (!::OpenProcessToken(::GetCurrentProcess(), TOKEN_QUERY,
+                            &token_handle)) {
+        return nullptr;
+    }
+    std::unique_ptr<void, decltype(&::CloseHandle)> const scoped_token(
+        token_handle, &::CloseHandle);
+
+    DWORD buffer_size = 0;
+    ::GetTokenInformation(token_handle, TokenUser, nullptr, 0, &buffer_size);
+
+    std::vector<char> buffer(buffer_size);
+    auto* token_user = reinterpret_cast<PTOKEN_USER>(buffer.data());
+
+    if (!::GetTokenInformation(token_handle, TokenUser, token_user, buffer_size,
+                               &buffer_size)) {
+        return nullptr;
+    }
+
+    DWORD const sid_len = ::GetLengthSid(token_user->User.Sid);
+    void* sid_copy = std::malloc(sid_len);
+    if (sid_copy) {
+        ::CopySid(sid_len, sid_copy, token_user->User.Sid);
+        return ScopedSid(sid_copy);
+    }
+    return nullptr;
+}
+
+bool FileSecurity::HasPermission(const std::wstring& file_path,
+                                 DWORD access_mask, PSID sid) {
+    PACL dacl = nullptr;
+    PSECURITY_DESCRIPTOR sd_raw = nullptr;
+    DWORD result = ::GetNamedSecurityInfoW(file_path.c_str(), SE_FILE_OBJECT,
+                                           DACL_SECURITY_INFORMATION, nullptr,
+                                           nullptr, &dacl, nullptr, &sd_raw);
+
+    if (result != ERROR_SUCCESS)
+        return false;
+    ScopedLocalInfo const scoped_sd(sd_raw);
+
+    TRUSTEE_W trustee = {nullptr};
+    trustee.TrusteeForm = TRUSTEE_IS_SID;
+    trustee.TrusteeType = TRUSTEE_IS_USER;
+    trustee.ptstrName = static_cast<LPWSTR>(sid);
+
+    ACCESS_MASK effective_rights = 0;
+    result = ::GetEffectiveRightsFromAclW(dacl, &trustee, &effective_rights);
+
+    if (result != ERROR_SUCCESS)
+        return false;
+
+    if ((access_mask & GENERIC_WRITE) && (effective_rights & FILE_WRITE_DATA))
+        return true;
+    if ((access_mask & GENERIC_READ) && (effective_rights & FILE_READ_DATA))
+        return true;
+    if ((access_mask & GENERIC_ALL) && (effective_rights & FILE_ALL_ACCESS))
+        return true;
+
+    return (effective_rights & access_mask) == access_mask;
+}
+
+bool FileSecurity::GrantPermission(const std::wstring& file_path,
+                                   DWORD access_mask, PSID sid,
+                                   PSECURITY_DESCRIPTOR* out_old_sd) {
+    PACL old_dacl = nullptr;
+    PSECURITY_DESCRIPTOR sd_raw = nullptr;
+
+    DWORD result = ::GetNamedSecurityInfoW(
+        file_path.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr,
+        nullptr, &old_dacl, nullptr, &sd_raw);
+
+    if (result != ERROR_SUCCESS)
+        return false;
+
+    if (out_old_sd)
+        *out_old_sd = sd_raw;
+    ScopedLocalInfo const temp_sd_wrapper(out_old_sd ? nullptr : sd_raw);
+
+    EXPLICIT_ACCESS_W ea = {0};
+    ea.grfAccessPermissions = access_mask;
+    ea.grfAccessMode = GRANT_ACCESS;
+    ea.grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
+    ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea.Trustee.TrusteeType = TRUSTEE_IS_USER;
+    ea.Trustee.ptstrName = static_cast<LPWSTR>(sid);
+
+    PACL new_dacl = nullptr;
+    result = ::SetEntriesInAclW(1, &ea, old_dacl, &new_dacl);
+    if (result != ERROR_SUCCESS)
+        return false;
+
+    ScopedLocalInfo const scoped_new_dacl(new_dacl);
+    result = ::SetNamedSecurityInfoW(const_cast<LPWSTR>(file_path.c_str()),
+                                     SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
+                                     nullptr, nullptr, new_dacl, nullptr);
+    return (result == ERROR_SUCCESS);
+}
+
+bool FileSecurity::ApplyDescriptor(const std::wstring& file_path,
+                                   PSECURITY_DESCRIPTOR sd) {
+    if (!sd)
+        return false;
+    BOOL present = FALSE;
+    BOOL defaulted = FALSE;
+    PACL dacl = nullptr;
+    if (!::GetSecurityDescriptorDacl(sd, &present, &dacl, &defaulted) ||
+        !present)
+        return false;
+
+    return ::SetNamedSecurityInfoW(const_cast<LPWSTR>(file_path.c_str()),
+                                   SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
+                                   nullptr, nullptr, dacl,
+                                   nullptr) == ERROR_SUCCESS;
+}
+
+bool FileSecurity::GetAttributes(const std::wstring& file_path,
+                                 DWORD* out_attr) {
+    DWORD const attr = ::GetFileAttributesW(file_path.c_str());
+    if (attr == INVALID_FILE_ATTRIBUTES)
+        return false;
+    if (out_attr)
+        *out_attr = attr;
+    return true;
+}
+
+bool FileSecurity::SetAttributes(const std::wstring& file_path, DWORD attr) {
+    return ::SetFileAttributesW(file_path.c_str(), attr) != 0;
+}
+
+ScopedFileAccess::ScopedFileAccess(std::wstring file_path, DWORD desired_access)
+    : file_path_(std::move(file_path)),
+      desired_access_(desired_access),
+      original_sd_(nullptr),
+      current_user_sid_(nullptr),
+      acl_needs_revert_(false),
+      original_attributes_(0),
+      attributes_changed_(false) {
+
+    // We must ensure we have permissions *first* before we try to
+    // change the file attributes in Phase 2.
+
+    current_user_sid_ = FileSecurity::GetCurrentUserSid();
+    if (!current_user_sid_) {
+        throw std::system_error(static_cast<int>(::GetLastError()),
+                                std::system_category(), "Failed to get SID");
+    }
+
+    // Check if we need to modify ACLs
+    if (!FileSecurity::HasPermission(file_path_, desired_access_,
+                                     current_user_sid_.get())) {
+        if (!FileSecurity::GrantPermission(file_path_, desired_access_,
+                                           current_user_sid_.get(),
+                                           &original_sd_)) {
+            throw std::system_error(static_cast<int>(::GetLastError()),
+                                    std::system_category(),
+                                    "Failed to grant ACL");
+        }
+        acl_needs_revert_ = true;
+    }
+
+    if (FileSecurity::GetAttributes(file_path_, &original_attributes_)) {
+        if (original_attributes_ & FILE_ATTRIBUTE_READONLY) {
+            // Remove the Read-Only bit
+            DWORD const new_attributes =
+                original_attributes_ & ~FILE_ATTRIBUTE_READONLY;
+
+            if (FileSecurity::SetAttributes(file_path_, new_attributes)) {
+                attributes_changed_ = true;
+            } else {
+                // If we fail to remove Read-Only, we might still fail to write later.
+                // We throw here to be safe and consistent.
+                throw std::system_error(static_cast<int>(::GetLastError()),
+                                        std::system_category(),
+                                        "Failed to remove Read-Only attribute");
+            }
+        }
+    } else {
+        throw std::system_error(static_cast<int>(::GetLastError()),
+                                std::system_category(),
+                                "Failed to get file attributes");
+    }
+}
+
+ScopedFileAccess::~ScopedFileAccess() {
+    // We must restore attributes *before* we revert ACLs, because reverting ACLs
+    // might remove our permission to write attributes.
+    if (attributes_changed_) {
+        // We ignore errors in destructors to prevent termination
+        FileSecurity::SetAttributes(file_path_, original_attributes_);
+    }
+
+    if (acl_needs_revert_ && original_sd_) {
+        FileSecurity::ApplyDescriptor(file_path_, original_sd_);
+        ::LocalFree(original_sd_);
+    }
+}
+
+bool ScopedFileAccess::IsAccessGranted() const {
+    // If we had to change anything, we assume success (constructor would throw otherwise)
+    if (acl_needs_revert_ || attributes_changed_)
+        return true;
+
+    return FileSecurity::HasPermission(file_path_, desired_access_,
+                                       current_user_sid_.get());
+}
+
 NameTooLongError::NameTooLongError(char const* const message)
     : std::runtime_error(message) {}
 
 char const* NameTooLongError::what() const {
+    return exception::what();
+}
+
+RCCompilerFailure::RCCompilerFailure(char const* const message)
+    : std::runtime_error(message) {}
+
+char const* RCCompilerFailure::what() const {
+    return exception::what();
+}
+
+FileIOError::FileIOError(char const* const message)
+    : std::runtime_error(message) {}
+
+char const* FileIOError::what() const {
     return exception::what();
 }
