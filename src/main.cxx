@@ -33,8 +33,6 @@ int main(int argc, const char* argv[]) {
             return -1;
         }
         bool const full = !(patch_args.find("full") == patch_args.end());
-        bool const deploy = !(patch_args.find("cmd") == patch_args.end()) &&
-                            patch_args.at("cmd") == "deploy";
         bool const report = !(patch_args.find("report") == patch_args.end());
         bool const has_pe = !(patch_args.find("pe") == patch_args.end());
         bool const debug = !(patch_args.find("debug") == patch_args.end());
@@ -77,12 +75,11 @@ int main(int argc, const char* argv[]) {
         std::unique_ptr<LibRename> rpath_lib;
         try {
             if (has_coff) {
-                rpath_lib = std::make_unique<LibRename>(patch_args.at("pe"),
-                                                        patch_args.at("coff"),
-                                                        full, deploy, true);
+                rpath_lib = std::make_unique<LibRename>(
+                    patch_args.at("pe"), patch_args.at("coff"), full, true);
             } else {
                 rpath_lib = std::make_unique<LibRename>(patch_args.at("pe"),
-                                                        full, deploy, true);
+                                                        full, true);
             }
         } catch (const NameTooLongError& e) {
             std::cerr << "Cannot Rename PE file " << patch_args.at("pe")
@@ -104,8 +101,8 @@ int main(int argc, const char* argv[]) {
         }
         if (report_args.find("pe") != report_args.end()) {
             try {
-                LibRename portable_executable(
-                    report_args.at("pe"), std::string(), false, false, true);
+                LibRename portable_executable(report_args.at("pe"),
+                                              std::string(), false, true);
                 portable_executable.ExecuteRename();
             } catch (const NameTooLongError& e) {
                 std::cerr

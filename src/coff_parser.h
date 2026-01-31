@@ -43,6 +43,9 @@ class CoffParser {
     bool NormalizeName(std::string& name);
     void Report();
     int Verify();
+    std::string GetLongName() const;
+    std::string GetShortName() const;
+    std::string GetName() const;
     static int Validate(std::string& coff);
 };
 

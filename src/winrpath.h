@@ -31,9 +31,8 @@
 
 class LibRename {
    public:
-    LibRename(std::string p_exe, std::string coff, bool full, bool deploy,
-              bool replace);
-    LibRename(std::string p_exe, bool full, bool deploy, bool replace);
+    LibRename(std::string p_exe, std::string coff, bool full, bool replace);
+    LibRename(std::string p_exe, bool full, bool replace);
     bool ExecuteRename();
     bool ExecuteLibRename();
     bool ExecutePERename();
@@ -42,9 +41,9 @@ class LibRename {
     std::string ComputeDefLine();
 
    private:
-    bool FindDllAndRename(HANDLE& pe_in);
-    bool SpackCheckForDll(const std::string& dll_path) const;
-    bool RenameDll(char* name_loc, const std::string& dll_path) const;
+    static bool FindDllAndRename(HANDLE& pe_in);
+    static bool SpackCheckForDll(const std::string& dll_path) ;
+    static bool RenameDll(char* name_loc, const std::string& dll_path) ;
     ExecuteCommand def_executor;
     ExecuteCommand lib_executor;
     std::string pe;
@@ -53,6 +52,5 @@ class LibRename {
     std::string def_file;
     std::string tmp_def_file;
     bool full;
-    bool deploy;
     bool replace;
 };
