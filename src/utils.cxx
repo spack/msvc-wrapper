@@ -647,7 +647,7 @@ std::string getSFN(const std::string& path, const bool make_file = false) {
 
         std::cerr << "Failed to process short name for " << path
                   << " Error: " << reportLastError() << "\n";
-        throw 
+        throw SFNProcessingError("Unable to create SFN");
     }
     if (!sfn && res) {
         // buffer was too small
