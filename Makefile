@@ -29,9 +29,9 @@ BUILD_LINK = /DEBUG
 BASE_CFLAGS = /EHsc
 CFLAGS = $(BASE_CFLAGS) $(BUILD_CFLAGS) $(CLFLAGS)
 LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
-API_LIBS = Shlwapi.lib \
-Pathcch.lib \
-Advapi32.lib
+API_LIBS = Shlwapi.lib \ # needed for basic path operations
+Pathcch.lib \ # needed for path cannonicalization with long paths
+Advapi32.lib # needed for win ACL functions
 
 SRCS = cl.obj \
 execute.obj \
