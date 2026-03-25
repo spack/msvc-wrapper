@@ -193,7 +193,7 @@ std::string short_name(const std::string& path);
 
 std::string mangle_name(const std::string& name);
 
-std::string CannonicalizePath(const std::string& path);
+std::string CanonicalizePath(const std::string& path);
 
 int get_padding_length(const std::string& name);
 
@@ -300,6 +300,18 @@ class FileIOError : public std::runtime_error {
    public:
     FileIOError(char const* const message);
     virtual char const* what() const;
+};
+
+class FileNotExist : public std::runtime_error {
+    public:
+     FileNotExist(char const* const message);
+     virtual char const * what() const;
+};
+
+class SFNProcessingError : public std::runtime_error {
+    public:
+      SFNProcessingError(char const * const message);
+      virtual char  const* what() const;
 };
 
 static bool DEBUG = false;

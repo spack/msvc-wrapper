@@ -104,6 +104,10 @@ bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) const {
                 new_library_loc = short_name(new_library_loc);
             } catch (NameTooLongError& e) {
                 return false;
+            } catch (FileNotExist &e) {
+                return false;
+            } catch (SFNProcessingError &e) {
+                return false;
             }
         }
         char* new_lib_pth =

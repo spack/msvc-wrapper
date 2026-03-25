@@ -29,15 +29,12 @@
 #include <iostream>
 #include <limits>
 #include <map>
-#include <memory>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
-#include <utility>
 #include <vector>
-#include <array>
 #include "shlwapi.h"
 #include "PathCch.h"
 
@@ -189,13 +186,16 @@ std::string lstrip(const std::string& str, const std::string& substr) {
 }
 
 /**
- * Strips double quotes from front and back of string
- *
- * Returns str with no leading or trailing quotes
- *
- * Note: removes only one set of quotes
+ * Strips pair of double or single quotes from front and back of string
+ *  Checks single quotes before double
+ * 
+ * Returns str with at most one fewer pair of enclosing single/double quotes
+ * 
  */
 std::string stripquotes(const std::string& str) {
+    // if we have single quotes, strip those
+    if (startswith(str, "'")) return strip(lstrip(str, "'"), "'");
+    // if we have double, do that instead.
     return strip(lstrip(str, "\""), "\"");
 }
 
@@ -619,7 +619,7 @@ std::string strip_padding(const std::string& lib) {
  *   than the system MAX_PATH_LENGTH
  *   (different from MAX_NAME_LEN)
  */
-std::string getSFN(const std::string& path) {
+std::string getSFN(const std::string& path, const bool make_file = false) {
     // Use "disable string parsing" prefix in case
     // the path is too long
     std::string const escaped = R"(\\?\)" + path;
@@ -628,6 +628,11 @@ std::string getSFN(const std::string& path) {
     // create a stub of the file, and allow the subsequent
     // commands to overwrite it
     if (!PathFileExistsA(path.c_str())) {
+        if (!make_file) {
+            char message[50];
+            std::snprintf(message, sizeof(message), "File %s does not exist to create an SFN name.", path.c_str());
+            throw FileNotExist(message);
+        }
         HANDLE h_file = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr,
                                     CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
         if (h_file == INVALID_HANDLE_VALUE) {
@@ -648,6 +653,7 @@ std::string getSFN(const std::string& path) {
 
         std::cerr << "Failed to process short name for " << path
                   << " Error: " << reportLastError() << "\n";
+        throw 
     }
     if (!sfn && res) {
         // buffer was too small
@@ -669,7 +675,7 @@ std::string getSFN(const std::string& path) {
  */
 std::string short_name(const std::string& path) {
     // Get SFN for path to name
-    std::string const new_abs_out = getSFN(path);
+    std::string const new_abs_out = getSFN(path, true);
     if (new_abs_out.length() > MAX_NAME_LEN) {
         std::cerr << "DLL path " << path << " too long to relocate.\n";
         std::cerr << "Shortened DLL path " << new_abs_out
@@ -689,7 +695,7 @@ std::string MakePathAbsolute(const std::string& path) {
     return join({GetCWD(), path}, "\\");
 }
 
-std::string CannonicalizePath(const std::string& path) {
+std::string CanonicalizePath(const std::string& path) {
     std::wstring const wpath = ConvertASCIIToWide(path);
     wchar_t canonicalized_path[PATHCCH_MAX_CCH];
     const size_t buffer_size = ARRAYSIZE(canonicalized_path);
@@ -713,7 +719,6 @@ std::string EnsureValidLengthPath(const std::string& path) {
     if (path.length() > MAX_NAME_LEN) {
         // Name is too long we need to attempt to shorten
         std::string const short_path = short_name(path);
-        // If new, shortened path is too long, bail
         proper_length_path = short_path;
     }
     return proper_length_path;
@@ -730,7 +735,7 @@ std::string mangle_name(const std::string& name) {
     std::string abs_out;
     std::string mangled_abs_out;
     abs_out = MakePathAbsolute(name);
-    abs_out = CannonicalizePath(abs_out);
+    abs_out = CanonicalizePath(abs_out);
     // Now that we have the full path, check size
     abs_out = EnsureValidLengthPath(abs_out);
     char* chr_abs_out = new char[abs_out.length() + 1];
@@ -935,6 +940,14 @@ char const* NameTooLongError::what() const {
     return exception::what();
 }
 
+
+FileNotExist::FileNotExist(char const* const message)
+    : std::runtime_error(message) {}
+
+char const* FileNotExist::what() const {
+    return exception::what();
+}
+
 RCCompilerFailure::RCCompilerFailure(char const* const message)
     : std::runtime_error(message) {}
 
@@ -946,5 +959,12 @@ FileIOError::FileIOError(char const* const message)
     : std::runtime_error(message) {}
 
 char const* FileIOError::what() const {
+    return exception::what();
+}
+
+SFNProcessingError::SFNProcessingError(char const* const message)
+    : std::runtime_error(message) {}
+
+char const* SFNProcessingError::what() const {
     return exception::what();
 }
