@@ -149,7 +149,7 @@ std::string quoteAsNeeded(std::string& str);
 /// @param regex - regex used to search
 /// @param opts - optional argument, list of regex tuning options to adapt the search behavior
 /// @return Character sequence matching search regex
-std::string regexSearch(
+std::smatch regexSearch(
     const std::string& searchDomain, const std::string& regex,
     const std::vector<std::regex_constants::syntax_option_type>& opts = {},
     const std::vector<std::regex_constants::match_flag_type>& flags = {});
@@ -160,7 +160,7 @@ std::string regexSearch(
 /// @param regex - regex used to match
 /// @param opts - optional argument, list of regex tuning options to adapt the match behavior
 /// @return Character sequence matching regex
-std::string regexMatch(
+std::smatch regexMatch(
     const std::string& searchDomain, const std::string& regex,
     const std::vector<std::regex_constants::syntax_option_type>& opts = {},
     const std::vector<std::regex_constants::match_flag_type>& flags = {});
@@ -286,31 +286,31 @@ const std::map<char, char> path_to_special_characters{{'\\', '|'},
 
 class NameTooLongError : public std::runtime_error {
    public:
-    NameTooLongError(char const* const message);
+    explicit NameTooLongError(char const* const message);
     virtual char const* what() const;
 };
 
 class RCCompilerFailure : public std::runtime_error {
    public:
-    RCCompilerFailure(char const* const message);
+    explicit RCCompilerFailure(char const* const message);
     virtual char const* what() const;
 };
 
 class FileIOError : public std::runtime_error {
    public:
-    FileIOError(char const* const message);
+    explicit FileIOError(char const* const message);
     virtual char const* what() const;
 };
 
 class FileNotExist : public std::runtime_error {
     public:
-     FileNotExist(char const* const message);
+     explicit FileNotExist(char const* const message);
      virtual char const * what() const;
 };
 
 class SFNProcessingError : public std::runtime_error {
     public:
-      SFNProcessingError(char const * const message);
+      explicit SFNProcessingError(char const * const message);
       virtual char  const* what() const;
 };
 

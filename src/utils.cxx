@@ -324,40 +324,34 @@ std::regex_constants::match_flag_type composeMatchTypes(
     return composed_flag;
 }
 
-std::string regexSearch(
+std::smatch regexSearch(
     const std::string& searchDomain, const std::string& regex,
     const std::vector<std::regex_constants::syntax_option_type>& opts,
     const std::vector<std::regex_constants::match_flag_type>& flags) {
-    std::string result_str;
     std::regex_constants::syntax_option_type const opt =
         composeRegexOptions(opts);
     std::regex_constants::match_flag_type const flag = composeMatchTypes(flags);
     std::regex const reg(regex, opt);
     std::smatch match;
     if (!std::regex_search(searchDomain, match, reg, flag)) {
-        result_str = std::string();
-    } else {
-        result_str = match.str();
-    }
-    return result_str;
+       return std::smatch();
+    } 
+    return match;
 }
 
-std::string regexMatch(
+std::smatch regexMatch(
     const std::string& searchDomain, const std::string& regex,
     const std::vector<std::regex_constants::syntax_option_type>& opts,
     const std::vector<std::regex_constants::match_flag_type>& flags) {
-    std::string result_str;
     std::regex_constants::syntax_option_type const opt =
         composeRegexOptions(opts);
     std::regex_constants::match_flag_type const flag = composeMatchTypes(flags);
     std::regex const reg(regex, opt);
     std::smatch match;
     if (!std::regex_match(searchDomain, match, reg, flag)) {
-        result_str = std::string();
-    } else {
-        result_str = match.str(1);
+        return std::smatch();
     }
-    return result_str;
+    return match;
 }
 
 std::string regexReplace(
