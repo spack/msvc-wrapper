@@ -6,12 +6,14 @@
 #include "utils.h"
 #include <errhandlingapi.h>
 #include <fileapi.h>
+#include <cstdio>
 #include <fstream>
 #include <handleapi.h>
 #include <minwinbase.h>
 #include <minwindef.h>
 #include <processenv.h>
 #include <stringapiset.h>
+#include <strsafe.h>
 #include <winbase.h>
 #include <winerror.h>
 #include <winnls.h>
@@ -28,11 +30,13 @@
 #include <limits>
 #include <map>
 #include <regex>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
 #include <vector>
 #include "shlwapi.h"
+#include "PathCch.h"
 
 //////////////////////////////////////////////////////////
 // String helper methods adding cxx20 features to cxx14 //
@@ -182,6 +186,20 @@ std::string lstrip(const std::string& str, const std::string& substr) {
 }
 
 /**
+ * Strips pair of double or single quotes from front and back of string
+ *  Checks single quotes before double
+ * 
+ * Returns str with at most one fewer pair of enclosing single/double quotes
+ * 
+ */
+std::string stripquotes(const std::string& str) {
+    // if we have single quotes, strip those
+    if (startswith(str, "'")) return strip(lstrip(str, "'"), "'");
+    // if we have double, do that instead.
+    return strip(lstrip(str, "\""), "\"");
+}
+
+/**
  * combines list of strings into one string joined on join_char
  */
 std::string join(const StrList& args, const std::string& join_char) {
@@ -306,40 +324,34 @@ std::regex_constants::match_flag_type composeMatchTypes(
     return composed_flag;
 }
 
-std::string regexSearch(
+std::smatch regexSearch(
     const std::string& searchDomain, const std::string& regex,
     const std::vector<std::regex_constants::syntax_option_type>& opts,
     const std::vector<std::regex_constants::match_flag_type>& flags) {
-    std::string result_str;
     std::regex_constants::syntax_option_type const opt =
         composeRegexOptions(opts);
     std::regex_constants::match_flag_type const flag = composeMatchTypes(flags);
     std::regex const reg(regex, opt);
     std::smatch match;
     if (!std::regex_search(searchDomain, match, reg, flag)) {
-        result_str = std::string();
-    } else {
-        result_str = match.str();
-    }
-    return result_str;
+       return std::smatch();
+    } 
+    return match;
 }
 
-std::string regexMatch(
+std::smatch regexMatch(
     const std::string& searchDomain, const std::string& regex,
     const std::vector<std::regex_constants::syntax_option_type>& opts,
     const std::vector<std::regex_constants::match_flag_type>& flags) {
-    std::string result_str;
     std::regex_constants::syntax_option_type const opt =
         composeRegexOptions(opts);
     std::regex_constants::match_flag_type const flag = composeMatchTypes(flags);
     std::regex const reg(regex, opt);
     std::smatch match;
     if (!std::regex_match(searchDomain, match, reg, flag)) {
-        result_str = std::string();
-    } else {
-        result_str = match.str();
+        return std::smatch();
     }
-    return result_str;
+    return match;
 }
 
 std::string regexReplace(
@@ -529,7 +541,8 @@ void replace_path_characters(char* path, size_t len) {
  *                  null terminators.
  * \param bsize the lengh of the padding to add
  */
-char* pad_path(const char* pth, DWORD str_size, DWORD bsize) {
+char* pad_path(const char* pth, DWORD str_size, char padding_char,
+               DWORD bsize) {
     // If str_size > bsize we get inappropriate conversion
     // from signed to unsigned
     if (str_size > bsize) {
@@ -543,11 +556,24 @@ char* pad_path(const char* pth, DWORD str_size, DWORD bsize) {
             padded_path[i] = pth[j];
             ++j;
         } else {
-            padded_path[i] = '|';
+            padded_path[i] = padding_char;
         }
     }
     padded_path[bsize] = '\0';
     return padded_path;
+}
+
+std::string escape_backslash(const std::string& path) {
+    std::string escaped;
+    escaped.reserve(path.length() * 2);
+    for (char const c : path) {
+        if (c == '\\') {
+            escaped += "\\\\";
+        } else {
+            escaped += c;
+        }
+    }
+    return escaped;
 }
 
 /**
@@ -587,15 +613,46 @@ std::string strip_padding(const std::string& lib) {
  *   than the system MAX_PATH_LENGTH
  *   (different from MAX_NAME_LEN)
  */
-std::string getSFN(const std::string& path) {
+std::string getSFN(const std::string& path, const bool make_file = false) {
     // Use "disable string parsing" prefix in case
     // the path is too long
     std::string const escaped = R"(\\?\)" + path;
+    // We cannot get the sfn for a path that doesn't exist
+    // if we find that the sfn we're looking for doesn't exist
+    // create a stub of the file, and allow the subsequent
+    // commands to overwrite it
+    if (!PathFileExistsA(path.c_str())) {
+        if (!make_file) {
+            char message[50];
+            std::snprintf(message, sizeof(message), "File %s does not exist to create an SFN name.", path.c_str());
+            throw FileNotExist(message);
+        }
+        HANDLE h_file = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr,
+                                    CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (h_file == INVALID_HANDLE_VALUE) {
+            debug("File " + path +
+                  " does not exist, nor can it be created, unable to "
+                  "compute SFN\n");
+            CloseHandle(h_file);
+            return std::string();
+        }
+        CloseHandle(h_file);
+    }
     // Get SFN length so we can create buffer
     DWORD const sfn_size =
         GetShortPathNameA(escaped.c_str(), NULL, 0);  //NOLINT
     char* sfn = new char[sfn_size + 1];
-    GetShortPathNameA(escaped.c_str(), sfn, escaped.length());
+    DWORD const res = GetShortPathNameA(escaped.c_str(), sfn, escaped.length());
+    if (!res) {
+
+        std::cerr << "Failed to process short name for " << path
+                  << " Error: " << reportLastError() << "\n";
+        throw SFNProcessingError("Unable to create SFN");
+    }
+    if (!sfn && res) {
+        // buffer was too small
+        throw SFNProcessingError("Cannot create SFN name, cannot allocate sufficient space");
+    }
     // sfn is null terminated per win32 api
     // Ensure we strip out the disable string parsing prefix
     std::string s_sfn = lstrip(sfn, R"(\\?\)");
@@ -611,7 +668,7 @@ std::string getSFN(const std::string& path) {
  */
 std::string short_name(const std::string& path) {
     // Get SFN for path to name
-    std::string const new_abs_out = getSFN(path);
+    std::string const new_abs_out = getSFN(path, true);
     if (new_abs_out.length() > MAX_NAME_LEN) {
         std::cerr << "DLL path " << path << " too long to relocate.\n";
         std::cerr << "Shortened DLL path " << new_abs_out
@@ -621,6 +678,43 @@ std::string short_name(const std::string& path) {
         throw NameTooLongError("DLL Path too long, cannot be relocated.");
     }
     return new_abs_out;
+}
+
+std::string MakePathAbsolute(const std::string& path) {
+    if (IsPathAbsolute(path)) {
+        return path;
+    }
+    // relative paths, assume they're relative to the CWD of the linker (as they have to be)
+    return join({GetCWD(), path}, "\\");
+}
+
+std::string CanonicalizePath(const std::string& path) {
+    std::wstring const wpath = ConvertASCIIToWide(path);
+    wchar_t canonicalized_path[PATHCCH_MAX_CCH];
+    const size_t buffer_size = ARRAYSIZE(canonicalized_path);
+
+    HRESULT const status = PathCchCanonicalizeEx(
+        canonicalized_path, buffer_size, wpath.c_str(),
+        PATHCCH_ALLOW_LONG_PATHS  // Flags for long path support
+    );
+
+    if (!SUCCEEDED(status)) {
+        std::stringstream status_report;
+        status_report << "Cannot canonicalize path " + path + " error: "
+                      << std::hex << status;
+        throw NameTooLongError(status_report.str().c_str());
+    }
+    return ConvertWideToASCII(canonicalized_path);
+}
+
+std::string EnsureValidLengthPath(const std::string& path) {
+    std::string proper_length_path = path;
+    if (path.length() > MAX_NAME_LEN) {
+        // Name is too long we need to attempt to shorten
+        std::string const short_path = short_name(path);
+        proper_length_path = short_path;
+    }
+    return proper_length_path;
 }
 
 /**
@@ -633,19 +727,10 @@ std::string short_name(const std::string& path) {
 std::string mangle_name(const std::string& name) {
     std::string abs_out;
     std::string mangled_abs_out;
-    if (IsPathAbsolute(name)) {
-        abs_out = name;
-    } else {
-        // relative paths, assume they're relative to the CWD of the linker (as they have to be)
-        abs_out = join({GetCWD(), name}, "\\");
-    }
+    abs_out = MakePathAbsolute(name);
+    abs_out = CanonicalizePath(abs_out);
     // Now that we have the full path, check size
-    if (abs_out.length() > MAX_NAME_LEN) {
-        // Name is too long we need to attempt to shorten
-        std::string const new_abs_out = short_name(abs_out);
-        // If new, shortened path is too long, bail
-        abs_out = new_abs_out;
-    }
+    abs_out = EnsureValidLengthPath(abs_out);
     char* chr_abs_out = new char[abs_out.length() + 1];
     strcpy(chr_abs_out, abs_out.c_str());
     replace_path_characters(chr_abs_out, abs_out.length());
@@ -688,7 +773,7 @@ bool SpackInstalledLib(const std::string& lib) {
         return false;
     }
     std::string const stripped_lib = strip_padding(lib);
-    startswith(stripped_lib, prefix);
+    return startswith(stripped_lib, prefix);
 }
 
 LibraryFinder::LibraryFinder() : search_vars{"SPACK_RELOCATE_PATH"} {}
@@ -845,5 +930,20 @@ NameTooLongError::NameTooLongError(char const* const message)
     : std::runtime_error(message) {}
 
 char const* NameTooLongError::what() const {
+    return exception::what();
+}
+
+
+FileNotExist::FileNotExist(char const* const message)
+    : std::runtime_error(message) {}
+
+char const* FileNotExist::what() const {
+    return exception::what();
+}
+
+SFNProcessingError::SFNProcessingError(char const* const message)
+    : std::runtime_error(message) {}
+
+char const* SFNProcessingError::what() const {
     return exception::what();
 }

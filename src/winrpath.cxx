@@ -24,6 +24,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <regex>
 
 /*
  * Checks a DLL name for special characters, if we're deploying, a path character, if we're
@@ -103,6 +104,10 @@ bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) const {
             try {
                 new_library_loc = short_name(new_library_loc);
             } catch (NameTooLongError& e) {
+                return false;
+            } catch (FileNotExist &e) {
+                return false;
+            } catch (SFNProcessingError &e) {
                 return false;
             }
         }
@@ -308,7 +313,9 @@ bool LibRename::ComputeDefFile() {
     std::string line;
     // Read until the output column titles
     while (std::getline(input_file, line)) {
-        std::string const res = regexSearch(line, R"(ordinal\s+name)");
+        std::smatch search_res = regexSearch(line, R"(ordinal\s+name)");
+        if (search_res.empty()) break;
+        std::string const res = search_res.str();
         if (!res.empty()) {
             break;
         }

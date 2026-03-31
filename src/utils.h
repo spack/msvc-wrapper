@@ -16,6 +16,9 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <aclapi.h>
+#include <sddl.h>
+#include <memory>
 
 #include "version.h"
 
@@ -52,7 +55,8 @@ enum ExitConditions {
     LIB_REMOVE_FAILURE,
     NORMALIZE_NAME_FAILURE,
     COFF_PARSE_FAILURE,
-    FILE_RENAME_FAILURE
+    FILE_RENAME_FAILURE,
+    CANNOT_OPEN_FILE_FAILURE
 };
 
 typedef std::vector<std::string> StrList;
@@ -94,6 +98,9 @@ std::string strip(const std::string& s, const std::string& substr);
 
 //Strips substr of LHS of the larger string
 std::string lstrip(const std::string& s, const std::string& substr);
+
+//Strips off leading and trailing quotes
+std::string stripquotes(const std::string& str);
 
 // Joins vector of strings by join character
 std::string join(const StrList& args, const std::string& join_char = " ");
@@ -142,7 +149,7 @@ std::string quoteAsNeeded(std::string& str);
 /// @param regex - regex used to search
 /// @param opts - optional argument, list of regex tuning options to adapt the search behavior
 /// @return Character sequence matching search regex
-std::string regexSearch(
+std::smatch regexSearch(
     const std::string& searchDomain, const std::string& regex,
     const std::vector<std::regex_constants::syntax_option_type>& opts = {},
     const std::vector<std::regex_constants::match_flag_type>& flags = {});
@@ -153,7 +160,7 @@ std::string regexSearch(
 /// @param regex - regex used to match
 /// @param opts - optional argument, list of regex tuning options to adapt the match behavior
 /// @return Character sequence matching regex
-std::string regexMatch(
+std::smatch regexMatch(
     const std::string& searchDomain, const std::string& regex,
     const std::vector<std::regex_constants::syntax_option_type>& opts = {},
     const std::vector<std::regex_constants::match_flag_type>& flags = {});
@@ -186,15 +193,24 @@ std::string short_name(const std::string& path);
 
 std::string mangle_name(const std::string& name);
 
+std::string CanonicalizePath(const std::string& path);
+
 int get_padding_length(const std::string& name);
 
-char* pad_path(const char* pth, DWORD str_size, DWORD bsize = MAX_NAME_LEN);
+char* pad_path(const char* pth, DWORD str_size, char padding_char = '|',
+               DWORD bsize = MAX_NAME_LEN);
+
+std::string escape_backslash(const std::string& path);
 
 void replace_path_characters(char* path, size_t len);
 
 void replace_special_characters(char* mangled, size_t len);
 
 bool SpackInstalledLib(const std::string& lib);
+
+std::string MakePathAbsolute(const std::string& path);
+
+std::string EnsureValidLengthPath(const std::string& path);
 
 // File and File handle helpers //
 /**
@@ -270,8 +286,20 @@ const std::map<char, char> path_to_special_characters{{'\\', '|'},
 
 class NameTooLongError : public std::runtime_error {
    public:
-    NameTooLongError(char const* const message);
+    explicit NameTooLongError(char const* const message);
     virtual char const* what() const;
+};
+
+class FileNotExist : public std::runtime_error {
+    public:
+     explicit FileNotExist(char const* const message);
+     virtual char const * what() const;
+};
+
+class SFNProcessingError : public std::runtime_error {
+    public:
+      explicit SFNProcessingError(char const * const message);
+      virtual char  const* what() const;
 };
 
 static bool DEBUG = false;
