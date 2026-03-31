@@ -942,20 +942,6 @@ char const* FileNotExist::what() const {
     return exception::what();
 }
 
-RCCompilerFailure::RCCompilerFailure(char const* const message)
-    : std::runtime_error(message) {}
-
-char const* RCCompilerFailure::what() const {
-    return exception::what();
-}
-
-FileIOError::FileIOError(char const* const message)
-    : std::runtime_error(message) {}
-
-char const* FileIOError::what() const {
-    return exception::what();
-}
-
 SFNProcessingError::SFNProcessingError(char const* const message)
     : std::runtime_error(message) {}
 
