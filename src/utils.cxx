@@ -651,7 +651,7 @@ std::string getSFN(const std::string& path, const bool make_file = false) {
     }
     if (!sfn && res) {
         // buffer was too small
-        throw SFNProcessingError("Cannot create SFN name, cannot allocate sufficient space")
+        throw SFNProcessingError("Cannot create SFN name, cannot allocate sufficient space");
     }
     // sfn is null terminated per win32 api
     // Ensure we strip out the disable string parsing prefix
