@@ -290,18 +290,6 @@ class NameTooLongError : public std::runtime_error {
     virtual char const* what() const;
 };
 
-class RCCompilerFailure : public std::runtime_error {
-   public:
-    explicit RCCompilerFailure(char const* const message);
-    virtual char const* what() const;
-};
-
-class FileIOError : public std::runtime_error {
-   public:
-    explicit FileIOError(char const* const message);
-    virtual char const* what() const;
-};
-
 class FileNotExist : public std::runtime_error {
     public:
      explicit FileNotExist(char const* const message);
