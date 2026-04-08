@@ -303,7 +303,7 @@ class FileSecurity {
 
     static ScopedSid GetCurrentUserSid();
 
-    static bool HasPermission(const std::wstring& file_path, DWORD access_mask,
+    static bool AclHasAccess(const std::wstring& file_path, DWORD access_mask,
                               PSID sid);
 
     static bool AddAccessControlEntry(const std::wstring& file_path,

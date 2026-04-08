@@ -966,7 +966,7 @@ ScopedSid FileSecurity::GetCurrentUserSid() {
  * \param sid user identifier to check for permissions in the context of
  * 
  */
-bool FileSecurity::HasPermission(const std::wstring& file_path,
+bool FileSecurity::AclHasAccess(const std::wstring& file_path,
                                  DWORD access_mask, PSID sid) {
     PACL dacl = nullptr;
     PSECURITY_DESCRIPTOR sd_raw = nullptr;
@@ -1122,7 +1122,7 @@ void ScopedFileAccess::Access() {
     }
     
     // Check if we need to modify ACLs
-    if (!FileSecurity::HasPermission(file_path_, desired_access_,
+    if (!FileSecurity::AclHasAccess(file_path_, desired_access_,
                                      current_user_sid_.get())) {
         if (!FileSecurity::AddAccessControlEntry(file_path_, desired_access_,
                                            current_user_sid_.get(),
@@ -1173,7 +1173,7 @@ ScopedFileAccess::~ScopedFileAccess() {
 
 bool ScopedFileAccess::IsAccessGranted() const {
 
-    return FileSecurity::HasPermission(file_path_, desired_access_,
+    return FileSecurity::AclHasAccess(file_path_, desired_access_,
                                        current_user_sid_.get());
 }
 
