@@ -306,7 +306,7 @@ class FileSecurity {
     static bool HasPermission(const std::wstring& file_path, DWORD access_mask,
                               PSID sid);
 
-    static bool GrantPermission(const std::wstring& file_path,
+    static bool AddPermission(const std::wstring& file_path,
                                 DWORD access_mask, PSID sid,
                                 PSECURITY_DESCRIPTOR* out_old_sd);
 

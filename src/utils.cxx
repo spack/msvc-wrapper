@@ -1007,7 +1007,7 @@ bool FileSecurity::HasPermission(const std::wstring& file_path,
  *                      useful to determine whether the security descriptor has been modified and
  *                      provide a baseline sid
  */
-bool FileSecurity::GrantPermission(const std::wstring& file_path,
+bool FileSecurity::AddPermission(const std::wstring& file_path,
                                    DWORD access_mask, PSID sid,
                                    PSECURITY_DESCRIPTOR* out_old_sd) {
     PACL old_dacl = nullptr;
@@ -1124,7 +1124,7 @@ void ScopedFileAccess::Access() {
     // Check if we need to modify ACLs
     if (!FileSecurity::HasPermission(file_path_, desired_access_,
                                      current_user_sid_.get())) {
-        if (!FileSecurity::GrantPermission(file_path_, desired_access_,
+        if (!FileSecurity::AddPermission(file_path_, desired_access_,
                                            current_user_sid_.get(),
                                            &original_sd_)) {
             throw std::system_error(static_cast<int>(::GetLastError()),
