@@ -1007,7 +1007,7 @@ bool FileSecurity::HasPermission(const std::wstring& file_path,
  *                      useful to determine whether the security descriptor has been modified and
  *                      provide a baseline sid
  */
-bool FileSecurity::AddPermission(const std::wstring& file_path,
+bool FileSecurity::AddAccessControlEntry(const std::wstring& file_path,
                                    DWORD access_mask, PSID sid,
                                    PSECURITY_DESCRIPTOR* out_old_sd) {
     PACL old_dacl = nullptr;
@@ -1049,7 +1049,7 @@ bool FileSecurity::AddPermission(const std::wstring& file_path,
  * \param file_path file to apply SD to
  * \param sd security descriptor to apply to file
  */
-bool FileSecurity::ApplyDescriptor(const std::wstring& file_path,
+bool FileSecurity::SetAclFromDescriptor(const std::wstring& file_path,
                                    PSECURITY_DESCRIPTOR sd) {
     if (!sd)
         return false;
@@ -1124,7 +1124,7 @@ void ScopedFileAccess::Access() {
     // Check if we need to modify ACLs
     if (!FileSecurity::HasPermission(file_path_, desired_access_,
                                      current_user_sid_.get())) {
-        if (!FileSecurity::AddPermission(file_path_, desired_access_,
+        if (!FileSecurity::AddAccessControlEntry(file_path_, desired_access_,
                                            current_user_sid_.get(),
                                            &original_sd_)) {
             throw std::system_error(static_cast<int>(::GetLastError()),
@@ -1166,7 +1166,7 @@ ScopedFileAccess::~ScopedFileAccess() {
     }
 
     if (acl_needs_revert_ && original_sd_) {
-        FileSecurity::ApplyDescriptor(file_path_, original_sd_);
+        FileSecurity::SetAclFromDescriptor(file_path_, original_sd_);
         ::LocalFree(original_sd_);
     }
 }

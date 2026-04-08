@@ -306,11 +306,11 @@ class FileSecurity {
     static bool HasPermission(const std::wstring& file_path, DWORD access_mask,
                               PSID sid);
 
-    static bool AddPermission(const std::wstring& file_path,
+    static bool AddAccessControlEntry(const std::wstring& file_path,
                                 DWORD access_mask, PSID sid,
                                 PSECURITY_DESCRIPTOR* out_old_sd);
 
-    static bool ApplyDescriptor(const std::wstring& file_path,
+    static bool SetAclFromDescriptor(const std::wstring& file_path,
                                 PSECURITY_DESCRIPTOR sd);
 
     // Retrieves file attributes (e.g., ReadOnly, Hidden).
