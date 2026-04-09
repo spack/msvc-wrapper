@@ -38,20 +38,7 @@
  * 
 */
 bool LibRename::SpackCheckForDll(const std::string& dll_path) const {
-    if (this->deploy) {
-        return hasPathCharacters(dll_path);
-    }
-    // First check for the case we're relocating out of a buildcache
-    bool reloc_spack = false;
-    if (!(dll_path.find("<!spack>") == std::string::npos) ||
-        !(dll_path.find("<sp>") == std::string::npos)) {
-        reloc_spack = true;
-    }
-    // If not, maybe we're just relocating a binary on the same system
-    if (!reloc_spack) {
-        reloc_spack = hasPathCharacters(dll_path);
-    }
-    return reloc_spack;
+    return hasPathCharacters(dll_path);
 }
 
 /*
@@ -67,61 +54,45 @@ bool LibRename::SpackCheckForDll(const std::string& dll_path) const {
  * 
 */
 bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) const {
-    if (this->deploy) {
-        int const padding_len = get_padding_length(dll_path);
-        if (padding_len < MIN_PADDING_THRESHOLD) {
-            // path is too long to mark as a Spack path
-            // use shorter sigil
-            char short_sigil[] = "<sp>";
-            // use _snprintf as it does not null terminate and we're writing into the middle
-            // of a null terminated string we want to later read from properly
-            _snprintf(name_loc, sizeof(short_sigil) - 1, "%s", short_sigil);
-        } else {
-            char long_sigil[] = "<!spack>";
-            // See _snprintf comment above for use context
-            _snprintf(name_loc, sizeof(long_sigil) - 1, "%s", long_sigil);
-        }
-    } else {
-        if (SpackInstalledLib(dll_path)) {
-            return true;
-        }
-        std::string const file_name = basename(dll_path);
-        if (file_name.empty()) {
-            std::cerr << "Unable to extract filename from dll for relocation"
-                      << "\n";
-            return false;
-        }
-        LibraryFinder lib_finder;
-        std::string new_library_loc =
-            lib_finder.FindLibrary(file_name, dll_path);
-        if (new_library_loc.empty()) {
-            std::cerr << "Unable to find library " << file_name << " from "
-                      << dll_path << " for relocation" << "\n";
-            return false;
-        }
-        if (new_library_loc.length() > MAX_NAME_LEN) {
-            try {
-                new_library_loc = short_name(new_library_loc);
-            } catch (NameTooLongError& e) {
-                return false;
-            } catch (FileNotExist &e) {
-                return false;
-            } catch (SFNProcessingError &e) {
-                return false;
-            }
-        }
-        char* new_lib_pth =
-            pad_path(new_library_loc.c_str(),
-                     static_cast<DWORD>(new_library_loc.size()));
-        if (!new_lib_pth) {
-            return false;
-        }
-        replace_special_characters(new_lib_pth, MAX_NAME_LEN);
-
-        // c_str returns a proper (i.e. null terminated) value, so we dont need to worry about
-        // size differences w.r.t the path to the new library
-        snprintf(name_loc, MAX_NAME_LEN + 1, "%s", new_lib_pth);
+    if (SpackInstalledLib(dll_path)) {
+        return true;
     }
+    std::string const file_name = basename(dll_path);
+    if (file_name.empty()) {
+        std::cerr << "Unable to extract filename from dll for relocation"
+                    << "\n";
+        return false;
+    }
+    LibraryFinder lib_finder;
+    std::string new_library_loc =
+        lib_finder.FindLibrary(file_name, dll_path);
+    if (new_library_loc.empty()) {
+        std::cerr << "Unable to find library " << file_name << " from "
+                    << dll_path << " for relocation" << "\n";
+        return false;
+    }
+    if (new_library_loc.length() > MAX_NAME_LEN) {
+        try {
+            new_library_loc = short_name(new_library_loc);
+        } catch (NameTooLongError& e) {
+            return false;
+        } catch (FileNotExist &e) {
+            return false;
+        } catch (SFNProcessingError &e) {
+            return false;
+        }
+    }
+    char* new_lib_pth =
+        pad_path(new_library_loc.c_str(),
+                    static_cast<DWORD>(new_library_loc.size()));
+    if (!new_lib_pth) {
+        return false;
+    }
+    replace_special_characters(new_lib_pth, MAX_NAME_LEN);
+
+    // c_str returns a proper (i.e. null terminated) value, so we dont need to worry about
+    // size differences w.r.t the path to the new library
+    snprintf(name_loc, MAX_NAME_LEN + 1, "%s", new_lib_pth);
     return true;
 }
 
