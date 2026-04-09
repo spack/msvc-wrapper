@@ -86,14 +86,6 @@ bool print_help() {
                  "said library is regenerated and the old imp lib\n";
     std::cout << "                                                          "
                  "replaced.\n";
-    std::cout << "          --export|--deploy                             = "
-                 "Mutually exclusive command modifier.\n";
-    std::cout << "                                                           "
-                 "Instructs relocate to either prepare the\n";
-    std::cout << "                                                           "
-                 "dynamic library for exporting to build cache\n";
-    std::cout << "                                                           "
-                 "or for extraction from bc onto new host system\n";
     std::cout << "          --report                                      = "
                  "Report information about the parsed PE/Coff files\n";
     std::cout << "          --debug|-d                                    = "
@@ -149,24 +141,6 @@ std::map<std::string, std::string> ParseRelocate(const char** args, int argc) {
                 return opts;
             }
             opts.insert(std::pair<std::string, std::string>("full", "full"));
-        } else if (!strcmp(args[i], "--export")) {
-            // export and deploy are mutually exclusive, if one is defined
-            // the other cannot be
-            if (redefinedArgCheck(opts, "export", "--export") ||
-                redefinedArgCheck(opts, "deploy", "--deploy")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("cmd", "export"));
-        } else if (!strcmp(args[i], "--deploy")) {
-            // export and deploy are mutually exclusive, if one is defined
-            // the other cannot be
-            if (redefinedArgCheck(opts, "export", "--export") ||
-                redefinedArgCheck(opts, "deploy", "--deploy")) {
-                opts.clear();
-                return opts;
-            }
-            opts.insert(std::pair<std::string, std::string>("cmd", "deploy"));
         } else if (!strcmp(args[i], "--debug") || !strcmp(args[i], "-d")) {
             opts.insert(std::pair<std::string, std::string>("debug", "on"));
         } else if (!strcmp(args[i], "--verify")) {
