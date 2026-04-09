@@ -39,6 +39,7 @@
 #include <string>
 #include <system_error>
 #include <vector>
+#include <array>
 #include "shlwapi.h"
 #include "PathCch.h"
 
