@@ -67,7 +67,7 @@ bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) {
     }
     try {
         new_loc =
-            EnsureValidLengthPath(CannonicalizePath(MakePathAbsolute(new_loc)));
+            EnsureValidLengthPath(CanonicalizePath(MakePathAbsolute(new_loc)));
     } catch (NameTooLongError& e) {
         std::cerr << "Cannot relocate path " << new_loc
                   << "it is too long to be relocated safely.\n";

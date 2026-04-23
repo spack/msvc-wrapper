@@ -344,7 +344,7 @@ std::smatch regexSearch(
     return match;
 }
 
-std::smatch regexMatch(
+std::string regexMatch(
     const std::string& searchDomain, const std::string& regex,
     const std::vector<std::regex_constants::syntax_option_type>& opts,
     const std::vector<std::regex_constants::match_flag_type>& flags) {
@@ -354,9 +354,11 @@ std::smatch regexMatch(
     std::regex const reg(regex, opt);
     std::smatch match;
     if (!std::regex_match(searchDomain, match, reg, flag)) {
-        return std::smatch();
+        return std::string();
     }
-    return match;
+    else {
+        return match.str(1);
+    }
 }
 
 std::string regexReplace(
