@@ -160,7 +160,7 @@ std::smatch regexSearch(
 /// @param regex - regex used to match
 /// @param opts - optional argument, list of regex tuning options to adapt the match behavior
 /// @return Character sequence matching regex
-std::smatch regexMatch(
+std::string regexMatch(
     const std::string& searchDomain, const std::string& regex,
     const std::vector<std::regex_constants::syntax_option_type>& opts = {},
     const std::vector<std::regex_constants::match_flag_type>& flags = {});
