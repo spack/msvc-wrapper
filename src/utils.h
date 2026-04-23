@@ -160,7 +160,7 @@ std::smatch regexSearch(
 /// @param regex - regex used to match
 /// @param opts - optional argument, list of regex tuning options to adapt the match behavior
 /// @return Character sequence matching regex
-std::smatch regexMatch(
+std::string regexMatch(
     const std::string& searchDomain, const std::string& regex,
     const std::vector<std::regex_constants::syntax_option_type>& opts = {},
     const std::vector<std::regex_constants::match_flag_type>& flags = {});
@@ -291,6 +291,20 @@ class LibraryFinder {
     std::string FindLibrary(const std::string& lib_name,
                             const std::string& lib_path);
     void EvalSearchPaths();
+};
+
+class PathRelocator {
+   private:
+    bool bc_;
+    std::string new_prefix_;
+    std::map<std::string, std::string> old_new_map;
+    std::string relocateBC(std::string const& pe);
+    std::string relocateStage(std::string const& pe);
+    void parseRelocate();
+
+   public:
+    PathRelocator();
+    std::string getRelocation(std::string const& pe);
 };
 
 using ScopedLocalInfo = std::unique_ptr<void, LocalFreeDeleter>;
