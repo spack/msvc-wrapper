@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include <cstdio>
-#include <stdio.h>
 #include <windows.h>  // NOLINT
 #include "winrpath.h"
 #include <fileapi.h>
@@ -27,38 +26,22 @@
 #include <regex>
 
 /*
- * Checks a DLL name for special characters, if we're deploying, a path character, if we're
- * relocating a spack sigil
+ * Checks a DLL name for path characters
  * 
  *  Path characters are not typically found in DLLs outside of those produced by this compiler wrapper
  *  and as such are an indication this is a Spack produced binary
  * 
- *  Spack sigils will not be found anywhere but a Spack produced binary as well
  * 
- * \param name The dll name to check for sigils or special path characters
+ * \param name The dll name to check for path characters
  * 
 */
 bool LibRename::SpackCheckForDll(const std::string& dll_path) const {
-    if (this->deploy) {
-        return hasPathCharacters(dll_path);
-    }
-    // First check for the case we're relocating out of a buildcache
-    bool reloc_spack = false;
-    if (!(dll_path.find("<!spack>") == std::string::npos) ||
-        !(dll_path.find("<sp>") == std::string::npos)) {
-        reloc_spack = true;
-    }
-    // If not, maybe we're just relocating a binary on the same system
-    if (!reloc_spack) {
-        reloc_spack = hasPathCharacters(dll_path);
-    }
-    return reloc_spack;
+    return hasPathCharacters(dll_path);
 }
 
 /*
  * Actually performs the DLL rename, given the DLL location in mapped memory view
- * determines the required padding for a name, if deploying, the proper length of a sigil
- * then either writes the sigil'd name back into the memory map, or gets the new path to a dll
+ * determines the required padding for a name, gets the new path to a dll
  * re-pads it, and then writes that into the DLL name location.
  * 
  * \param  name_loc Raw offset to the imported DLL name
@@ -68,61 +51,45 @@ bool LibRename::SpackCheckForDll(const std::string& dll_path) const {
  * 
 */
 bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) const {
-    if (this->deploy) {
-        int const padding_len = get_padding_length(dll_path);
-        if (padding_len < MIN_PADDING_THRESHOLD) {
-            // path is too long to mark as a Spack path
-            // use shorter sigil
-            char short_sigil[] = "<sp>";
-            // use _snprintf as it does not null terminate and we're writing into the middle
-            // of a null terminated string we want to later read from properly
-            _snprintf(name_loc, sizeof(short_sigil) - 1, "%s", short_sigil);
-        } else {
-            char long_sigil[] = "<!spack>";
-            // See _snprintf comment above for use context
-            _snprintf(name_loc, sizeof(long_sigil) - 1, "%s", long_sigil);
-        }
-    } else {
-        if (SpackInstalledLib(dll_path)) {
-            return true;
-        }
-        std::string const file_name = basename(dll_path);
-        if (file_name.empty()) {
-            std::cerr << "Unable to extract filename from dll for relocation"
-                      << "\n";
-            return false;
-        }
-        LibraryFinder lib_finder;
-        std::string new_library_loc =
-            lib_finder.FindLibrary(file_name, dll_path);
-        if (new_library_loc.empty()) {
-            std::cerr << "Unable to find library " << file_name << " from "
-                      << dll_path << " for relocation" << "\n";
-            return false;
-        }
-        if (new_library_loc.length() > MAX_NAME_LEN) {
-            try {
-                new_library_loc = short_name(new_library_loc);
-            } catch (NameTooLongError& e) {
-                return false;
-            } catch (FileNotExist &e) {
-                return false;
-            } catch (SFNProcessingError &e) {
-                return false;
-            }
-        }
-        char* new_lib_pth =
-            pad_path(new_library_loc.c_str(),
-                     static_cast<DWORD>(new_library_loc.size()));
-        if (!new_lib_pth) {
-            return false;
-        }
-        replace_special_characters(new_lib_pth, MAX_NAME_LEN);
-
-        // c_str returns a proper (i.e. null terminated) value, so we dont need to worry about
-        // size differences w.r.t the path to the new library
-        snprintf(name_loc, MAX_NAME_LEN + 1, "%s", new_lib_pth);
+    if (SpackInstalledLib(dll_path)) {
+        return true;
     }
+    std::string const file_name = basename(dll_path);
+    if (file_name.empty()) {
+        std::cerr << "Unable to extract filename from dll for relocation"
+                    << "\n";
+        return false;
+    }
+    LibraryFinder lib_finder;
+    std::string new_library_loc =
+        lib_finder.FindLibrary(file_name, dll_path);
+    if (new_library_loc.empty()) {
+        std::cerr << "Unable to find library " << file_name << " from "
+                    << dll_path << " for relocation" << "\n";
+        return false;
+    }
+    if (new_library_loc.length() > MAX_NAME_LEN) {
+        try {
+            new_library_loc = short_name(new_library_loc);
+        } catch (NameTooLongError& e) {
+            return false;
+        } catch (FileNotExist &e) {
+            return false;
+        } catch (SFNProcessingError &e) {
+            return false;
+        }
+    }
+    char* new_lib_pth =
+        pad_path(new_library_loc.c_str(),
+                    static_cast<DWORD>(new_library_loc.size()));
+    if (!new_lib_pth) {
+        return false;
+    }
+    replace_special_characters(new_lib_pth, MAX_NAME_LEN);
+
+    // c_str returns a proper (i.e. null terminated) value, so we dont need to worry about
+    // size differences w.r.t the path to the new library
+    snprintf(name_loc, MAX_NAME_LEN + 1, "%s", new_lib_pth);
     return true;
 }
 
@@ -134,12 +101,10 @@ bool LibRename::RenameDll(char* name_loc, const std::string& dll_path) const {
  * 
  * Decompose the PE file into a series of structs to locate the IMPORT section
  * Parse the IMPORT section for the names of all imported DLLS
- * If a given DLL name is a Spack derived DLL name, identifiable via the
- * spack sigil or the fact there are path characters in the DLL name, which is not 
- * normally the case without Spack, depending on the operation, the name is modified
- * If we're performing a deployment to a buildcache, we mark the name with a spack sigil
- * to identify it as one in need of relocation post builcache extraction
- * On extraction, we find dll names with the Spack sigil and rename (and repad) them with
+ * If a given DLL name is a Spack derived DLL name, identifiable via fact there are 
+ * path characters in the DLL name, which is not normally the case without Spack, 
+ * depending on the operation, the name is modified.
+ * On extraction, we find dll names with path characters and rename (and repad) them with
  * the correct absolute path to the requisite DLL on the new host system.
  * 
  * This approach is heavily based on 
@@ -229,13 +194,6 @@ bool LibRename::FindDllAndRename(HANDLE& pe_in) {
  * LibRename is responsible for renaming and relocating DLLs and
  * their corresponding import libraries
  * 
- * Deploy - this flag determines whether or not this invocation is
- *          being used to prepare a binary for deployment into a
- *          build cache. If this is true, the import library is not
- *          re-written to create an absolute path, and the dll names
- *          in the dll are not made to be absolute paths, instead
- *          a spack sigil is injected into the names so we can identify
- *          them as Spack paths
  * Full -   this flag informs the process as to whether we're relocating a DLL or
  *          just its import library. If we're doing a "full" pass, we
  *          produce a new import library with the absolute path to its dll
@@ -249,15 +207,15 @@ bool LibRename::FindDllAndRename(HANDLE& pe_in) {
  * \param replace a flag indicating if we're replacing the renamed import lib or making a copy with absolute dll names
  * \param report a flag indicating if we should be reporting the contents of the PE/COFF file we're parsing to stdout
 */
-LibRename::LibRename(std::string p_exe, bool full, bool deploy, bool replace)
-    : replace(replace), full(full), pe(std::move(p_exe)), deploy(deploy) {}
+LibRename::LibRename(std::string p_exe, bool full, bool replace)
+    : replace(replace), full(full), pe(std::move(p_exe)) {
+}
 
 LibRename::LibRename(std::string p_exe, std::string coff, bool full,
-                     bool deploy, bool replace)
+                     bool replace)
     : replace(replace),
       full(full),
       pe(std::move(p_exe)),
-      deploy(deploy),
       coff(std::move(coff)) {
     std::string const coff_path = stem(this->coff);
     this->tmp_def_file = coff_path + "-tmp.def";
@@ -350,12 +308,10 @@ bool LibRename::ComputeDefFile() {
  * On standard extraction, we want to regenerate the import library
  *  from our import library pointing to the new location of the dll/exe
  *  post buildcache extraction
- * 
- * On a full deployment, we mark the spack based DLL names in the binary
- *  with a spack sigil <sp!>
+ *
  * 
  * On a full extraction, in addition to the standard extraction operation
- *  we rename the Dll names marked with the spack sigil (<sp!>)
+ *  we rename the Dll names that have paths
  *
  */
 bool LibRename::ExecuteRename() {
@@ -364,7 +320,7 @@ bool LibRename::ExecuteRename() {
     // exes
     // We do not bother with defs for things that don't have
     // import libraries
-    if (!this->deploy && !this->coff.empty()) {
+    if (!this->coff.empty()) {
         // Extract DLL
         if (!this->ComputeDefFile()) {
             debug("Failed to compute def file");
