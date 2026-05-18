@@ -20,16 +20,15 @@ class LinkerInvocation {
     std::string get_mangled_out() const;
     std::string get_implib_name() const;
     std::string get_def_file() const;
-    StrList get_rsp_files() const;
     StrList get_rc_files() const;
     StrList get_input_files() const;
     std::string get_lib_link_args() const;
     bool makeRsp();
 
    private:
+    void ProcessTokens(const std::string &normal_token, const std::string& token);
     void processDefFile();
-    void processInputFiles();
-    static StrList processRSPFile(std::string const& rsp_file);
+    void processRSPFile(std::string const& rsp_file);
     std::string line_;
     std::string pe_name_;
     std::string implibname_;
