@@ -56,7 +56,8 @@ enum ExitConditions {
     NORMALIZE_NAME_FAILURE,
     COFF_PARSE_FAILURE,
     FILE_RENAME_FAILURE,
-    CANNOT_OPEN_FILE_FAILURE
+    CANNOT_OPEN_FILE_FAILURE,
+    FILE_IO_FAILURE
 };
 
 typedef std::vector<std::string> StrList;

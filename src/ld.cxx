@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -38,13 +39,26 @@ DWORD LdInvocation::InvokeToolchain() {
     // First parse the linker command line to
     // understand what we'll be doing
     LinkerInvocation link_run(this->inputs);
-    link_run.Parse();
+    try {
+        link_run.Parse();
+    } catch (const FileIOError& e) {
+        return ExitConditions::FILE_IO_FAILURE;
+    }
+
+    try {
+        link_run.makeRsp();
+    } catch (const FileIOError& e) {
+        return ExitConditions::FILE_IO_FAILURE;
+    }
     std::unique_ptr<RCFileManager> rc_file;
     try {
         // Run resource compiler to create
         // Resource for id'ing binary when relocating its import library
         rc_file = LdInvocation::createRC(link_run);
     } catch (const RCCompilerFailure& e) {
+        return ExitConditions::TOOLCHAIN_FAILURE;
+    } catch (const std::exception& e) {
+        std::cerr << "Unexpected error occurred: " << e.what() << "\n";
         return ExitConditions::TOOLCHAIN_FAILURE;
     }
 
@@ -114,7 +128,6 @@ DWORD LdInvocation::InvokeToolchain() {
         }
         existing_coff_reader.Close();
     }
-
     std::string pe_name;
     try {
         pe_name = link_run.get_mangled_out();
@@ -180,17 +193,24 @@ std::unique_ptr<RCFileManager> LdInvocation::createRC(LinkerInvocation& link_run
     const std::string pe_name = stripLastExt(basename(pe_stage_name));
     const std::string base_rc_file_name = "spack-" + pe_name + ".rc";
 
-    std::array<char, MAX_PATH> temp_dir_buffer;
-    if (!GetTempPath2A(MAX_PATH, temp_dir_buffer.data())) {
+    const size_t TMP_BUF_CHARS = 32768;
+    std::vector<wchar_t> tmpw(TMP_BUF_CHARS);
+    DWORD tmp_len = GetTempPathW(static_cast<DWORD>(tmpw.size()), tmpw.data());
+    if (tmp_len == 0) {
         throw std::system_error(static_cast<int>(::GetLastError()),
                                 std::system_category(), "Failed to get TEMP PATH");
     }
-    const std::string rc_tmp_dir = join({std::string(temp_dir_buffer.data()), std::to_string(_getpid())}, "");
-    if(!CreateDirectoryA(rc_tmp_dir.c_str(), nullptr)){
+    if (tmp_len >= tmpw.size()) {
+        throw std::runtime_error("Temp path too long");
+    }
+    std::wstring tmpdirw(tmpw.data(), tmp_len);
+    std::string tmpdir = ConvertWideToASCII(tmpdirw);
+    const std::string rc_tmp_dir = join({tmpdir, std::to_string(_getpid())}, "");
+    if (!CreateDirectoryA(rc_tmp_dir.c_str(), nullptr)) {
         const DWORD err = ::GetLastError();
         if (err != ERROR_ALREADY_EXISTS) {
             throw std::system_error(static_cast<int>(err),
-                                std::system_category(), "Failed to make directory");
+                                    std::system_category(), "Failed to make directory");
         }
     }
     // This res file name needs to mirror the PE name _exactly_
@@ -214,15 +234,12 @@ std::unique_ptr<RCFileManager> LdInvocation::createRC(LinkerInvocation& link_run
     }
     std::string abs_out = EnsureValidLengthPath(
         CanonicalizePath(MakePathAbsolute(pe_stage_name)));
-    char* chr_abs_out = new char[abs_out.length() + 1];
-    strcpy(chr_abs_out, abs_out.c_str());
-    char* padded_path =
-        pad_path(chr_abs_out, static_cast<DWORD>(abs_out.length()), '\\');
-    abs_out = std::string(padded_path, MAX_NAME_LEN);
-    free(chr_abs_out);
-    free(padded_path);
-    abs_out = escape_backslash(abs_out);
-    rc_out << template_base << "    " << '"' << abs_out << '"' << "\n"
+    std::string padded(pad_path(abs_out.c_str(), static_cast<DWORD>(abs_out.length()), '\\', MAX_NAME_LEN), MAX_NAME_LEN);
+    if (padded.empty()) {
+        throw RCCompilerFailure("Could not pad path for RC file");
+    }
+    std::string escaped = escape_backslash(padded);
+    rc_out << template_base << "    " << '"' << escaped << '"' << "\n"
            << template_end;
     rc_out.close();
     rc_executor.Execute();
