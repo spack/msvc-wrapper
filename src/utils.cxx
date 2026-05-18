@@ -480,7 +480,7 @@ DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER& section_header,
 
 void debug(const std::string& dbgStmt) {
     if (DEBUG || getenv("SPACK_DEBUG_WRAPPER")) {
-        std::cout << "DEBUG: " << dbgStmt << "\n";
+        std::cout << "DEBUG: " << dbgStmt << std::endl;
     }
 }
 
@@ -645,25 +645,22 @@ std::string getSFN(const std::string& path, const bool make_file = false) {
         }
         CloseHandle(h_file);
     }
-    // Get SFN length so we can create buffer
-    DWORD const sfn_size =
-        GetShortPathNameA(escaped.c_str(), NULL, 0);  //NOLINT
-    char* sfn = new char[sfn_size + 1];
-    DWORD const res = GetShortPathNameA(escaped.c_str(), sfn, escaped.length());
-    if (!res) {
-
+    // Probe required buffer size
+    DWORD req = GetShortPathNameA(escaped.c_str(), nullptr, 0);
+    if (req == 0) {
+        DWORD err = GetLastError();
+        std::cerr << "Failed to get short path length for " << path
+                  << " Error: " << reportLastError() << "\n";
+        throw SFNProcessingError("Unable to get SFN length");
+    }
+    std::vector<char> sfn(req + 1);
+    DWORD const res = GetShortPathNameA(escaped.c_str(), sfn.data(), static_cast<DWORD>(sfn.size()));
+    if (res == 0) {
         std::cerr << "Failed to process short name for " << path
                   << " Error: " << reportLastError() << "\n";
         throw SFNProcessingError("Unable to create SFN");
     }
-    if (!sfn && res) {
-        // buffer was too small
-        throw SFNProcessingError("Cannot create SFN name, cannot allocate sufficient space");
-    }
-    // sfn is null terminated per win32 api
-    // Ensure we strip out the disable string parsing prefix
-    std::string s_sfn = lstrip(sfn, R"(\\?\)");
-    delete[] sfn;
+    std::string s_sfn = lstrip(std::string(sfn.data()), R"(\\?\)");
     return s_sfn;
 }
 
@@ -697,13 +694,12 @@ std::string MakePathAbsolute(const std::string& path) {
 
 std::string CanonicalizePath(const std::string& path) {
     std::wstring const wpath = ConvertASCIIToWide(path);
-    wchar_t canonicalized_path[PATHCCH_MAX_CCH];
-    const size_t buffer_size = ARRAYSIZE(canonicalized_path);
-
-    HRESULT const status = PathCchCanonicalizeEx(
-        canonicalized_path, buffer_size, wpath.c_str(),
-        PATHCCH_ALLOW_LONG_PATHS  // Flags for long path support
-    );
+    const size_t BUF_CHARS = PATHCCH_MAX_CCH;
+    std::vector<wchar_t> canonicalized_path(BUF_CHARS);
+    HRESULT const status = PathCchCanonicalizeEx(canonicalized_path.data(),
+                                                 canonicalized_path.size(),
+                                                 wpath.c_str(),
+                                                 PATHCCH_FORCE_ENABLE_LONG_NAME_PROCESS | PATHCCH_ALLOW_LONG_PATHS);
 
     if (!SUCCEEDED(status)) {
         std::stringstream status_report;
@@ -711,7 +707,7 @@ std::string CanonicalizePath(const std::string& path) {
                       << std::hex << status;
         throw NameTooLongError(status_report.str().c_str());
     }
-    return ConvertWideToASCII(canonicalized_path);
+    return ConvertWideToASCII(std::wstring(canonicalized_path.data()));
 }
 
 std::string EnsureValidLengthPath(const std::string& path) {
@@ -896,8 +892,8 @@ void PathRelocator::parseRelocate() {
     const StrList mappings = split(relocations, ";");
     for (const auto& pair : mappings) {
         const StrList old_new = split(pair, "|");
-        const std::string& old = old_new[0];
-        const std::string& new_ = old_new[1];
+        const std::string& old = strip_padding(old_new[0]);
+        const std::string& new_ = strip_padding(old_new[1]);
         this->old_new_map[old] = new_;
         if (endswith(old, ".dll") || endswith(old, ".exe")) {
             this->bc_ = false;
@@ -957,11 +953,14 @@ bool LibraryFinder::IsSystem(const std::string& pth) {
 }
 
 int SafeHandleCleanup(HANDLE& handle) {
-    if (handle != INVALID_HANDLE_VALUE) {
-        if (!CloseHandle(handle)) {
-            return 0;
-        }
+    if (handle == nullptr || handle == INVALID_HANDLE_VALUE) {
+        return 1;
     }
+    if (!CloseHandle(handle)) {
+        return 0;
+    }
+    // Mark handle as closed to avoid double-close
+    handle = INVALID_HANDLE_VALUE;
     return 1;
 }
 
