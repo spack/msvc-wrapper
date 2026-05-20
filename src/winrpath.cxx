@@ -398,7 +398,8 @@ bool LibRename::ExecutePERename() {
         return false;
     }
     try {
-        ScopedFileAccess const obtain_write(pe_path, GENERIC_ALL);
+        ScopedFileAccess obtain_write(pe_path, GENERIC_ALL);
+        obtain_write.Access();
         HANDLE pe_handle = CreateFileW(
             pe_path.c_str(), (GENERIC_READ | GENERIC_WRITE), FILE_SHARE_WRITE,
             nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
