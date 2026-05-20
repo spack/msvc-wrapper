@@ -31,6 +31,56 @@ LinkerInvocation::LinkerInvocation(const StrList& linkLine) {
     this->line_ = join(linkLine);
 }
 
+
+/**
+ * Takes a normalized token and determines the appropriate handling 
+ * based on the linker command line arguments
+ */
+void LinkerInvocation::ProcessTokens(const std::string &normal_token, const std::string& token) {
+    // implib specifies the eventuall import libraries name_
+    // and thus will contain a ".lib" extension, which
+    // the next check will process as a library argument
+    if (normal_token.find("implib:") != std::string::npos) {
+        // If there was nothing after the ":", the
+        // previous link command would have failed
+        // and : is not a legal character in a name_
+        // guarantees this split command produces a vec of
+        // len 2
+        StrList implib_line = split(token, ":");
+        this->implibname_ = implib_line[1];
+    } else if (normal_token == "dll") {
+        this->is_exe_ = false;
+    } else if (startswith(normal_token, "out")) {
+        this->output_ = split(token, ":")[1];
+    } else if (endswith(normal_token, ".obj") ||
+                endswith(normal_token, ".lib") ||
+                endswith(normal_token, ".lo")) {
+        this->input_files_.push_back(token);
+    } else if (startswith(normal_token, "@")) {
+        // RSP files are used to describe object files, libraries, other CLI
+        // Switches relevant to the tool the rsp file is being passed to
+        // Primarily utilized by CMake and MSBuild projects to bypass
+        // Command line length limits
+        // Since rsp files are essentially expanded in place on the command line
+        // i.e objA rspA objC
+        // where rspA defines objB the cli would then be
+        // objA objB objC
+        // so we also need to track them in input_files since the order
+        // of their expansion has implications for naming, i.e
+        // if rspA was the first input file, the dll/imp name would be objB
+        this->processRSPFile(token);
+    } else if (endswith(normal_token, ".res")) {
+        this->rc_files_.push_back(token);
+        this->input_files_.push_back(token);
+    } else if (startswith(normal_token, "def")) {
+        this->def_file_ = strip(split(token, ":", 1)[1], "\"");
+    } else if (this->piped_args_.find(normal_token) !=
+                this->piped_args_.end()) {
+        this->piped_args_.at(normal_token).emplace_back(token);
+    }   
+}
+
+
 /**
  * Parses a linker invocation to extract imformation about the artifacts produced
  * and the obj files used to produce it
@@ -40,48 +90,7 @@ void LinkerInvocation::Parse() {
          ++token) {
         std::string normal_token = *token;
         normalArg(normal_token);
-        // implib specifies the eventuall import libraries name_
-        // and thus will contain a ".lib" extension, which
-        // the next check will process as a library argument
-        if (normal_token.find("implib:") != std::string::npos) {
-            // If there was nothing after the ":", the
-            // previous link command would have failed
-            // and : is not a legal character in a name_
-            // guarantees this split command produces a vec of
-            // len 2
-            StrList implib_line = split(*token, ":");
-            this->implibname_ = implib_line[1];
-        } else if (normal_token == "dll") {
-            this->is_exe_ = false;
-        } else if (startswith(normal_token, "out")) {
-            this->output_ = split(*token, ":")[1];
-        } else if (endswith(normal_token, ".obj") ||
-                   endswith(normal_token, ".lib") ||
-                   endswith(normal_token, ".lo")) {
-            this->input_files_.push_back(*token);
-        } else if (startswith(normal_token, "@")) {
-            // RSP files are used to describe object files, libraries, other CLI
-            // Switches relevant to the tool the rsp file is being passed to
-            // Primarily utilized by CMake and MSBuild projects to bypass
-            // Command line length limits
-            this->rsp_files_.push_back(*token);
-            // Since rsp files are essentially expanded in place on the command line
-            // i.e objA rspA objC
-            // where rspA defines objB the cli would then be
-            // objA objB objC
-            // so we also need to track them in binary_files_ since the order
-            // of their expansion has implications for naming, i.e
-            // if rspA was the first input file, the dll/imp name would be objB
-            this->input_files_.push_back(*token);
-        } else if (endswith(normal_token, ".res")) {
-            this->rc_files_.push_back(*token);
-            this->input_files_.push_back(*token);
-        } else if (startswith(normal_token, "def")) {
-            this->def_file_ = strip(split(*token, ":", 1)[1], "\"");
-        } else if (this->piped_args_.find(normal_token) !=
-                   this->piped_args_.end()) {
-            this->piped_args_.at(normal_token).emplace_back(*token);
-        }
+        this->ProcessTokens(normal_token, *token);
     }
 
     // Note for the below: name will never be specified so we only have
@@ -103,10 +112,9 @@ void LinkerInvocation::Parse() {
     // if no def or no LIBRARY
     // /NAME
     // if no /NAME
-    // first input file (post rc expanion)
+    // first input file (post rc expansion)
 
     this->processDefFile();
-    this->processInputFiles();
     std::string const ext = this->is_exe_ ? ".exe" : ".dll";
     if (this->output_.empty()) {
         // with no "out" argument, the linker
@@ -122,24 +130,21 @@ void LinkerInvocation::Parse() {
     this->makeRsp();
 }
 
-void LinkerInvocation::processInputFiles() {
-    StrList new_input_files;
-    for (auto input = this->input_files_.begin();
-         input != this->input_files_.end(); ++input) {
-        if (startswith(*input, "@")) {
-            // rsp file - expand contents in input files
-            // list in place and remove self
-            StrList rsp_inputs = LinkerInvocation::processRSPFile(*input);
-            new_input_files.insert(new_input_files.end(), rsp_inputs.begin(),
-                                   rsp_inputs.end());
-        } else {
-            new_input_files.push_back(*input);
+
+std::string handleQuotedStrings(std::stringstream& ss, std::string &input) {
+    std::string token;
+    while (ss >> token) {
+        input += " " + token;
+        if (token.back() == '"') {
+            break;
         }
     }
-    this->input_files_ = new_input_files;
+    input = stripquotes(input);
+    return input;
 }
 
-StrList LinkerInvocation::processRSPFile(std::string const& rsp_file) {
+
+void LinkerInvocation::processRSPFile(std::string const& rsp_file) {
     std::string const rsp_file_in = lstrip(rsp_file, "@");
     std::ifstream rsp_stream(rsp_file_in);
     if (!rsp_stream) {
@@ -147,15 +152,20 @@ StrList LinkerInvocation::processRSPFile(std::string const& rsp_file) {
                   << "\n";
         throw FileIOError("Cannot open rsp input file: " + GetLastError());
     }
-    StrList inputs;
     std::string line;
     while (std::getline(rsp_stream, line)) {
         std::stringstream rsp_line(line);
-        std::string input_file;
-        rsp_line >> input_file;
-        inputs.push_back(input_file);
+        std::string input_token;
+        std::string normal_token;
+        while(rsp_line >> input_token) {
+            normal_token = input_token;
+            if (input_token.front() == '"') {
+                normal_token = handleQuotedStrings(rsp_line, input_token);
+            }
+            normalArg(normal_token);
+            this->ProcessTokens(normal_token, input_token);
+        }
     }
-    return inputs;
 }
 
 /**
@@ -182,7 +192,6 @@ bool LinkerInvocation::makeRsp() {
         }
         rsp_out.close();
         this->input_files_ = {"@" + rsp_name};
-        this->rsp_files_ = {"@" + rsp_name};
         return true;
     }
     return false;
@@ -288,10 +297,6 @@ std::string LinkerInvocation::get_lib_link_args() const {
 
 std::string LinkerInvocation::get_def_file() const {
     return this->def_file_;
-}
-
-StrList LinkerInvocation::get_rsp_files() const {
-    return this->rsp_files_;
 }
 
 StrList LinkerInvocation::get_rc_files() const {
