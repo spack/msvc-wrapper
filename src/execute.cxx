@@ -83,9 +83,12 @@ void ExecuteCommand::SetupExecute() {
     // This structure specifies the STDIN and STDOUT handles for redirection.
     ZeroMemory(&si_start_info, sizeof(STARTUPINFOW));
     si_start_info.cb = sizeof(STARTUPINFOW);
-    si_start_info.hStdError = this->ChildStdErr_Wd;
-    si_start_info.hStdOutput = this->ChildStdOut_Wd;
-    si_start_info.dwFlags |= STARTF_USESTDHANDLES;
+    // Do not attach the pipe handles here. We'll create inheritable
+    // duplicates of the write ends immediately before CreateProcess to
+    // minimize the inheritance window.
+    si_start_info.hStdError = INVALID_HANDLE_VALUE;
+    si_start_info.hStdOutput = INVALID_HANDLE_VALUE;
+    si_start_info.dwFlags = 0;
     this->procInfo = pi_proc_info;
     this->startInfo = si_start_info;
 }
@@ -97,27 +100,24 @@ void ExecuteCommand::SetupExecute() {
 int ExecuteCommand::CreateChildPipes() {
     // Create stdout pipes
     SECURITY_ATTRIBUTES sa_attr;
-    // Set the bInheritHandle flag so pipe handles are inherited.
+    // Create non-inheritable pipes. We'll duplicate the write ends to
+    // inheritable handles immediately before CreateProcess to reduce the
+    // window where other processes could inherit them.
     sa_attr.nLength = sizeof(SECURITY_ATTRIBUTES);
-    sa_attr.bInheritHandle = TRUE;
+    sa_attr.bInheritHandle = FALSE;
     sa_attr.lpSecurityDescriptor = nullptr;
     this->saAttr = sa_attr;
     if (!CreatePipe(&this->ChildStdOut_Rd, &this->ChildStdOut_Wd, &sa_attr, 0))
         return 0;
-    if (!SetHandleInformation(this->ChildStdOut_Rd, HANDLE_FLAG_INHERIT, 0))
-        return 0;
 
     // create stderr pipes
     SECURITY_ATTRIBUTES sa_attr_err;
-    // Set the bInheritHandle flag so pipe handles are inherited.
     sa_attr_err.nLength = sizeof(SECURITY_ATTRIBUTES);
-    sa_attr_err.bInheritHandle = TRUE;
+    sa_attr_err.bInheritHandle = FALSE;
     sa_attr_err.lpSecurityDescriptor = nullptr;
     this->saAttrErr = sa_attr_err;
     if (!CreatePipe(&this->ChildStdErr_Rd, &this->ChildStdErr_Wd, &sa_attr_err,
                     0))
-        return 0;
-    if (!SetHandleInformation(this->ChildStdErr_Rd, HANDLE_FLAG_INHERIT, 0))
         return 0;
 
     return 1;
@@ -137,9 +137,38 @@ bool ExecuteCommand::ExecuteToolChainChild() {
         std::cerr << e.what() << "\n";
         return false;
     }
-    wchar_t* nc_command_line = _wcsdup(c_command_line.c_str());
-    if (!CreateProcessW(nullptr, nc_command_line, nullptr, nullptr, TRUE, 0,
-                        nullptr, nullptr, &this->startInfo, &this->procInfo)) {
+    // Duplicate command line into writable buffer expected by CreateProcessW
+    std::vector<wchar_t> cmdbuf(c_command_line.begin(), c_command_line.end());
+    cmdbuf.push_back(L'\0');
+    wchar_t* nc_command_line = cmdbuf.data();
+    // Duplicate our non-inheritable write handles into inheritable handles
+    // immediately before CreateProcess to minimize the inheritance window.
+    HANDLE inheritableOut = INVALID_HANDLE_VALUE;
+    HANDLE inheritableErr = INVALID_HANDLE_VALUE;
+    HANDLE const self = GetCurrentProcess();
+    if (this->ChildStdOut_Wd && this->ChildStdOut_Wd != INVALID_HANDLE_VALUE) {
+        if (!DuplicateHandle(self, this->ChildStdOut_Wd, self, &inheritableOut,
+                             0, TRUE, DUPLICATE_SAME_ACCESS)) {
+            return false;
+        }
+        this->startInfo.hStdOutput = inheritableOut;
+        this->startInfo.dwFlags |= STARTF_USESTDHANDLES;
+    }
+    if (this->ChildStdErr_Wd && this->ChildStdErr_Wd != INVALID_HANDLE_VALUE) {
+        if (!DuplicateHandle(self, this->ChildStdErr_Wd, self, &inheritableErr,
+                             0, TRUE, DUPLICATE_SAME_ACCESS)) {
+            // Clean up any previously duplicated handle
+            if (inheritableOut && inheritableOut != INVALID_HANDLE_VALUE)
+                CloseHandle(inheritableOut);
+            return false;
+        }
+        this->startInfo.hStdError = inheritableErr;
+        this->startInfo.dwFlags |= STARTF_USESTDHANDLES;
+    }
+
+    if (!CreateProcessW(nullptr, nc_command_line, nullptr, nullptr, TRUE,
+                        CREATE_UNICODE_ENVIRONMENT, nullptr, nullptr,
+                        &this->startInfo, &this->procInfo)) {
         // Handle errors coming from creation of child proc
         FormatMessage(
             FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
@@ -158,18 +187,37 @@ bool ExecuteCommand::ExecuteToolChainChild() {
         }
 
         std::cerr << "With error: ";
-        std::cerr << static_cast<char*>(lp_msg_buf) << "\n";
-        free(nc_command_line);
+        if (lp_msg_buf) {
+            std::cerr << static_cast<char*>(lp_msg_buf) << "\n";
+            LocalFree(lp_msg_buf);
+        } else {
+            std::cerr << reportLastError() << "\n";
+        }
         this->cpw_initalization_failure = true;
         return false;
     }
     // We've suceeded in kicking off the toolchain run
-    // Explicitly close write handle to child proc stdout
-    // as it is no longer needed and if we do not then cannot
-    // determine when child proc is done
-    free(nc_command_line);
-    CloseHandle(this->ChildStdOut_Wd);
-    CloseHandle(this->ChildStdErr_Wd);
+    // Parent no longer needs the inheritable duplicates; close them in the
+    // parent. The child has inherited its own copies.
+    if (this->startInfo.hStdOutput && this->startInfo.hStdOutput != INVALID_HANDLE_VALUE) {
+        CloseHandle(this->startInfo.hStdOutput);
+        this->startInfo.hStdOutput = INVALID_HANDLE_VALUE;
+    }
+    if (this->startInfo.hStdError && this->startInfo.hStdError != INVALID_HANDLE_VALUE) {
+        CloseHandle(this->startInfo.hStdError);
+        this->startInfo.hStdError = INVALID_HANDLE_VALUE;
+    }
+    // Also ensure our member copies of the write handles are closed in the
+    // parent; they reference the same kernel objects as the STARTUPINFO
+    // entries above.
+    if (this->ChildStdOut_Wd && this->ChildStdOut_Wd != INVALID_HANDLE_VALUE) {
+        SafeHandleCleanup(this->ChildStdOut_Wd);
+        this->ChildStdOut_Wd = INVALID_HANDLE_VALUE;
+    }
+    if (this->ChildStdErr_Wd && this->ChildStdErr_Wd != INVALID_HANDLE_VALUE) {
+        SafeHandleCleanup(this->ChildStdErr_Wd);
+        this->ChildStdErr_Wd = INVALID_HANDLE_VALUE;
+    }
     return true;
 }
 
@@ -182,7 +230,7 @@ int ExecuteCommand::PipeChildToStdStream(DWORD STD_HANDLE,
                                          HANDLE reader_handle) {
     DWORD dw_read;
     DWORD dw_written;
-    CHAR ch_buf[BUFSIZE];
+    std::vector<char> ch_buf(BUFSIZE);
     BOOL b_success = TRUE;
     HANDLE h_parent_out;
     if (this->write_to_file && this->fileout != INVALID_HANDLE_VALUE) {
@@ -192,30 +240,27 @@ int ExecuteCommand::PipeChildToStdStream(DWORD STD_HANDLE,
     }
 
     for (;;) {
-        b_success = ReadFile(reader_handle, ch_buf, BUFSIZE, &dw_read, nullptr);
+        b_success = ReadFile(reader_handle, ch_buf.data(), BUFSIZE, &dw_read, nullptr);
         if (!b_success || (dw_read == 0 && this->terminated))
             break;
         if (dw_read != 0) {
             b_success =
-                WriteFile(h_parent_out, ch_buf, dw_read, &dw_written, nullptr);
+                WriteFile(h_parent_out, ch_buf.data(), dw_read, &dw_written, nullptr);
             if (dw_written < dw_read && b_success) {
                 // incomplete write but not a failure
                 // since bSuccess is true
                 // So lets write until bSuccess is false or
                 // until all bytes are written
                 DWORD current_pos = dw_written;
-                while ((dw_written < dw_read) || dw_written == 0) {
-                    dw_read = dw_read - dw_written;
-                    CHAR* partial_buf = new CHAR[dw_read];
-                    for (DWORD i = 0; i < dw_read; ++i) {
-                        partial_buf[i] = ch_buf[current_pos + i];
-                    }
-                    b_success = WriteFile(h_parent_out, partial_buf, dw_read,
-                                          &dw_written, nullptr);
-                    delete partial_buf;
+                DWORD remaining = dw_read - dw_written;
+                while (remaining > 0) {
+                    DWORD to_write = remaining;
+                    b_success = WriteFile(h_parent_out, ch_buf.data() + current_pos,
+                                          to_write, &dw_written, nullptr);
                     if (!b_success)
                         break;
                     current_pos += dw_written;
+                    remaining -= dw_written;
                 }
             }
             if (!b_success) {
@@ -224,6 +269,20 @@ int ExecuteCommand::PipeChildToStdStream(DWORD STD_HANDLE,
         }
         if (!b_success)
             break;
+    }
+    // Close the reader handle now that we're done reading from the pipe to
+    // release underlying kernel resources. This prevents leaking handles
+    // across many invocations which can cause pipes to never reach EOF and
+    // eventually exhaust kernel resources.
+    if (reader_handle && reader_handle != INVALID_HANDLE_VALUE) {
+        CloseHandle(reader_handle);
+        // Clear the member copy so CleanupHandles doesn't attempt to close the
+        // same handle again.
+        if (reader_handle == this->ChildStdOut_Rd) {
+            this->ChildStdOut_Rd = INVALID_HANDLE_VALUE;
+        } else if (reader_handle == this->ChildStdErr_Rd) {
+            this->ChildStdErr_Rd = INVALID_HANDLE_VALUE;
+        }
     }
     return static_cast<int>(static_cast<int>(b_success) == 0);
 }
@@ -257,7 +316,9 @@ DWORD ExecuteCommand::ReportExitCode() {
             break;
     }
     this->terminated = true;
-    CloseHandle(this->procInfo.hProcess);
+    // Use SafeHandleCleanup to close the process handle and mark it invalid
+    // so later cleanup paths do not attempt to close it again.
+    SafeHandleCleanup(this->procInfo.hProcess);
     return exit_code;
 }
 
@@ -288,21 +349,35 @@ bool ExecuteCommand::Execute(const std::string& filename) {
                 ConvertASCIIToWide(filename).c_str(), FILE_APPEND_DATA,
                 FILE_SHARE_WRITE | FILE_SHARE_READ, &this->saAttr, OPEN_ALWAYS,
                 FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (this->fileout != INVALID_HANDLE_VALUE) {
+                // Ensure file handle is not inheritable by child processes
+                SetHandleInformation(this->fileout, HANDLE_FLAG_INHERIT, 0);
+            }
         } catch (const std::overflow_error& e) {
             std::cerr << e.what() << "\n";
             return false;
         }
     }
+    // Start reader threads before spawning the child so they are ready to
+    // drain the pipe as soon as the child writes. This reduces a small race
+    // window where a very fast child can fill the pipe buffer before the
+    // parent starts reading.
+    this->child_out_future = std::async(
+        std::launch::async, &ExecuteCommand::PipeChildToStdStream, this,
+        STD_OUTPUT_HANDLE, this->ChildStdOut_Rd);
+    this->child_err_future = std::async(
+        std::launch::async, &ExecuteCommand::PipeChildToStdStream, this,
+        STD_ERROR_HANDLE, this->ChildStdErr_Rd);
+
     bool const ret_code = this->ExecuteToolChainChild();
     if (ret_code) {
-        this->child_out_future = std::async(
-            std::launch::async, &ExecuteCommand::PipeChildToStdStream, this,
-            STD_OUTPUT_HANDLE, this->ChildStdOut_Rd);
-        this->child_err_future = std::async(
-            std::launch::async, &ExecuteCommand::PipeChildToStdStream, this,
-            STD_ERROR_HANDLE, this->ChildStdErr_Rd);
+        // Start exit code watcher only after the process is created
         this->exit_code_future = std::async(
             std::launch::async, &ExecuteCommand::ReportExitCode, this);
+    } else {
+        // If we failed to spawn, ensure reader futures are cancelled/observed
+        // by setting terminated so readers can exit promptly.
+        this->terminated = true;
     }
     return ret_code;
 }
