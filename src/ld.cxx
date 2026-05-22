@@ -3,7 +3,10 @@
  *
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
+
+
 #include "ld.h"
+#include <Windows.h>
 #include <errhandlingapi.h>
 #include <fileapi.h>
 #include <minwindef.h>
@@ -247,7 +250,7 @@ std::unique_ptr<RCFileManager> LdInvocation::createRC(LinkerInvocation& link_run
     if (err_code != 0) {
         throw RCCompilerFailure("Could not compile RC file");
     }
-    if(!DeleteFile2A(rc_file_name.c_str(), FILE_FLAG_DISALLOW_PATH_REDIRECTS)) {
+    if(!DeleteFileA(rc_file_name.c_str())) {
         throw std::system_error(static_cast<int>(::GetLastError()),
                                 std::system_category(), "Failed to remove intermediate rc file");
     }
@@ -261,7 +264,7 @@ RCFileManager::RCFileManager(std::string file) {
 }
 
 RCFileManager::~RCFileManager(){
-    if(!DeleteFile2A(this->rc_file_.c_str(), FILE_FLAG_DISALLOW_PATH_REDIRECTS)) {
+    if(!DeleteFileA(this->rc_file_.c_str())) {
         std::cerr << std::system_error(static_cast<int>(::GetLastError()),
                             std::system_category(), "Failed to remove intermediate rc file").what() << "\n";
     }
