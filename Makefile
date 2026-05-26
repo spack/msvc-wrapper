@@ -17,7 +17,7 @@
 #		        is provided to nmake
 #   test    - 
 
-!IFNDEF "$(PREFIX)"
+!IFNDEF PREFIX
 PREFIX="$(MAKEDIR)\install\"
 !ENDIF
 
@@ -64,12 +64,12 @@ cl.exe :  $(SRCS)
 	link $(LFLAGS) $** $(API_LIBS) /out:cl.exe
 
 install : cl.exe
-	mkdir "$(PREFIX)"
-	move cl.exe "$(PREFIX)""
-	mklink "$(PREFIX)\link.exe" "$(PREFIX)\cl.exe"
-	mklink "$(PREFIX)\ifx.exe" "$(PREFIX)\cl.exe"
-	mklink "$(PREFIX)\ifort.exe" "$(PREFIX)\ifort.exe"
-	mklink "$(PREFIX)\relocate.exe" "$(PREFIX)\cl.exe"
+	@if not exist "$(PREFIX)" mkdir "$(PREFIX)""
+	@if not exist "$(PREFIX)\cl.exe" move cl.exe "$(PREFIX)"
+	@if not exist "$(PREFIX)\link.exe" mklink "$(PREFIX)\link.exe" "$(PREFIX)\cl.exe"
+	@if not exist "$(PREFIX)\ifx.exe" mklink "$(PREFIX)\ifx.exe" "$(PREFIX)\cl.exe"
+	@if not exist "$(PREFIX)\ifort.exe" mklink "$(PREFIX)\ifort.exe" "$(PREFIX)\ifort.exe"
+	@if not exist "$(PREFIX)\relocate.exe" mklink "$(PREFIX)\relocate.exe" "$(PREFIX)\cl.exe"
 
 setup_test: cl.exe
 	@echo \n
