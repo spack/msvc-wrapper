@@ -64,12 +64,12 @@ cl.exe :  $(SRCS)
 	link $(LFLAGS) $** $(API_LIBS) /out:cl.exe
 
 install : cl.exe
-	mkdir $(PREFIX)
-	move cl.exe $(PREFIX)
-	mklink $(PREFIX)\link.exe $(PREFIX)\cl.exe
-	mklink $(PREFIX)\ifx.exe $(PREFIX)\cl.exe
-	mklink $(PREFIX)\ifort.exe $(PREFIX)\ifort.exe
-	mklink $(PREFIX)\relocate.exe $(PREFIX)\cl.exe
+	mkdir "$(PREFIX)"
+	move cl.exe "$(PREFIX)""
+	mklink "$(PREFIX)\link.exe" "$(PREFIX)\cl.exe"
+	mklink "$(PREFIX)\ifx.exe" "$(PREFIX)\cl.exe"
+	mklink "$(PREFIX)\ifort.exe" "$(PREFIX)\ifort.exe"
+	mklink "$(PREFIX)\relocate.exe" "$(PREFIX)\cl.exe"
 
 setup_test: cl.exe
 	@echo \n
