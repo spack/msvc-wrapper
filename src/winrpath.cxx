@@ -121,24 +121,42 @@ bool LibRename::FindDllAndRename(HANDLE& pe_in) {
     }
     // Establish base PE headers
     auto* dos_header = static_cast<PIMAGE_DOS_HEADER>(basepointer);
-    auto* nt_header = reinterpret_cast<PIMAGE_NT_HEADERS>(
+    if (dos_header->e_magic != IMAGE_DOS_SIGNATURE) {
+        std::cerr << "Error: Invalid DOS signature (Not an Executable/DLL file).\n";
+        return false;
+    }
+    auto* pe_signature = reinterpret_cast<DWORD*>(
         static_cast<char*>(basepointer) + dos_header->e_lfanew);
 
-    auto* coff_header = reinterpret_cast<PIMAGE_FILE_HEADER>(
-        static_cast<char*>(basepointer) + dos_header->e_lfanew +
-        sizeof(nt_header->Signature));
+    if (*pe_signature != IMAGE_NT_SIGNATURE) {
+        std::cerr << "Error: Invalid PE signature (Not a Windows PE binary).\n";
+        return false;
+    }
 
-    auto* optional_header = reinterpret_cast<PIMAGE_OPTIONAL_HEADER>(
-        static_cast<char*>(basepointer) + dos_header->e_lfanew +
-        sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader));
+    auto* coff_header = reinterpret_cast<PIMAGE_FILE_HEADER>(
+        static_cast<char*>(basepointer) + dos_header->e_lfanew + sizeof(DWORD));
+
+    auto* raw_optional_ptr = static_cast<char*>(basepointer) + dos_header->e_lfanew +
+        sizeof(DWORD) + sizeof(IMAGE_FILE_HEADER);
+
+    WORD const magic = *reinterpret_cast<WORD*>(raw_optional_ptr);
+
+    DWORD number_of_rva_and_sections = 0;
+    DWORD rva_import_directory = 0;
+
+    if (magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
+        auto* opt64 = reinterpret_cast<PIMAGE_OPTIONAL_HEADER64>(raw_optional_ptr);
+        number_of_rva_and_sections = opt64->NumberOfRvaAndSizes;
+        rva_import_directory = opt64->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+    } else {
+        auto* opt32 = reinterpret_cast<PIMAGE_OPTIONAL_HEADER32>(raw_optional_ptr);
+        number_of_rva_and_sections = opt32->NumberOfRvaAndSizes;
+        rva_import_directory = opt32->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+    }
 
     auto* section_header = reinterpret_cast<PIMAGE_SECTION_HEADER>(
-        static_cast<char*>(basepointer) + dos_header->e_lfanew +
-        sizeof(nt_header->Signature) + sizeof(nt_header->FileHeader) +
-        sizeof(nt_header->OptionalHeader));
+        raw_optional_ptr + coff_header->SizeOfOptionalHeader);
 
-    DWORD const number_of_rva_and_sections =
-        optional_header->NumberOfRvaAndSizes;
     if (number_of_rva_and_sections == 0) {
         std::cerr << "PE file does not import symbols" << "\n";
         return false;
@@ -151,10 +169,6 @@ bool LibRename::FindDllAndRename(HANDLE& pe_in) {
     }
 
     DWORD const number_of_sections = coff_header->NumberOfSections;
-    // Data directory #2 points to the RVA of the import section
-    DWORD const rva_import_directory =
-        nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT]
-            .VirtualAddress;
     DWORD const import_section_file_offset = RvaToFileOffset(
         section_header, number_of_sections, rva_import_directory);
     char* import_table_offset =
