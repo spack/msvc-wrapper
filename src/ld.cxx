@@ -228,7 +228,8 @@ std::unique_ptr<RCFileManager> LdInvocation::createRC(LinkerInvocation& link_run
     const std::string rc_file_name = join({rc_tmp_dir, base_rc_file_name}, "\\");
 
     ExecuteCommand rc_executor("rc",
-                               {"/fo" + res_file_name + " " + rc_file_name});
+                               {"/fo\"" + res_file_name + "\"",
+                                "\"" + rc_file_name + "\""});
     std::ofstream rc_out(rc_file_name);
     if (!rc_out) {
         std::cerr << "Error: could not open rc file for creation: "
