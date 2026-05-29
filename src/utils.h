@@ -296,7 +296,7 @@ class LibraryFinder {
 
 class PathRelocator {
    private:
-    bool bc_;
+    bool bc_ = true;  // default: build-cache prefix→prefix mode
     std::string new_prefix_;
     std::map<std::string, std::string> old_new_map;
     std::string relocateBC(std::string const& pe);

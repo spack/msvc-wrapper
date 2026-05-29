@@ -239,7 +239,7 @@ LibRename::LibRename(std::string p_exe, std::string coff, bool full,
  * Produces something like `/EXPORTS <name of coff file>`
  */
 std::string LibRename::ComputeDefLine() {
-    return "/NOLOGO /EXPORTS " + this->coff;
+    return "/NOLOGO /EXPORTS \"" + this->coff + "\"";
 }
 
 /**
@@ -454,10 +454,10 @@ bool LibRename::ExecutePERename() {
  * 
 */
 std::string LibRename::ComputeRenameLink() {
-    std::string line("-def:");
-    line += this->def_file + " ";
-    line += "-name:";
-    line += mangle_name(this->pe) + " ";
+    std::string line("-def:\"");
+    line += this->def_file + "\" ";
+    line += "-name:\"";
+    line += mangle_name(this->pe) + "\" ";
     std::string const name(stem(this->coff));
     if (!this->replace) {
         this->new_lib = name + ".abs-name.lib";
