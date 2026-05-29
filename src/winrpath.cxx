@@ -168,9 +168,22 @@ bool LibRename::FindDllAndRename(HANDLE& pe_in) {
         return false;
     }
 
+    if (rva_import_directory == 0) {
+        // No import table is valid (e.g. python3.dll which only forwards exports).
+        FlushViewOfFile((LPCVOID)basepointer, 0);
+        UnmapViewOfFile((LPCVOID)basepointer);
+        return SafeHandleCleanup(h_map_object) != 0;
+    }
+
     DWORD const number_of_sections = coff_header->NumberOfSections;
     DWORD const import_section_file_offset = RvaToFileOffset(
         section_header, number_of_sections, rva_import_directory);
+    if (import_section_file_offset == 0) {
+        std::cerr << "Import table RVA 0x" << std::hex << rva_import_directory
+                  << " could not be resolved to a file offset.\n";
+        UnmapViewOfFile((LPCVOID)basepointer);
+        return false;
+    }
     char* import_table_offset =
         static_cast<char*>(basepointer) + import_section_file_offset;
     auto* import_image_descriptor =
