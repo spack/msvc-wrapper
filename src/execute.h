@@ -33,13 +33,16 @@ class ExecuteCommand {
     ~ExecuteCommand();
     bool Execute(const std::string& filename = empty);
     DWORD Join();
+    // Idempotent - safe to call before destruction to release resources
+    // (e.g. an output file handle) earlier than the object's lifetime would
+    // otherwise allow; the destructor calls this again harmlessly.
+    int CleanupHandles();
 
    private:
     void SetupExecute();
     bool ExecuteToolChainChild();
     int PipeChildToStdStream(DWORD STD_HANDLE, HANDLE reader_handle);
     int CreateChildPipes();
-    int CleanupHandles();
     DWORD ReportExitCode();
     // Holds the exit code of the
     // pipe from child process stdout
