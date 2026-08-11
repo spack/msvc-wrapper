@@ -11,34 +11,32 @@
  * Loads Spack relevant variables from the environment
  * into the compiler wrapper for easy access
  * with convenient interface.
- * 
+ *
  * ENV variables that are lists are decomposed as such
  * by this method and are accessible as c++ lists
  * Variables that are simple strings are also treated as such
+ *
+ * This is loaded on every invocation of the wrapper, i.e. once per compiled
+ * source file, so it deliberately reads only what the wrapper consumes.
+ * Variables Spack sets that nothing here acts on are left unread rather than
+ * being fetched and split into vectors that are immediately discarded.
  */
 struct SpackEnvState {
-    std::string AddDebugFlags;
+    // NOTE: the four flag lists below are read from the environment but never
+    // applied to any command line. That is an unimplemented feature (Spack's
+    // per-package compiler flags are silently dropped)
+    // see the note in LoadSpackEnvState.
     StrList SpackFFlags;
     StrList SpackCFlags;
     StrList SpackCxxFlags;
     StrList SpackLdFlags;
+
     StrList SpackLdLibs;
     StrList SpackCompilerExtraRPaths;
     StrList SpackCompilerImplicitRPaths;
     StrList SpackIncludeDirs;
     StrList SpackLinkDirs;
-    StrList SpackCompilerFlagsKeep;
-    StrList SpackCompilerFlagsReplace;
-    StrList SpackEnvPath;
-    StrList SpackSystemDirs;
     StrList SpackRPathDirs;
-    std::string SpackCCRPathArg;
-    std::string SpackCXXRPathArg;
-    std::string SpackFCRPathArg;
-    std::string SpackF77RPathArg;
-    std::string SpackLinkerArg;
-    std::string Spack;
-    std::string SpackInstDir;
     std::string SpackCC;
     // SpackCXX is unused in the current implementation
     // but is left here for future compatibility with
@@ -46,7 +44,6 @@ struct SpackEnvState {
     std::string SpackCXX;
     std::string SpackFC;
     std::string SpackF77;
-    std::string SpackRoot;
     std::string SpackLD;
 
     /**

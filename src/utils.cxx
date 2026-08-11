@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: (Apache-2.0 OR MIT)
  */
 #include "utils.h"
+#include "regex_utils.h"
 #include <aclapi.h>
 #include <accctrl.h>
 #include <errhandlingapi.h>
@@ -279,7 +280,7 @@ void lower(std::string& str) {
  * 
  *  Return the escaped string
  */
-std::string quoteAsNeeded(std::string& str) {
+void quoteAsNeeded(std::string& str) {
     // Note: the ordering if these two conditionals is important
     // If the second conditional is executed first, the first
     // will always be true as the second injects the string
@@ -291,18 +292,30 @@ std::string quoteAsNeeded(std::string& str) {
         // If there are escaped quotes in input
         // We need to escape them as well as we're adding another
         // layer of indirection between caller and compiler
-        std::regex const pattern("\"");
-        str = std::regex_replace(str, pattern, "\\\"");
+        // This runs for every argument of every invocation, so it is a plain
+        // scan rather than a regex - constructing a std::regex is one of the
+        // most expensive operations in the standard library
+        std::string escaped;
+        escaped.reserve(str.size() + 8);
+        for (char const chr : str) {
+            if (chr == '\"') {
+                escaped += '\\';
+            }
+            escaped += chr;
+        }
+        str = std::move(escaped);
     }
     if (str.find_first_of(" &<>|()") != std::string::npos) {
         // There are spaces or special characters in string, quote it
-        str = "\"" + str + "\"";
+        str.insert(str.begin(), '\"');
+        str += '\"';
     }
-    return str;
 }
 
 void quoteList(StrList& args) {
-    std::transform(args.begin(), args.end(), args.begin(), quoteAsNeeded);
+    for (std::string& arg : args) {
+        quoteAsNeeded(arg);
+    }
 }
 
 std::regex_constants::syntax_option_type composeRegexOptions(
@@ -384,6 +397,40 @@ std::string GetSpackEnv(const char* env) {
 }
 
 /**
+ * Reports whether the given command refers to this very executable.
+ *
+ * A misconfigured environment - SPACK_CC or SPACK_LD pointing at the wrapper
+ * rather than at the tool it wraps - otherwise produces an unbounded chain of
+ * wrapper processes, each spawning another, until the machine is exhausted.
+ * Comparison is a pure string operation on the fully qualified forms; no
+ * filesystem access is involved, so this is cheap enough for the hot path.
+ */
+bool IsSelf(const std::string& command) {
+    if (command.empty()) {
+        return false;
+    }
+    wchar_t self_path[MAX_PATH * 4];
+    DWORD const self_len =
+        GetModuleFileNameW(nullptr, self_path, ARRAYSIZE(self_path));
+    if (self_len == 0 || self_len >= ARRAYSIZE(self_path)) {
+        return false;
+    }
+    std::wstring wcommand;
+    try {
+        wcommand = ConvertASCIIToWide(command);
+    } catch (const std::overflow_error&) {
+        return false;
+    }
+    wchar_t full_command[MAX_PATH * 4];
+    DWORD const full_len = GetFullPathNameW(
+        wcommand.c_str(), ARRAYSIZE(full_command), full_command, nullptr);
+    if (full_len == 0 || full_len >= ARRAYSIZE(full_command)) {
+        return false;
+    }
+    return _wcsicmp(self_path, full_command) == 0;
+}
+
+/**
  * Given an environment variable name
  * return the corresponding environment variable value
  * or an empty string as appropriate
@@ -396,7 +443,7 @@ std::string GetSpackEnv(const std::string& env) {
  * Returns list of strings from environment variable value
  * representing a list delineated by delim argument
  */
-StrList GetEnvList(const std::string& envVar, const std::string& delim) {
+StrList GetEnvList(const char* envVar, const std::string& delim) {
     std::string const env_value = GetSpackEnv(envVar);
     if (!env_value.empty())
         return split(env_value, delim);
@@ -405,15 +452,15 @@ StrList GetEnvList(const std::string& envVar, const std::string& delim) {
 }
 
 bool ValidateSpackEnv() {
-    std::vector<std::string> const spack_env{
+    static const char* const spack_env[] = {
         "SPACK_COMPILER_WRAPPER_PATH", "SPACK_DEBUG_LOG_DIR",
         "SPACK_DEBUG_LOG_ID",          "SPACK_SHORT_SPEC",
         "SPACK_SYSTEM_DIRS",           "SPACK_MANAGED_DIRS"};
-    for (const auto& var : spack_env)
-        if (!getenv(var.c_str())) {
+    for (const char* var : spack_env)
+        if (!getenv(var)) {
             std::cerr
-                << var +
-                       " isn't set in the environment and is expected to be\n";
+                << var
+                << " isn't set in the environment and is expected to be\n";
             return false;
         }
     return true;
@@ -478,9 +525,24 @@ DWORD RvaToFileOffset(PIMAGE_SECTION_HEADER& section_header,
     return 0;
 }
 
+namespace {
+bool g_debug_forced = false;
+}  // namespace
+
+void SetDebug(bool enabled) {
+    g_debug_forced = enabled;
+}
+
+bool DebugEnabled() {
+    // The environment cannot change under a running process, so pay for the
+    // lookup once rather than on every message
+    static const bool env_enabled = getenv("SPACK_DEBUG_WRAPPER") != nullptr;
+    return g_debug_forced || env_enabled;
+}
+
 void debug(const std::string& dbgStmt) {
-    if (DEBUG || getenv("SPACK_DEBUG_WRAPPER")) {
-        std::cout << "DEBUG: " << dbgStmt << std::endl;
+    if (DebugEnabled()) {
+        std::cerr << "DEBUG: " << dbgStmt << std::endl;
     }
 }
 
@@ -553,7 +615,7 @@ char* pad_path(const char* pth, DWORD str_size, char padding_char,
     // If str_size > bsize we get inappropriate conversion
     // from signed to unsigned
     if (str_size > bsize) {
-        debug("Padding string is greater than max string size allowed");
+        DEBUG_LOG("Padding string is greater than max string size allowed");
         return nullptr;
     }
     size_t const extended_buf = bsize - str_size + 2;
@@ -637,9 +699,9 @@ std::string getSFN(const std::string& path, const bool make_file = false) {
         HANDLE h_file = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr,
                                     CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
         if (h_file == INVALID_HANDLE_VALUE) {
-            debug("File " + path +
-                  " does not exist, nor can it be created, unable to "
-                  "compute SFN\n");
+            DEBUG_LOG("File " + path +
+                      " does not exist, nor can it be created, unable to "
+                      "compute SFN\n");
             CloseHandle(h_file);
             return std::string();
         }
@@ -798,7 +860,7 @@ bool hasPathCharacters(const std::string& name) {
 bool SpackInstalledLib(const std::string& lib) {
     const std::string prefix = GetSpackEnv("SPACK_INSTALL_PREFIX");
     if (prefix.empty()) {
-        debug(
+        DEBUG_LOG(
             "Unable to determine Spack install prefix, SPACK_INSTALL_PREFIX "
             "unset");
         return false;
@@ -867,7 +929,7 @@ std::string PathRelocator::relocateBC(std::string const& pe) {
     }
     // Don't fail if we're relocating from a BC
     // Just warn
-    debug("Unable to find relocation mapping for library: " + pe);
+    DEBUG_LOG("Unable to find relocation mapping for library: " + pe);
     return pe;
 }
 
@@ -876,7 +938,7 @@ std::string PathRelocator::relocateStage(std::string const& pe) {
         std::string prefix_loc = this->old_new_map.at(pe);
         return prefix_loc;
     } catch (std::out_of_range& e) {
-        debug("Could not find path to " + pe + "in relocation mapping");
+        DEBUG_LOG("Could not find path to " + pe + "in relocation mapping");
         return std::string();
     }
 }
@@ -1185,8 +1247,8 @@ ScopedFile::~ScopedFile() {
         // The file having already been consumed (renamed away or never
         // produced) is the common success case, not a cleanup failure
         if (err != ERROR_FILE_NOT_FOUND && err != ERROR_PATH_NOT_FOUND) {
-            debug("Failed to remove temporary file " + file_path_ + ": " +
-                  reportLastError());
+            DEBUG_LOG("Failed to remove temporary file " + file_path_ + ": " +
+                      reportLastError());
         }
     }
 }

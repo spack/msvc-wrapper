@@ -160,7 +160,7 @@ void LinkerInvocation::processRSPFile(std::string const& rsp_file) {
     if (!rsp_stream) {
         std::cerr << "Error: Could not open input rsp file: " << rsp_file_in
                   << "\n";
-        throw FileIOError("Cannot open rsp input file: " + GetLastError());
+        throw FileIOError(("Cannot open rsp input file: " + std::to_string(GetLastError())).c_str());
     }
     std::string line;
     while (std::getline(rsp_stream, line)) {
@@ -187,8 +187,8 @@ void LinkerInvocation::processRSPFile(std::string const& rsp_file) {
  * input file for the lib tool
  */
 bool LinkerInvocation::makeRsp() {
-    int const total_length = std::accumulate(
-        this->input_files_.begin(), this->input_files_.end(), 0,
+    size_t const total_length = std::accumulate(
+        this->input_files_.begin(), this->input_files_.end(), size_t{0},
         [](size_t sum, const std::string& s) { return sum + s.size(); });
     if (total_length > MaxProcessCommandLength) {
         std::string const rsp_name = "spack-build.rsp";
@@ -226,7 +226,7 @@ void LinkerInvocation::processDefFile() {
     if (!def_in) {
         std::cerr << "Error: Could not open input def file: " << this->def_file_->file()
                   << "\n";
-        throw FileIOError("Cannot open def input file: " + GetLastError());
+        throw FileIOError(("Cannot open def input file: " + std::to_string(GetLastError())).c_str());
     }
 
     std::string line;
@@ -274,7 +274,7 @@ void LinkerInvocation::processDefFile() {
         if (!def_out) {
             std::cerr << "Error: could not open output def file: " << rename_def
                       << "\n";
-            throw FileIOError("Cannot open def output file: " + GetLastError());
+            throw FileIOError(("Cannot open def output file: " + std::to_string(GetLastError())).c_str());
         }
         for (const auto& line : exports) {
             def_out << line << "\n";

@@ -58,7 +58,7 @@ DWORD LdInvocation::InvokeToolchain() {
             std::cerr << "Spack compiler wrapper: no file inputs "
                          "recognized on link line; outputs will not be "
                          "relocatable\n";
-            debug("Unrecognized link line: " + join(this->inputs));
+            DEBUG_LOG("Unrecognized link line: " + join(this->inputs));
         }
         return ToolChainInvocation::InvokeToolchain();
     }
@@ -135,13 +135,13 @@ DWORD LdInvocation::InvokeToolchain() {
         std::string const shorter_name = existing_coff.GetName();
         std::string const link_name = basename(link_run.get_out());
         if (shorter_name.empty() || link_name.empty()) {
-            debug("Cannot determine either PE or COFF names (Pe: " + link_name +
-                  "; Coff: " + shorter_name + ") skipping absolute rename\n");
+            DEBUG_LOG("Cannot determine either PE or COFF names (Pe: " + link_name +
+                      "; Coff: " + shorter_name + ") skipping absolute rename\n");
         }
 
         if (shorter_name != link_name) {
-            debug("internal lib name: " + shorter_name +
-                  " Pe name: " + link_name + " are not equivalent");
+            DEBUG_LOG("internal lib name: " + shorter_name +
+                      " Pe name: " + link_name + " are not equivalent");
             return 0;
         }
         existing_coff_reader.Close();
@@ -176,20 +176,20 @@ DWORD LdInvocation::InvokeToolchain() {
     }
     CoffReaderWriter coff_reader(abs_out_imp_lib_name);
     CoffParser coff(&coff_reader);
-    debug("Parsing COFF file: " + abs_out_imp_lib_name);
+    DEBUG_LOG("Parsing COFF file: " + abs_out_imp_lib_name);
     if (!coff.Parse()) {
-        debug("Failed to parse COFF file: " + abs_out_imp_lib_name);
+        DEBUG_LOG("Failed to parse COFF file: " + abs_out_imp_lib_name);
         return ExitConditions::COFF_PARSE_FAILURE;
     }
-    debug("COFF file parsed");
-    debug("Normalizing coff file for name: " + pe_name);
+    DEBUG_LOG("COFF file parsed");
+    DEBUG_LOG("Normalizing coff file for name: " + pe_name);
     if (!coff.NormalizeName(pe_name)) {
-        debug("Failed to normalize name for COFF file: " +
-              abs_out_imp_lib_name);
+        DEBUG_LOG("Failed to normalize name for COFF file: " +
+                  abs_out_imp_lib_name);
         return ExitConditions::NORMALIZE_NAME_FAILURE;
     }
-    debug("Renaming library from " + abs_out_imp_lib_name + " to " +
-          imp_lib_name);
+    DEBUG_LOG("Renaming library from " + abs_out_imp_lib_name + " to " +
+              imp_lib_name);
     if (!ReplaceFileWithRename(imp_lib_name, abs_out_imp_lib_name)) {
         return ExitConditions::FILE_RENAME_FAILURE;
     }

@@ -24,9 +24,9 @@ class ToolChainInvocation {
    protected:
     virtual void ParseCommandArgs(char const* const* cli);
     virtual void LoadToolchainDependentSpackVars(SpackEnvState& spackenv) = 0;
-    static std::string ComposeIncludeArg(std::string& include);
-    static std::string ComposeLibPathArg(std::string& libPath);
-    void AddExtraLibPaths(StrList paths);
+    static std::string ComposeIncludeArg(const std::string& include);
+    static std::string ComposeLibPathArg(const std::string& libPath);
+    void AddExtraLibPaths(const StrList& paths);
     static StrList ComposeCommandLists(
         const std::vector<StrList>& command_args);
 

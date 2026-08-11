@@ -21,14 +21,28 @@
 PREFIX="$(MAKEDIR)\install\"
 !ENDIF
 
-!IF "$(BUILD_TYPE)" == "DEBUG"
-BUILD_CFLAGS = /Zi -D_CRT_SECURE_NO_WARNINGS
+# This binary is spawned once per compiled source file and once per link of
+# every package Spack builds, so it is built optimized by default. Without an
+# explicit /O switch cl.exe defaults to /Od, which leaves every std::string,
+# std::map and iostream operation as an out-of-line call.
+!IF "$(BUILD_TYPE)" == "DEBUG" || "$(BUILD_TYPE)" == "debug" || "$(BUILD_TYPE)" == "Debug"
+BUILD_CFLAGS = /Od /Zi /MTd
 BUILD_LINK = /DEBUG
+TEST_LINK = /DEBUG
+!ELSE
+BUILD_CFLAGS = /O2 /Ob2 /Oi /GL /DNDEBUG /MT
+BUILD_LINK = /LTCG /OPT:REF /OPT:ICF /INCREMENTAL:NO
+TEST_LINK =
 !ENDIF
 
-BASE_CFLAGS = /EHsc
+BASE_CFLAGS = /EHsc /nologo -D_CRT_SECURE_NO_WARNINGS
 CFLAGS = $(BASE_CFLAGS) $(BUILD_CFLAGS) $(CLFLAGS)
-LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
+# Link flags for the wrapper binary itself
+WRAPPER_LFLAGS = $(BUILD_LINK) $(LINKFLAGS)
+# Link flags the test targets hand to the *wrapped* linker. Deliberately free
+# of the wrapper's own codegen options (/LTCG and friends), which describe how
+# this binary is built and have no bearing on the test artifacts it produces.
+LFLAGS = $(TEST_LINK) $(LINKFLAGS)
 # shlwapi: needed for basic path operations
 # pathcch: needed for long path canonicalization
 # advapi32: needed for win32 ACL interactions
@@ -51,6 +65,30 @@ coff_reader_writer.obj \
 coff_parser.obj \
 linker_invocation.obj
 
+HEADERS = src\cl.h \
+src\coff.h \
+src\coff_parser.h \
+src\coff_pe_reporter.h \
+src\coff_reader_writer.h \
+src\commandline.h \
+src\execute.h \
+src\intel.h \
+src\ld.h \
+src\linker_invocation.h \
+src\regex_utils.h \
+src\spack_env.h \
+src\toolchain.h \
+src\toolchain_factory.h \
+src\utils.h \
+src\version.h \
+src\winrpath.h
+
+# NMAKE does not scan #include directives, so every object is declared to
+# depend on every header. Without this, changing a struct layout or a function
+# signature in a header rebuilds only the .cxx that shares its name and leaves
+# the rest of the objects compiled against the old declarations. That links
+# without complaint and corrupts memory at runtime.
+$(SRCS) : $(HEADERS)
 
 {src}.cxx{}.obj::
 	"$(CC)" /c $(CFLAGS) $(CVARS) /I:src $<	
@@ -61,11 +99,16 @@ linker_invocation.obj
 all : install test
 
 cl.exe :  $(SRCS)
-	link $(LFLAGS) $** $(API_LIBS) /out:cl.exe
+	link $(WRAPPER_LFLAGS) $** $(API_LIBS) /out:cl.exe
 
 install : cl.exe
 	@if not exist "$(PREFIX)" mkdir "$(PREFIX)"
-	@if not exist "$(PREFIX)\cl.exe" move cl.exe "$(PREFIX)"
+# Always overwrite. This used to be guarded by "if not exist", which meant a
+# rebuild installed nothing over an existing prefix and callers kept running
+# the previous binary with no indication anything had been skipped.
+	move /Y cl.exe "$(PREFIX)"
+# The symlinks below only need creating once; they resolve by name, so they
+# stay correct across reinstalls of cl.exe
 	@if not exist "$(PREFIX)\link.exe" mklink "$(PREFIX)\link.exe" "$(PREFIX)\cl.exe"
 	@if not exist "$(PREFIX)\ifx.exe" mklink "$(PREFIX)\ifx.exe" "$(PREFIX)\cl.exe"
 	@if not exist "$(PREFIX)\ifort.exe" mklink "$(PREFIX)\ifort.exe" "$(PREFIX)\cl.exe"
@@ -172,7 +215,7 @@ test_pipe_error_overflow: build_and_check_test_sample
 	set SPACK_CC=%SPACK_CC_TMP%
 
 build_zerowrite_test: test\writezero.obj
-	link $(LFLAGS) $** $(API_LIBS) /out:writezero.exe
+	link $(WRAPPER_LFLAGS) $** $(API_LIBS) /out:writezero.exe
 
 test_zerowrite: build_zerowrite_test
 	@echo \n

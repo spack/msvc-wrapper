@@ -9,26 +9,34 @@
 #include <strsafe.h>
 #include <tchar.h>
 #include <windows.h>
-#include <future>
-#include <iostream>
 #include <string>
 #include <vector>
 
 #include "utils.h"
 
-#define BUFSIZE 4096
-
 const std::string empty = std::string();
 
 /**
- * @brief
- */
+ * @brief Spawns a wrapped toolchain process and reports its exit code
+ *
+ * The wrapper is invoked once per compiled source file, so this class does as
+ * little as possible per invocation: the child inherits this process' standard
+ * handles directly rather than having its output pumped through a pipe, and
+ * the parent blocks on the child rather than polling it.
+ *
+ * When Execute() is given a filename, the child's stdout and stderr are
+ * pointed at that file instead. That is used by the relocation path to capture
+ * dumpbin's export listing; nothing on the compile or link path needs it.
+ *
+ * */
 class ExecuteCommand {
    public:
     // constructor for single executable/arguments + command in one string
-    ExecuteCommand(std::string command);
+    explicit ExecuteCommand(std::string command);
     ExecuteCommand(std::string arg, const StrList& args);
     ExecuteCommand() = default;
+    ExecuteCommand(const ExecuteCommand&) = delete;
+    ExecuteCommand& operator=(const ExecuteCommand&) = delete;
     ExecuteCommand& operator=(ExecuteCommand&& execute_command) noexcept;
     ~ExecuteCommand();
     bool Execute(const std::string& filename = empty);
@@ -36,34 +44,16 @@ class ExecuteCommand {
     int CleanupHandles();
 
    private:
-    void SetupExecute();
     bool ExecuteToolChainChild();
-    int PipeChildToStdStream(DWORD STD_HANDLE, HANDLE reader_handle);
-    int CreateChildPipes();
-    DWORD ReportExitCode();
-    // Holds the exit code of the
-    // pipe from child process stdout
-    // to parent std out or file
-    std::future<int> child_out_future;
-    // Holds the exit code of the pipe
-    // from child to parent stderr
-    std::future<int> child_err_future;
-    // Holds the exit code of the
-    // command wrapped by this class
-    std::future<DWORD> exit_code_future;
-    std::string ComposeCLI();
-    HANDLE ChildStdOut_Rd;
-    HANDLE ChildStdOut_Wd;
-    HANDLE ChildStdErr_Rd;
-    HANDLE ChildStdErr_Wd;
-    PROCESS_INFORMATION procInfo;
-    STARTUPINFOW startInfo;
-    SECURITY_ATTRIBUTES saAttr;
-    SECURITY_ATTRIBUTES saAttrErr;
+    std::string ComposeCLI() const;
+
+    PROCESS_INFORMATION procInfo{};
+    STARTUPINFOW startInfo{};
+    // Destination for the child's stdout/stderr when Execute() was given a
+    // filename; INVALID_HANDLE_VALUE means "inherit ours"
     HANDLE fileout = INVALID_HANDLE_VALUE;
     bool write_to_file = false;
     bool cpw_initalization_failure = false;
-    bool terminated = false;
     std::string base_command;
     StrList command_args;
 };

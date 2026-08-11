@@ -16,6 +16,7 @@
 *.def
 *.res
 *.rc
+*.dmp
 
 # Vscode 
 /.vscode/

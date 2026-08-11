@@ -12,7 +12,6 @@
 #include <cctype>
 #include <iostream>
 #include <map>
-#include <regex>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -65,8 +64,12 @@ typedef std::vector<std::string> StrList;
 // Environment Helper Methods
 std::string GetSpackEnv(const char* env);
 std::string GetSpackEnv(const std::string& env);
-StrList GetEnvList(const std::string& envVar, const std::string& delim = ";");
+StrList GetEnvList(const char* envVar, const std::string& delim = ";");
 bool ValidateSpackEnv();
+
+// Returns true if command resolves to the running executable, i.e. the
+// wrapper has been pointed at itself and would spawn itself forever
+bool IsSelf(const std::string& command);
 
 // String helper methods adding cxx20 features to cxx14 //
 
@@ -142,43 +145,7 @@ char* findstr(char* search_str, const char* substr, size_t size);
 // side effects on Windows
 void quoteList(StrList& args);
 
-std::string quoteAsNeeded(std::string& str);
-
-/// @brief Searches a sections of a string for a given regex using provided
-///     options to control search behavior
-/// @param searchDomain - string to be searched
-/// @param regex - regex used to search
-/// @param opts - optional argument, list of regex tuning options to adapt the search behavior
-/// @return Character sequence matching search regex
-std::smatch regexSearch(
-    const std::string& searchDomain, const std::string& regex,
-    const std::vector<std::regex_constants::syntax_option_type>& opts = {},
-    const std::vector<std::regex_constants::match_flag_type>& flags = {});
-
-/// @brief Tries to match an entire string to a given regex using provided
-///     options to control match behavior
-/// @param searchDomain - string to be matched
-/// @param regex - regex used to match
-/// @param opts - optional argument, list of regex tuning options to adapt the match behavior
-/// @return Character sequence matching regex
-std::smatch regexMatch(
-    const std::string& searchDomain, const std::string& regex,
-    const std::vector<std::regex_constants::syntax_option_type>& opts = {},
-    const std::vector<std::regex_constants::match_flag_type>& flags = {});
-
-/// @brief Searches a string for a given regex using provided
-///     options to control search behavior, and if found, replaces
-///     discovered string with given replacement string
-/// @param searchDomain - string to be searched
-/// @param regex - regex used to search
-/// @param replacement - string used to replace regex matched result
-/// @param opts - optional argument, list of regex tuning options to adapt the search behavior
-/// @return Character sequence matching search regex
-std::string regexReplace(
-    const std::string& replaceDomain, const std::string& regex,
-    const std::string& replacement,
-    const std::vector<std::regex_constants::syntax_option_type>& opts = {},
-    const std::vector<std::regex_constants::match_flag_type>& flags = {});
+void quoteAsNeeded(std::string& str);
 
 // FS/Path helpers //
 
@@ -278,9 +245,34 @@ DWORD ToLittleEndian(DWORD val);
 
 // Operating Utils //
 
+/**
+ * Returns true if debug reporting is on, either because the wrapper was
+ * invoked with --debug/-d or because SPACK_DEBUG_WRAPPER is set. The
+ * environment is consulted once per process, not once per message.
+ */
+bool DebugEnabled();
+
+// Forces debug reporting on regardless of the environment
+void SetDebug(bool enabled);
+
 void debug(const std::string& dbgStmt);
 
 void debug(char* dbgStmt, int len);
+
+/**
+ * Emits a debug message.
+ *
+ * Always prefer this over calling debug() directly: the wrapper runs once per
+ * compiled source file, and a bare debug() call still pays for building its
+ * message (string concatenation, typeid, whole command lines) even when
+ * reporting is off. This checks first and builds second.
+ */
+#define DEBUG_LOG(dbgStmt)          \
+    do {                            \
+        if (DebugEnabled()) {       \
+            debug(dbgStmt);         \
+        }                           \
+    } while (0)
 
 bool isCommandArg(const std::string& arg, const std::string& command);
 
@@ -408,5 +400,3 @@ class FileIOError : public std::runtime_error {
     FileIOError(char const* const message);
     virtual char const* what() const;
 };
-
-static bool DEBUG = false;

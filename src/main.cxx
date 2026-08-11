@@ -72,7 +72,7 @@ int main(int argc, const char* argv[]) {
             }
             return ExitConditions::SUCCESS;
         }
-        DEBUG = debug;
+        SetDebug(debug);
         std::unique_ptr<LibRename> rpath_lib;
         try {
             if (has_coff) {
