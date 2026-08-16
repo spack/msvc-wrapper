@@ -194,6 +194,61 @@ test_relocate_dll: build_and_check_test_sample
 	.\tester.exe
 	cd ../..
 
+# Test relocating a dll AND its import lib in the same invocation - this
+# is the exact combination Spack's install-time relocation always uses
+# (apply_pe_relocations always passes --full, and adds --coff whenever an
+# import lib is found for the target), but which test_relocate_dll
+# (--coff only) and test_relocate_exe (--full only) never exercise together.
+# Builds its own isolated copy of the sample rather than sharing state
+# with the other relocate tests, so it doesn't depend on run order.
+test_relocate_dll_full:
+	@echo \n
+	@echo -------------------------------------
+	@echo Running Relocate DLL+Full test
+	@echo -------------------------------------
+	mkdir tmp\test\relocate_full
+	xcopy /E test\include tmp\test\relocate_full
+	xcopy /E "test\src file" tmp\test\relocate_full
+	xcopy test\main.cxx tmp\test\relocate_full
+	cd tmp\test\relocate_full
+	copy ..\..\..\cl.exe cl.exe
+	-@ if NOT EXIST "link.exe" mklink link.exe cl.exe
+	-@ if NOT EXIST "relocate.exe" mklink relocate.exe cl.exe
+	cl /c /EHsc "calc.cxx" /DCALC_EXPORTS /DCALC_HEADER="\"calc header/calc.h\"" /I include
+	cl /c /EHsc main.cxx /I include
+	link $(LFLAGS) calc.obj /out:calc.dll /DLL
+	link $(LFLAGS) main.obj calc.lib /out:tester.exe
+	tester.exe
+	mkdir tmp_bin
+	mkdir tmp_lib
+	move calc.dll tmp_bin\calc.dll
+	move calc.lib tmp_lib\calc.lib
+	relocate.exe --pe tmp_bin\calc.dll --full --coff tmp_lib\calc.lib
+	del tester.exe
+	link main.obj tmp_lib\calc.lib /out:tester.exe
+	tester.exe
+	cd ../../..
+
+# Test rsp-driven links - build systems like CMake+Ninja and Meson pass
+# inputs (and sometimes flags) through an rsp file, with paths quoted.
+# The wrapper must still parse the inputs and inject the absolute dll
+# path/id resource; the moved tester only runs if the import library
+# carried the absolute path to calcrsp.dll
+test_rsp_link: build_and_check_test_sample
+	@echo \n
+	@echo ---------------------
+	@echo Running RSP link test
+	@echo ---------------------
+	cd tmp\test
+	echo "calc.obj" /out:calcrsp.dll /implib:calcrsp.lib /DLL > calcrsp.rsp
+	link @calcrsp.rsp
+	link main.obj calcrsp.lib /out:testerrsp.exe
+	cd ..
+	move test\testerrsp.exe .\testerrsp.exe
+	.\testerrsp.exe
+	del testerrsp.exe
+	cd ..
+
 test_pipe_out_overflow: build_and_check_test_sample
 	@echo \n
 	@echo ---------------------------
@@ -330,7 +385,7 @@ test_def_file_name_override:
 test_and_cleanup: test clean-test
 
 
-test: test_wrapper test_relocate_exe test_relocate_dll test_def_file_name_override test_exe_with_exports test_long_paths test_pipe_out_overflow test_pipe_error_overflow
+test: test_wrapper test_relocate_exe test_relocate_dll test_relocate_dll_full test_rsp_link test_def_file_name_override test_exe_with_exports test_long_paths test_pipe_out_overflow test_pipe_error_overflow
 
 
 clean : clean-test clean-cl
